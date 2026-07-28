@@ -1,0 +1,698 @@
+﻿[
+    {
+        "Id":  72,
+        "Name":  "خط تست",
+        "Tag":  "Dizel_TestLine",
+        "Capacity":  1,
+        "Terminal":  1,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  73,
+        "Name":  "D7G",
+        "Tag":  "Dizel_D7G",
+        "Capacity":  1,
+        "Terminal":  1,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  74,
+        "Name":  "باطری خانه",
+        "Tag":  "Dizel_Battery",
+        "Capacity":  1,
+        "Terminal":  1,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  75,
+        "Name":  "دیزل شاپ B1",
+        "Tag":  "Dizel_B1",
+        "Capacity":  1,
+        "Terminal":  1,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  76,
+        "Name":  "دیزل شاپ B2",
+        "Tag":  "Dizel_B2",
+        "Capacity":  1,
+        "Terminal":  1,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  77,
+        "Name":  "دیزل شاپ 1",
+        "Tag":  "Dizel_1",
+        "Capacity":  1,
+        "Terminal":  1,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  78,
+        "Name":  "دیزل شاپ 2",
+        "Tag":  "Dizel_2",
+        "Capacity":  1,
+        "Terminal":  1,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  79,
+        "Name":  "دیزل شاپ 3",
+        "Tag":  "Dizel_3",
+        "Capacity":  1,
+        "Terminal":  1,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  80,
+        "Name":  "دیزل شاپ 4",
+        "Tag":  "Dizel_4",
+        "Capacity":  1,
+        "Terminal":  1,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  81,
+        "Name":  "دیزل شاپ 5",
+        "Tag":  "Dizel_5",
+        "Capacity":  1,
+        "Terminal":  1,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  82,
+        "Name":  "دیزل شاپ 6",
+        "Tag":  "Dizel_6",
+        "Capacity":  1,
+        "Terminal":  1,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  83,
+        "Name":  "دیزل شاپ 7",
+        "Tag":  "Dizel_7",
+        "Capacity":  1,
+        "Terminal":  1,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  84,
+        "Name":  "دیزل شاپ 8",
+        "Tag":  "Dizel_8",
+        "Capacity":  1,
+        "Terminal":  1,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  85,
+        "Name":  "دیزل شاپ 9",
+        "Tag":  "Dizel_9",
+        "Capacity":  1,
+        "Terminal":  1,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  86,
+        "Name":  "دیزل شاپ 10",
+        "Tag":  "Dizel_10",
+        "Capacity":  1,
+        "Terminal":  1,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  87,
+        "Name":  "کارخانه 1",
+        "Tag":  "Dizel_Factory1",
+        "Capacity":  1,
+        "Terminal":  1,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  88,
+        "Name":  "کارخانه 2",
+        "Tag":  "Dizel_Factory2",
+        "Capacity":  1,
+        "Terminal":  1,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  89,
+        "Name":  "کارخانه 3",
+        "Tag":  "Dizel_Factory3",
+        "Capacity":  1,
+        "Terminal":  1,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  90,
+        "Name":  "واگن سازی 1",
+        "Tag":  "Wagon_1",
+        "Capacity":  1,
+        "Terminal":  2,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  91,
+        "Name":  "واگن سازی 2",
+        "Tag":  "Wagon_2",
+        "Capacity":  1,
+        "Terminal":  2,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  92,
+        "Name":  "واگن سازی 3",
+        "Tag":  "Wagon_3",
+        "Capacity":  1,
+        "Terminal":  2,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  93,
+        "Name":  "واگن سازی 4",
+        "Tag":  "Wagon_4",
+        "Capacity":  1,
+        "Terminal":  2,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  94,
+        "Name":  "واگن سازی 5",
+        "Tag":  "Wagon_5",
+        "Capacity":  1,
+        "Terminal":  2,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  95,
+        "Name":  "واگن سازی 6",
+        "Tag":  "Wagon_6",
+        "Capacity":  1,
+        "Terminal":  2,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  96,
+        "Name":  "واگن سازی 7",
+        "Tag":  "Wagon_7",
+        "Capacity":  1,
+        "Terminal":  2,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  97,
+        "Name":  "واگن سازی 8",
+        "Tag":  "Wagon_8",
+        "Capacity":  1,
+        "Terminal":  2,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  98,
+        "Name":  "واگن سازی 9",
+        "Tag":  "Wagon_9",
+        "Capacity":  1,
+        "Terminal":  2,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  99,
+        "Name":  "واگن سازی 10",
+        "Tag":  "Wagon_10",
+        "Capacity":  1,
+        "Terminal":  2,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  100,
+        "Name":  "واگن سازی 11",
+        "Tag":  "Wagon_11",
+        "Capacity":  1,
+        "Terminal":  2,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  101,
+        "Name":  "واگن سازی 12",
+        "Tag":  "Wagon_12",
+        "Capacity":  1,
+        "Terminal":  2,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  102,
+        "Name":  "واگن سازی 13",
+        "Tag":  "Wagon_13",
+        "Capacity":  1,
+        "Terminal":  2,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  103,
+        "Name":  "واگن سازی 14",
+        "Tag":  "Wagon_14",
+        "Capacity":  1,
+        "Terminal":  2,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  104,
+        "Name":  "واگن سازی 15",
+        "Tag":  "Wagon_15",
+        "Capacity":  1,
+        "Terminal":  2,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  105,
+        "Name":  "واگن سازی 16",
+        "Tag":  "Wagon_16",
+        "Capacity":  1,
+        "Terminal":  2,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  106,
+        "Name":  "بادگیری",
+        "Tag":  "Wagon_Badgiri",
+        "Capacity":  1,
+        "Terminal":  2,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  107,
+        "Name":  "خط کور1",
+        "Tag":  "Wagon_CoorLine1",
+        "Capacity":  1,
+        "Terminal":  2,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  108,
+        "Name":  "پارکینگ شمالی 1",
+        "Tag":  "ShParking_1",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  109,
+        "Name":  "پارکینگ شمالی 2",
+        "Tag":  "ShParking_2",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  110,
+        "Name":  "پارکینگ شمالی 3",
+        "Tag":  "ShParking_3",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  111,
+        "Name":  "پارکینگ شمالی 4",
+        "Tag":  "ShParking_4",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  112,
+        "Name":  "پارکینگ شمالی 5",
+        "Tag":  "ShParking_5",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  113,
+        "Name":  "پارکینگ شمالی 6",
+        "Tag":  "ShParking_6",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  114,
+        "Name":  "پارکینگ شمالی 7",
+        "Tag":  "ShParking_7",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  115,
+        "Name":  "پارکینگ شمالی 8",
+        "Tag":  "ShParking_8",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  116,
+        "Name":  "پارکینگ شمالی 9",
+        "Tag":  "ShParking_9",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  117,
+        "Name":  "پارکینگ شمالی 10",
+        "Tag":  "ShParking_10",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  118,
+        "Name":  "پارکینگ شمالی 11",
+        "Tag":  "ShParking_11",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  119,
+        "Name":  "پارکینگ شمالی 12",
+        "Tag":  "ShParking_12",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  120,
+        "Name":  "پارکینگ شمالی 13",
+        "Tag":  "ShParking_13",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  121,
+        "Name":  "پارکینگ شمالی 14",
+        "Tag":  "ShParking_14",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  122,
+        "Name":  "پارکینگ شمالی 15",
+        "Tag":  "ShParking_15",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  123,
+        "Name":  "پارکینگ شمالی 16",
+        "Tag":  "ShParking_16",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  124,
+        "Name":  "پارکینگ شمالی 17",
+        "Tag":  "ShParking_17",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  125,
+        "Name":  "پارکینگ شمالی 18",
+        "Tag":  "ShParking_18",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  126,
+        "Name":  "پارکینگ شمالی 19",
+        "Tag":  "ShParking_19",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  127,
+        "Name":  "پارکینگ شمالی 20",
+        "Tag":  "ShParking_20",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  128,
+        "Name":  "پارکینگ شمالی 21",
+        "Tag":  "ShParking_21",
+        "Capacity":  1,
+        "Terminal":  4,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  129,
+        "Name":  "پارکینگ جنوبی 1",
+        "Tag":  "JParking_1",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  130,
+        "Name":  "پارکینگ جنوبی 2",
+        "Tag":  "JParking_2",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  131,
+        "Name":  "پارکینگ جنوبی 3",
+        "Tag":  "JParking_3",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  132,
+        "Name":  "پارکینگ جنوبی 4",
+        "Tag":  "JParking_4",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  133,
+        "Name":  "پارکینگ جنوبی 5",
+        "Tag":  "JParking_5",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  134,
+        "Name":  "پارکینگ جنوبی 6",
+        "Tag":  "JParking_6",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  135,
+        "Name":  "پارکینگ جنوبی 7",
+        "Tag":  "JParking_7",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  136,
+        "Name":  "پارکینگ جنوبی 8",
+        "Tag":  "JParking_8",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  137,
+        "Name":  "پارکینگ جنوبی 9",
+        "Tag":  "JParking_9",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  138,
+        "Name":  "پارکینگ جنوبی 10",
+        "Tag":  "JParking_10",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  139,
+        "Name":  "پارکینگ جنوبی 11",
+        "Tag":  "JParking_11",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  140,
+        "Name":  "پارکینگ جنوبی 12",
+        "Tag":  "JParking_12",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  141,
+        "Name":  "پارکینگ جنوبی 13",
+        "Tag":  "JParking_13",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  142,
+        "Name":  "پارکینگ جنوبی 14",
+        "Tag":  "JParking_14",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  143,
+        "Name":  "پارکینگ جنوبی 15",
+        "Tag":  "JParking_15",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  144,
+        "Name":  "پارکینگ جنوبی 16",
+        "Tag":  "JParking_16",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  145,
+        "Name":  "پارکینگ جنوبی 17",
+        "Tag":  "JParking_17",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  146,
+        "Name":  "پارکینگ جنوبی 18",
+        "Tag":  "JParking_18",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  147,
+        "Name":  "پارکینگ جنوبی 19",
+        "Tag":  "JParking_19",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  148,
+        "Name":  "پارکینگ جنوبی 20",
+        "Tag":  "JParking_20",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  149,
+        "Name":  "پارکینگ جنوبی 21",
+        "Tag":  "JParking_21",
+        "Capacity":  1,
+        "Terminal":  5,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  150,
+        "Name":  "دوار غربی",
+        "Tag":  "Alt_DavarGarbi",
+        "Capacity":  1,
+        "Terminal":  7,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  151,
+        "Name":  "دوار شرقی",
+        "Tag":  "Alt_DavarShargi",
+        "Capacity":  1,
+        "Terminal":  7,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  152,
+        "Name":  "آبگیری",
+        "Tag":  "Alt_Abgiri",
+        "Capacity":  1,
+        "Terminal":  7,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  153,
+        "Name":  "خط کور2",
+        "Tag":  "Alt_CoorLine2",
+        "Capacity":  1,
+        "Terminal":  7,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  154,
+        "Name":  "متروواش",
+        "Tag":  "Alt_MetroWash",
+        "Capacity":  1,
+        "Terminal":  6,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  155,
+        "Name":  "پیتلاین",
+        "Tag":  "Alt_Pitline",
+        "Capacity":  1,
+        "Terminal":  6,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  156,
+        "Name":  "مجاور سوله",
+        "Tag":  "Alt_MojaverSole",
+        "Capacity":  1,
+        "Terminal":  6,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  157,
+        "Name":  "مجاور مرکز",
+        "Tag":  "Alt_MojaverMarkaz",
+        "Capacity":  1,
+        "Terminal":  6,
+        "IsDynamic":  false
+    },
+    {
+        "Id":  158,
+        "Name":  "خط اصلی",
+        "Tag":  "S_OriginalLine",
+        "Capacity":  100,
+        "Terminal":  3,
+        "IsDynamic":  true
+    }
+]

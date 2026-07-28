@@ -1,0 +1,319 @@
+// Manovr v2 — schema. SQLite for local dev; portable to Postgres (change provider + datasource).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Personnel — پرسنل و حساب‌های کاربری
+model Personnel {
+  id           Int      @id @default(autoincrement())
+  firstName    String
+  lastName     String
+  userName     String?  @unique
+  passwordHash String?
+  role         Int      @default(0) // 0 بدون‌دسترسی، 1 ادمین، 2 مسئول، 3 مشاهده
+  shift        Int      @default(1) // 1=A 2=B 3=C
+  orgPosition  Int      @default(1) // 1 راهبر، 2 مسئول، 3 ادمین، 4 سایر
+  workPlace    Int      @default(1)
+  personnelType Int      @default(1) // 1 = مانور (Maneuver)، 2 = پایانه (Terminal)
+  personnelCode String?  @unique // کد پرسنلی منحصر‌به‌فرد
+  hasAccount   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  // دفتر تلفن
+  phone1      String?
+  phone2      String?
+  internalTel String?
+  address     String?
+  avatarColor String?
+
+  // نقش سفارشی (جایگزین تدریجی role عددی)
+  accessRoleId Int?
+  accessRole   AccessRole? @relation(fields: [accessRoleId], references: [id])
+
+  manovrsAsRahbar1 Manovr[] @relation("Rahbar1")
+  manovrsAsRahbar2 Manovr[] @relation("Rahbar2")
+  manovrsCreated   Manovr[] @relation("Creator")
+  settings         AppSetting[]
+  savedReports     SavedReport[]
+  notifications    Notification[]
+  tickets          Ticket[] @relation("Creator")
+  ticketsAssigned  Ticket[] @relation("Assignee")
+  historyFrom      TicketHistory[] @relation("HistoryFrom")
+  historyTo        TicketHistory[] @relation("HistoryTo")
+
+  @@index([role])
+  @@index([shift])
+}
+
+// AccessRole — نقش سفارشی با مجوزهای ریز
+model AccessRole {
+  id          Int     @id @default(autoincrement())
+  name        String  @unique
+  permissions String  @default("[]") // JSON string[] مثل ["manovr.create","report.export"]
+  isSystem    Boolean @default(false)
+
+  personnel Personnel[]
+}
+
+// AppSetting — تنظیمات سراسری و شخصی (key-value)
+model AppSetting {
+  id     Int    @id @default(autoincrement())
+  scope  String @default("user") // "global" | "user"
+  userId Int?
+  key    String
+  value  String @default("{}") // JSON
+
+  user Personnel? @relation(fields: [userId], references: [id])
+
+  @@unique([scope, userId, key])
+}
+
+// SavedReport — گزارش‌های ذخیره‌شده‌ی کاربر
+model SavedReport {
+  id        Int      @id @default(autoincrement())
+  name      String
+  ownerId   Int
+  isShared  Boolean  @default(false)
+  config    String   @default("{}") // JSON: entity, fields[], filters[], groupBy, chart, sort
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner            Personnel         @relation(fields: [ownerId], references: [id])
+  scheduledReports ScheduledReport[]
+
+  @@index([ownerId])
+}
+
+// Line — خطوط دپو
+model Line {
+  id        Int     @id @default(autoincrement())
+  name      String
+  tag       String?
+  capacity  Int     @default(1)
+  terminal  Int     @default(1) // 1..7
+  isDynamic Boolean @default(false)
+  isActive  Boolean @default(true)
+
+  // مختصات در صحنه‌ی سه‌بعدی پایانه (قابل چیدمان توسط ادمین)
+  posX     Float @default(0)
+  posY     Float @default(0)
+  rotation Float @default(0)
+  length   Float @default(30)
+  sortIdx  Int   @default(0)
+
+  trains          Train[]
+  manovrsFromHere Manovr[] @relation("Source")
+  manovrsToHere   Manovr[] @relation("Destination")
+
+  @@index([terminal])
+}
+
+// Train — قطارها
+model Train {
+  id          Int     @id @default(autoincrement())
+  code        String
+  type        Int     @default(0) // 0=AC مترویی، 1=DC دیزلی
+  isDisposed  Boolean @default(false)
+  lineTag     String?
+  lineId      Int?
+  line        Line?   @relation(fields: [lineId], references: [id])
+  slotIndex   Int     @default(0) // جایگاه پارک روی خط
+  status      Int     @default(1) // 1=آماده به کار/استندبای، 2=در اختیار تعمیرات، 3=غیرفعال، 4=در حال اعزام
+
+  // ویژگی‌های جدید وضعیت فنی قطار
+  hasKafshak  Boolean @default(false) // وجود کفشک
+  noAtp       Boolean @default(false) // عدم ATP
+  movadDavvar String?                 // موعد دوار: "A" | "B" | "C" | null
+  noLicense   Boolean @default(false) // بدون مجوز
+
+  manovrs Manovr[]
+
+  @@index([type])
+  @@index([isDisposed])
+}
+
+// LookupType — نوع مقادیر پویا (مثل «نوع مانور»، «ترمینال»)
+model LookupType {
+  id       Int     @id @default(autoincrement())
+  key      String  @unique // کلید ماشینی مثل "manovrType"
+  label    String // برچسب فارسی مثل «نوع مانور»
+  isSystem Boolean @default(true) // انواع سیستمی حذف نمی‌شوند؛ فقط مقادیرشان ویرایش می‌شود
+
+  values LookupValue[]
+}
+
+// LookupValue — مقادیر هر نوع؛ code همان کدهای عددی قدیمی را حفظ می‌کند
+model LookupValue {
+  id       Int     @id @default(autoincrement())
+  typeId   Int
+  type     LookupType @relation(fields: [typeId], references: [id])
+  code     Int // کد عددی — با کدهای رکوردهای موجود یکسان می‌ماند
+  label    String
+  color    String? // رنگ نشان/نمودار
+  icon     String?
+  isActive Boolean @default(true) // غیرفعال‌سازی نرم به‌جای حذف (تاریخچه ارجاع دارد)
+  sortIdx  Int     @default(0)
+  meta     String  @default("{}") // JSON برای نیازهای خاص
+
+  @@unique([typeId, code])
+  @@index([typeId, isActive])
+}
+
+// Manovr — مانورها
+model Manovr {
+  id                 Int       @id @default(autoincrement())
+  type               Int       // 1..19
+  status             Int       @default(1) // 1 شروع، 2 پایان، 3 حذف
+  confirmationStatus Int       @default(3) // 1 تأیید، 2 رد، 3 بدون
+  description        String?
+  createdAt          DateTime  @default(now())
+  finishedAt         DateTime?
+  executionTime      DateTime  @default(now())
+
+  sourceLineId      Int?
+  sourceLine        Line?      @relation("Source", fields: [sourceLineId], references: [id])
+  destinationLineId Int?
+  destinationLine   Line?      @relation("Destination", fields: [destinationLineId], references: [id])
+
+  trainId Int?
+  train   Train? @relation(fields: [trainId], references: [id])
+
+  rahbar1Id Int?
+  rahbar1   Personnel? @relation("Rahbar1", fields: [rahbar1Id], references: [id])
+  rahbar2Id Int?
+  rahbar2   Personnel? @relation("Rahbar2", fields: [rahbar2Id], references: [id])
+  creatorId Int?
+  creator   Personnel? @relation("Creator", fields: [creatorId], references: [id])
+
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// AuditLog — لاگ تغییرات داده‌ها و تنظیمات
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  actorId   Int?
+  actorName String   // نام اپراتور جهت نگهداری تاریخی
+  entity    String   // نام مدل (مانند "manovr", "train")
+  entityId  Int
+  action    String   // نوع تغییر: "CREATE" | "UPDATE" | "DELETE" | "CONFIRM"
+  changes   String   // تغییرات به صورت JSON string
+  summary   String   // خلاصه فارسی تغییر
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+}
+
+// Notification — اعلان‌های کاربران
+model Notification {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      Personnel @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String    // نوع: "info" | "success" | "warning" | "alert"
+  title     String
+  body      String
+  link      String?   // لینک اختیاری جهت ارجاع مستقیم
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([readAt])
+}
+
+// DashboardLayout — تنظیمات داشبورد
+model DashboardLayout {
+  id        Int      @id @default(autoincrement())
+  scope     String   @default("default") // "default" | "role" | "user"
+  userId    Int?
+  roleId    Int?
+  layout    String   // JSON string
+  updatedAt DateTime @updatedAt
+
+  @@unique([scope, userId, roleId])
+}
+
+// ScheduledReport — گزارش‌های زمان‌بندی شده
+model ScheduledReport {
+  id            Int         @id @default(autoincrement())
+  savedReportId Int
+  savedReport   SavedReport @relation(fields: [savedReportId], references: [id], onDelete: Cascade)
+  cron          String      // فرمت استاندارد کرون
+  format        String      // "excel" | "pdf"
+  recipients    String      // شناسه مخاطبان یا آدرس‌ها
+  outputDir     String      // دایرکتوری ذخیره فایل‌ها
+  isActive      Boolean     @default(true)
+  lastRunAt     DateTime?
+  createdAt     DateTime    @default(now())
+
+  @@index([savedReportId])
+}
+
+// Ticket — تیکت‌ها و درخواست‌های پشتیبانی پرسنل
+model Ticket {
+  id          Int      @id @default(autoincrement())
+  title       String
+  body        String
+  status      String   @default("open") // "open" | "resolved" | "closed"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  creatorId   Int
+  creator     Personnel @relation("Creator", fields: [creatorId], references: [id], onDelete: Cascade)
+  assigneeId  Int?
+  assignee    Personnel? @relation("Assignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  replies     TicketReply[]
+  history     TicketHistory[]
+
+  @@index([creatorId])
+  @@index([assigneeId])
+  @@index([status])
+}
+
+// TicketReply — پاسخ‌های هر تیکت
+model TicketReply {
+  id        Int      @id @default(autoincrement())
+  ticketId  Int
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  body      String
+  userId    Int
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+}
+
+// TicketHistory — تاریخچه گردش کار تیکت
+model TicketHistory {
+  id         Int      @id @default(autoincrement())
+  ticketId   Int
+  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  fromUserId Int?
+  fromUser   Personnel? @relation("HistoryFrom", fields: [fromUserId], references: [id], onDelete: SetNull)
+  toUserId   Int?
+  toUser     Personnel? @relation("HistoryTo", fields: [toUserId], references: [id], onDelete: SetNull)
+  action     String   // "CREATE" | "REASSIGN" | "REPLY" | "STATUS_CHANGE"
+  note       String?  // یادداشت یا توضیح ارجاع
+  createdAt  DateTime @default(now())
+
+  @@index([ticketId])
+}
+
+
+// Backup — نسخه پشتیبان دیتابیس و کدهای برنامه
+model Backup {
+  id         Int      @id @default(autoincrement())
+  filename   String
+  filePath   String
+  fileSize   Int      // حجم بر حسب بایت
+  backupType String   // "manual" | "scheduled"
+  schedule   String?  // "daily" | "weekly" | "monthly"
+  createdAt  DateTime @default(now())
+}
+

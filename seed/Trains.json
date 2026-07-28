@@ -1,0 +1,1554 @@
+﻿[
+    {
+        "Id":  1114482077,
+        "Code":  "123",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  "Dizel_Battery",
+        "Line_Id":  74
+    },
+    {
+        "Id":  1114482078,
+        "Code":  "456",
+        "IsDisposed":  true,
+        "Type":  0,
+        "LineTag":  "Wagon_1",
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482079,
+        "Code":  "121",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482080,
+        "Code":  "122",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482082,
+        "Code":  "124",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482083,
+        "Code":  "125",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482084,
+        "Code":  "126",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482085,
+        "Code":  "127",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482086,
+        "Code":  "128",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482087,
+        "Code":  "129",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482088,
+        "Code":  "130",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482089,
+        "Code":  "131",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482090,
+        "Code":  "132",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482091,
+        "Code":  "133",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482092,
+        "Code":  "134",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482093,
+        "Code":  "135",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  "Wagon_8",
+        "Line_Id":  97
+    },
+    {
+        "Id":  1114482094,
+        "Code":  "136",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482095,
+        "Code":  "137",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482096,
+        "Code":  "138",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482097,
+        "Code":  "139",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482098,
+        "Code":  "140",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482099,
+        "Code":  "141",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482100,
+        "Code":  "142",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482101,
+        "Code":  "143",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482102,
+        "Code":  "144",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482103,
+        "Code":  "145",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482104,
+        "Code":  "146",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482105,
+        "Code":  "147",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482106,
+        "Code":  "148",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482107,
+        "Code":  "149",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482108,
+        "Code":  "150",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482109,
+        "Code":  "151",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482110,
+        "Code":  "152",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482111,
+        "Code":  "301",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482112,
+        "Code":  "302",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482113,
+        "Code":  "303",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482114,
+        "Code":  "304",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482115,
+        "Code":  "305",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482116,
+        "Code":  "306",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482117,
+        "Code":  "307",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482118,
+        "Code":  "308",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482119,
+        "Code":  "309",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482120,
+        "Code":  "310",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482121,
+        "Code":  "311",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482122,
+        "Code":  "312",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482123,
+        "Code":  "313",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482124,
+        "Code":  "314",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482125,
+        "Code":  "315",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482126,
+        "Code":  "316",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482127,
+        "Code":  "317",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482128,
+        "Code":  "318",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482129,
+        "Code":  "319",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482130,
+        "Code":  "320",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482131,
+        "Code":  "321",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482132,
+        "Code":  "322",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482133,
+        "Code":  "323",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482134,
+        "Code":  "324",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482135,
+        "Code":  "325",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482136,
+        "Code":  "326",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482137,
+        "Code":  "327",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482138,
+        "Code":  "328",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482139,
+        "Code":  "329",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482140,
+        "Code":  "330",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482141,
+        "Code":  "501",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482142,
+        "Code":  "502",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482143,
+        "Code":  "503",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482144,
+        "Code":  "504",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482145,
+        "Code":  "505",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482146,
+        "Code":  "506",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482147,
+        "Code":  "507",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482148,
+        "Code":  "508",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482149,
+        "Code":  "509",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482150,
+        "Code":  "510",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482151,
+        "Code":  "511",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482152,
+        "Code":  "512",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482153,
+        "Code":  "513",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482154,
+        "Code":  "514",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482155,
+        "Code":  "515",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  "ShParking_1",
+        "Line_Id":  108
+    },
+    {
+        "Id":  1114482156,
+        "Code":  "516",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482157,
+        "Code":  "517",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482158,
+        "Code":  "518",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482159,
+        "Code":  "519",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482160,
+        "Code":  "520",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482161,
+        "Code":  "521",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482162,
+        "Code":  "522",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482163,
+        "Code":  "523",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482164,
+        "Code":  "524",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482165,
+        "Code":  "525",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482166,
+        "Code":  "526",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482167,
+        "Code":  "527",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482168,
+        "Code":  "528",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482169,
+        "Code":  "529",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482170,
+        "Code":  "530",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482171,
+        "Code":  "331",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482172,
+        "Code":  "332",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482173,
+        "Code":  "333",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482174,
+        "Code":  "334",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482175,
+        "Code":  "335",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482176,
+        "Code":  "336",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482177,
+        "Code":  "337",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482178,
+        "Code":  "338",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482179,
+        "Code":  "339",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482180,
+        "Code":  "340",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482181,
+        "Code":  "341",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482182,
+        "Code":  "350",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482183,
+        "Code":  "342",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482184,
+        "Code":  "343",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482185,
+        "Code":  "344",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482186,
+        "Code":  "345",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482187,
+        "Code":  "346",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482188,
+        "Code":  "347",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482189,
+        "Code":  "348",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482190,
+        "Code":  "349",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482191,
+        "Code":  "531",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482192,
+        "Code":  "532",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482193,
+        "Code":  "533",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482194,
+        "Code":  "534",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482195,
+        "Code":  "535",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482196,
+        "Code":  "536",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482197,
+        "Code":  "537",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482198,
+        "Code":  "538",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482199,
+        "Code":  "539",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482200,
+        "Code":  "540",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482201,
+        "Code":  "541",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482202,
+        "Code":  "542",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482203,
+        "Code":  "543",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482204,
+        "Code":  "544",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482205,
+        "Code":  "545",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482211,
+        "Code":  "401",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482212,
+        "Code":  "402",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482213,
+        "Code":  "403",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482214,
+        "Code":  "404",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482215,
+        "Code":  "701",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482216,
+        "Code":  "702",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482217,
+        "Code":  "703",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482218,
+        "Code":  "704",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482219,
+        "Code":  "705",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482220,
+        "Code":  "706",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482221,
+        "Code":  "707",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482222,
+        "Code":  "708",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482223,
+        "Code":  "709",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482224,
+        "Code":  "710",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482225,
+        "Code":  "711",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482226,
+        "Code":  "712",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482227,
+        "Code":  "713",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482228,
+        "Code":  "714",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482229,
+        "Code":  "715",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482230,
+        "Code":  "716",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482231,
+        "Code":  "101",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482232,
+        "Code":  "102",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482233,
+        "Code":  "103",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482234,
+        "Code":  "104",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  "Wagon_1",
+        "Line_Id":  90
+    },
+    {
+        "Id":  1114482235,
+        "Code":  "105",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482236,
+        "Code":  "106",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482237,
+        "Code":  "107",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482238,
+        "Code":  "108",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482239,
+        "Code":  "109",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482240,
+        "Code":  "110",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482241,
+        "Code":  "111",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482242,
+        "Code":  "112",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482243,
+        "Code":  "113",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482244,
+        "Code":  "114",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482245,
+        "Code":  "115",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482246,
+        "Code":  "116",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482247,
+        "Code":  "117",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482248,
+        "Code":  "118",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482249,
+        "Code":  "119",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482250,
+        "Code":  "120",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482251,
+        "Code":  "201",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482252,
+        "Code":  "202",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482253,
+        "Code":  "203",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482254,
+        "Code":  "204",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482255,
+        "Code":  "205",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482256,
+        "Code":  "206",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482257,
+        "Code":  "207",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482258,
+        "Code":  "208",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482259,
+        "Code":  "209",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482260,
+        "Code":  "210",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482261,
+        "Code":  "211",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482262,
+        "Code":  "212",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482263,
+        "Code":  "213",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482264,
+        "Code":  "214",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482265,
+        "Code":  "215",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482266,
+        "Code":  "216",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482267,
+        "Code":  "217",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482268,
+        "Code":  "218",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482269,
+        "Code":  "219",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482270,
+        "Code":  "220",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482271,
+        "Code":  "221",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482272,
+        "Code":  "222",
+        "IsDisposed":  false,
+        "Type":  1,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482273,
+        "Code":  "LT101",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482274,
+        "Code":  "LT102",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482275,
+        "Code":  "LT103",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    },
+    {
+        "Id":  1114482276,
+        "Code":  "LT104",
+        "IsDisposed":  false,
+        "Type":  0,
+        "LineTag":  null,
+        "Line_Id":  null
+    }
+]

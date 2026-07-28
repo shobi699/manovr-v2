@@ -1,0 +1,17 @@
+{
+  "name": "سیستم مدیریت مانور پایانه فتح‌آباد",
+  "short_name": "مدیریت مانور",
+  "description": "سامانه مدیریت پویای مانور و استقرار قطارهای دپوی فتح‌آباد",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#1f3a5f",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}

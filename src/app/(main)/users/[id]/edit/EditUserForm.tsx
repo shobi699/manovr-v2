@@ -1,0 +1,300 @@
+"use client";
+
+import React, { useActionState, useState } from "react";
+import { useRouter } from "next/navigation";
+import { updateUser, resetPassword } from "@/app/actions/user";
+import { Role, OrgPosition, Shift, PersonnelType } from "@/lib/enums";
+
+type User = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  userName: string | null;
+  role: number;
+  shift: number;
+  orgPosition: number;
+  personnelType: number;
+  personnelCode: string;
+  hasAccount: boolean;
+  accessRoleId: number | null;
+  phone1: string;
+  phone2: string;
+  internalTel: string;
+  address: string;
+  avatarColor: string;
+};
+
+interface LookupItem {
+  code: number;
+  label: string;
+  isActive?: boolean;
+}
+
+export default function EditUserForm({
+  user,
+  roles = [],
+  currentUser,
+  orgPositions = [],
+  shifts = [],
+  systemRoles = [],
+}: {
+  user: User;
+  roles: { id: number; name: string }[];
+  currentUser?: {
+    id: number;
+    shift: number;
+    orgPosition: number;
+    personnelType: number;
+    role: number;
+  } | null;
+  orgPositions?: LookupItem[];
+  shifts?: LookupItem[];
+  systemRoles?: LookupItem[];
+}) {
+  const [state, action, pending] = useActionState(updateUser, null);
+  const [pwState, pwAction, pwPending] = useActionState(resetPassword, null);
+  const [hasAcc, setHasAcc] = useState(user.hasAccount);
+  const router = useRouter();
+  const [avatarCol, setAvatarCol] = useState(user.avatarColor || "#4b5563");
+
+  function getRoleLevel(r: number): number {
+    if (r === 4) return 100; // Super Admin
+    if (r === 1) return 80;  // Admin
+    if (r === 2) return 50;  // Operator
+    if (r === 3) return 30;  // Viewer
+    return 0;                // No Access
+  }
+
+  const actorLevel = getRoleLevel(currentUser?.role ?? 0);
+
+  const isShiftSupervisor = currentUser?.orgPosition === 2;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <form action={action}>
+        <input type="hidden" name="id" value={user.id} />
+        {state?.error && <div className="err">{state.error}</div>}
+
+        <h3 style={{ borderBottom: "1px solid var(--line)", paddingBottom: "6px", fontWeight: "700", marginBottom: "16px" }}>
+          اطلاعات پرسنلی
+        </h3>
+
+        <div className="grid2">
+          <div className="field">
+            <label htmlFor="firstName">نام *</label>
+            <input id="firstName" name="firstName" className="input" defaultValue={user.firstName} required autoFocus />
+          </div>
+          <div className="field">
+            <label htmlFor="lastName">نام خانوادگی *</label>
+            <input id="lastName" name="lastName" className="input" defaultValue={user.lastName} required />
+          </div>
+        </div>
+
+        <div className="grid2">
+          <div className="field">
+            <label htmlFor="personnelCode">کد پرسنلی</label>
+            <input id="personnelCode" name="personnelCode" className="input num" defaultValue={user.personnelCode} placeholder="مثال: ۱۲۳۴۵" />
+          </div>
+          <div className="field" />
+        </div>
+
+        <div className="grid2">
+          <div className="field">
+            <label htmlFor="orgPosition">پست سازمانی</label>
+            <select id="orgPosition" name="orgPosition" className="input" defaultValue={user.orgPosition}>
+              {orgPositions && orgPositions.length > 0
+                ? orgPositions
+                    .filter((o) => o.isActive !== false && (!isShiftSupervisor || (o.code !== 2 && o.code !== 3)))
+                    .map((o) => (
+                      <option key={o.code} value={o.code}>{o.label}</option>
+                    ))
+                : Object.entries(OrgPosition)
+                    .filter(([k]) => !isShiftSupervisor || (k !== "2" && k !== "3"))
+                    .map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))
+              }
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="shift">شیفت</label>
+            {isShiftSupervisor && currentUser ? (
+              <>
+                <input type="hidden" name="shift" value={currentUser.shift} />
+                <select className="input" defaultValue={currentUser.shift} disabled>
+                  {shifts && shifts.length > 0
+                    ? shifts.map((s) => (
+                        <option key={s.code} value={s.code}>{s.label}</option>
+                      ))
+                    : Object.entries(Shift).map(([k, v]) => (
+                        <option key={k} value={k}>{v}</option>
+                      ))
+                  }
+                </select>
+              </>
+            ) : (
+              <select id="shift" name="shift" className="input" defaultValue={user.shift}>
+                {shifts && shifts.length > 0
+                  ? shifts
+                      .filter((s) => s.isActive !== false)
+                      .map((s) => (
+                        <option key={s.code} value={s.code}>{s.label}</option>
+                      ))
+                  : Object.entries(Shift).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))
+                }
+              </select>
+            )}
+          </div>
+        </div>
+
+        <div className="grid2">
+          <div className="field">
+            <label htmlFor="personnelType">نوع پرسنل</label>
+            {isShiftSupervisor && currentUser ? (
+              <>
+                <input type="hidden" name="personnelType" value={currentUser.personnelType} />
+                <select className="input" defaultValue={currentUser.personnelType} disabled>
+                  {Object.entries(PersonnelType).map(([k, v]) => (
+                    <option key={k} value={k}>{v}</option>
+                  ))}
+                </select>
+              </>
+            ) : (
+              <select id="personnelType" name="personnelType" className="input" defaultValue={user.personnelType}>
+                {Object.entries(PersonnelType).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+            )}
+          </div>
+          <div className="field" />
+        </div>
+
+        <h3 style={{ borderBottom: "1px solid var(--line)", paddingBottom: "6px", fontWeight: "700", margin: "20px 0 16px" }}>
+          اطلاعات تماس (دفتر تلفن)
+        </h3>
+
+        <div className="grid2">
+          <div className="field">
+            <label htmlFor="phone1">شماره همراه ۱</label>
+            <input id="phone1" name="phone1" className="input num" defaultValue={user.phone1} />
+          </div>
+          <div className="field">
+            <label htmlFor="phone2">شماره همراه ۲</label>
+            <input id="phone2" name="phone2" className="input num" defaultValue={user.phone2} />
+          </div>
+        </div>
+
+        <div className="grid2">
+          <div className="field">
+            <label htmlFor="internalTel">تلفن داخلی پایانه</label>
+            <input id="internalTel" name="internalTel" className="input num" defaultValue={user.internalTel} />
+          </div>
+          <div className="field">
+            <label htmlFor="avatarColor">رنگ آواتار (Hex/HSL)</label>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <input
+                type="color"
+                value={avatarCol.startsWith("hsl") ? "#d8842a" : avatarCol}
+                onChange={(e) => setAvatarCol(e.target.value)}
+                style={{ width: "40px", height: "40px", padding: 0, border: "0", cursor: "pointer", borderRadius: "4px" }}
+              />
+              <input
+                id="avatarColor"
+                name="avatarColor"
+                type="text"
+                className="input num"
+                value={avatarCol}
+                onChange={(e) => setAvatarCol(e.target.value)}
+                style={{ flex: 1 }}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="field">
+          <label htmlFor="address">آدرس منزل</label>
+          <textarea id="address" name="address" className="input" rows={2} defaultValue={user.address} />
+        </div>
+
+        <h3 style={{ borderBottom: "1px solid var(--line)", paddingBottom: "6px", fontWeight: "700", margin: "20px 0 16px" }}>
+          حساب کاربری و سطوح دسترسی
+        </h3>
+
+        <div className="field">
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              name="hasAccount"
+              value="1"
+              checked={hasAcc}
+              onChange={(e) => setHasAcc(e.target.checked)}
+            />
+            <b>حساب کاربری فعال (دسترسی ورود به نرم‌افزار)</b>
+          </label>
+        </div>
+
+        {hasAcc && (
+          <div style={{ padding: "16px", backgroundColor: "var(--panel-2)", borderRadius: "var(--radius)", marginBottom: "16px" }}>
+            <div className="grid2">
+              <div className="field">
+                <label htmlFor="userName">نام کاربری *</label>
+                <input id="userName" name="userName" className="input" dir="ltr" defaultValue={user.userName ?? ""} required />
+              </div>
+              <div className="field">
+                <label htmlFor="role">نقش سیستمی (پیش‌فرض قدیمی)</label>
+                <select id="role" name="role" className="input" defaultValue={user.role}>
+                  {Object.entries(Role)
+                    .filter(([k]) => k !== "0" && getRoleLevel(Number(k)) < actorLevel)
+                    .map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))}
+                </select>
+              </div>
+            </div>
+            <div className="field" style={{ maxWidth: "320px" }}>
+              <label htmlFor="accessRoleId">نقش سفارشی (سیستم دسترسی جدید V3)</label>
+              <select id="accessRoleId" name="accessRoleId" className="input" defaultValue={user.accessRoleId ?? ""}>
+                <option value="">-- بدون نقش سفارشی (استفاده از نقش سیستمی) --</option>
+                {roles.map((r) => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+          <button className="btn primary" disabled={pending}>
+            {pending ? "در حال ذخیره…" : "ذخیره تغییرات"}
+          </button>
+          <button type="button" className="btn" onClick={() => router.push("/users")}>
+            انصراف
+          </button>
+        </div>
+      </form>
+
+      {user.hasAccount && (
+        <form action={pwAction} style={{ borderTop: "1px solid var(--line)", paddingTop: 20 }}>
+          <input type="hidden" name="id" value={user.id} />
+          <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, marginTop: 0 }}>تغییر رمز عبور</h3>
+          {pwState?.error && <div className="err">{pwState.error}</div>}
+          {pwState?.ok && (
+            <div style={{ background: "var(--good-bg)", color: "var(--good)", padding: "10px 14px", borderRadius: 9, fontSize: 13.5, marginBottom: 14 }}>
+              رمز عبور با موفقیت تغییر کرد.
+            </div>
+          )}
+          <div className="field" style={{ maxWidth: 320 }}>
+            <label htmlFor="password">رمز عبور جدید</label>
+            <input id="password" name="password" type="password" className="input" dir="ltr" />
+          </div>
+          <button className="btn primary sm" disabled={pwPending}>
+            {pwPending ? "در حال تغییر…" : "تغییر رمز"}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}

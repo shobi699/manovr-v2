@@ -1,0 +1,307 @@
+# Plan 011: Bump Next.js to 16.2.12 to clear the reachable high-severity advisories
+
+> **Executor instructions**: Follow this plan step by step. Run every
+> verification command and confirm the expected result before moving to the
+> next step. If anything in the "STOP conditions" section occurs, stop and
+> report — do not improvise. When done, update the status row for this plan
+> in `plans/README.md` — unless a reviewer dispatched you and told you they
+> maintain the index.
+>
+> **Drift check (run first)**: Do NOT use `git diff` for this. This repository
+> has exactly one commit (`3ec213d`) and essentially the entire application
+> lives in uncommitted working-tree state, so a diff against HEAD is
+> meaningless. Instead: open `package.json` and confirm the versions quoted
+> under "Current state" still match. On any mismatch, treat it as a STOP
+> condition.
+
+## Status
+
+- **Priority**: P2
+- **Effort**: S
+- **Risk**: LOW
+- **Depends on**: plans/001-verification-baseline.md
+- **Category**: migration
+- **Planned at**: commit `3ec213d`, 2026-07-29
+
+## Why this matters
+
+`npm audit --omit=dev` reports 13 vulnerabilities: 12 high, 1 moderate. Four of
+them — `next` itself plus its `postcss` and `sharp` dependencies — are cleared
+by a **patch-level** bump from `16.2.10` to `16.2.12`. No API changes, no
+migration, no behavioural risk beyond what any patch release carries.
+
+It is a small, cheap, clean win. This plan does that and nothing else.
+
+It is worth being honest about proportionality: this is an offline Electron
+desktop application serving `http://localhost` to a single operator on terminal
+hardware (`main.js:140-152`). It is not internet-facing. The practical exposure
+from these advisories here is far lower than the same advisories on a public
+deployment. The bump is still worth taking because it costs almost nothing —
+not because the situation is urgent.
+
+## Current state
+
+### `package.json:26-33` and `:44-45` — the pinned versions
+
+```json
+    "next": "16.2.10",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+```
+
+```json
+    "eslint-config-next": "16.2.10",
+```
+
+Note `next` and `eslint-config-next` are pinned **exactly** — no `^` — and they
+are pinned to the same version. Keep both properties: bump them together, keep
+them exact. This is why `npm audit` reports the fix as "outside the stated
+dependency range".
+
+### The current audit output
+
+`npm audit --omit=dev` summary:
+
+```
+13 vulnerabilities (1 moderate, 12 high)
+```
+
+Broken down by what actually fixes each:
+
+| Package | Severity | Fix |
+|---|---|---|
+| `next` | high | `next@16.2.12` — **non-breaking** |
+| `postcss` | high | `next@16.2.12` — **non-breaking** |
+| `sharp` | high | `next@16.2.12` — **non-breaking** |
+| `archiver` | high | `exceljs@3.4.0` — a **downgrade** |
+| `archiver-utils` | high | `exceljs@3.4.0` — a **downgrade** |
+| `brace-expansion` | high | `exceljs@3.4.0` — a **downgrade** |
+| `exceljs` | high | `exceljs@3.4.0` — a **downgrade** |
+| `glob` | high | `exceljs@3.4.0` — a **downgrade** |
+| `minimatch` | high | `exceljs@3.4.0` — a **downgrade** |
+| `readdir-glob` | high | `exceljs@3.4.0` — a **downgrade** |
+| `zip-stream` | high | (transitive of the above) |
+| `rimraf` | high | (transitive of the above) |
+| `uuid` | moderate | `exceljs@3.4.0` — a **downgrade** |
+
+**Nine of the thirteen have no forward fix.** They all sit in `exceljs`'s
+`archiver` → `glob` → `minimatch` dependency chain, and `npm audit fix --force`
+proposes resolving them by installing `exceljs@3.4.0` — an older major than the
+`^4.4.0` currently in use (`package.json:24`). Downgrading a major version of
+the library that generates every Excel export, to satisfy an audit, would be a
+worse outcome than the advisories. **They are explicitly out of scope.**
+
+### What uses `exceljs` and `sharp`
+
+- `exceljs` — `src/lib/export-helpers.ts:1`, used by `generateExcelBuffer`
+  (line 113). Reached from `/api/export/excel` and the scheduler.
+- `sharp` — not imported anywhere in `src/`. It is Next.js's optional image
+  optimisation dependency. Confirm with
+  `grep -rn "sharp" src/ main.js scripts/` → expected: no matches.
+- `postcss` — build-time only, via `@tailwindcss/postcss`
+  (`postcss.config.mjs`).
+
+## Commands you will need
+
+| Purpose   | Command                    | Expected on success |
+|-----------|----------------------------|---------------------|
+| Install   | `npm install`              | exit 0              |
+| Audit     | `npm audit --omit=dev`     | 9 vulnerabilities remaining |
+| Typecheck | `npx tsc --noEmit`         | exit 0              |
+| Lint      | `npm run lint`             | exit 0              |
+| Tests     | `npm run test:run`         | exit 0, all pass    |
+| Build     | `npm run build`            | exit 0              |
+| Dev run   | `npm run dev`              | serves on :3000     |
+
+## Scope
+
+**In scope** (the only files you should modify):
+- `package.json` — the `next` and `eslint-config-next` version strings only
+- `package-lock.json` — regenerated by `npm install`
+
+**Out of scope** (do NOT touch, even though they look related):
+- `exceljs`. Do not downgrade it, do not replace it, do not run
+  `npm audit fix --force` — that command would do exactly this.
+- `react` / `react-dom` at `19.2.4`. Not implicated in any advisory.
+- Any other dependency version. This plan changes two strings.
+- `next.config.ts`. A patch bump requires no config change; if it appears to,
+  that is a STOP condition.
+- Source code. If the bump requires a source change, that is a STOP condition —
+  it would mean this is not the patch release it claims to be.
+
+## Git workflow
+
+- Branch: `advisor/011-bump-nextjs-patch`
+- One commit: `Bump next and eslint-config-next to 16.2.12`.
+- Do NOT push or open a PR unless the operator instructed it.
+
+## Steps
+
+### Step 1: Record the baseline
+
+Before changing anything, capture what "working" looks like so you can tell
+whether the bump broke it:
+
+```bash
+npm run build 2>&1 | tail -20
+npm audit --omit=dev 2>&1 | tail -5
+```
+
+Write both outputs into your report. The build one matters most — if the build
+is already failing for an unrelated reason, you need to know that now rather
+than attributing it to the bump.
+
+**Verify**: `npm run build` exits 0. If it does not, STOP — fix nothing, report
+the pre-existing failure.
+
+> If plan 002 has landed, `npm run build` requires `AUTH_SECRET` to be set in
+> your environment, because `src/lib/auth.ts` throws at import time without it.
+> That is expected. Set it and retry once before treating it as a failure.
+
+### Step 2: Bump both versions together
+
+Edit `package.json`:
+
+- `"next": "16.2.10"` → `"next": "16.2.12"` (line 27, in `dependencies`)
+- `"eslint-config-next": "16.2.10"` → `"eslint-config-next": "16.2.12"`
+  (line 45, in `devDependencies`)
+
+Keep both **exact** — do not add a `^` or `~`. The repo pins these deliberately,
+and an Electron app that ships a pinned build has a good reason to.
+
+Then:
+
+```bash
+npm install
+```
+
+**Verify**:
+- `node -e "const p=require('./package.json');console.log(p.dependencies.next, p.devDependencies['eslint-config-next'])"`
+  → prints `16.2.12 16.2.12`
+- `npm ls next` → shows `next@16.2.12`
+- `git diff --name-only` → lists only `package.json` and `package-lock.json`
+
+### Step 3: Confirm the advisories cleared
+
+```bash
+npm audit --omit=dev
+```
+
+**Verify**: the summary reports **9 vulnerabilities** (8 high, 1 moderate) —
+down from 13. `next`, `postcss`, and `sharp` no longer appear. The remaining
+entries are all in the `exceljs` chain.
+
+If any of those three still appears, or the count is not 9, record the actual
+output and see STOP conditions.
+
+### Step 4: Confirm nothing broke
+
+```bash
+npx tsc --noEmit && npm run lint && npm run test:run && npm run build
+```
+
+**Verify**: all four exit 0. Compare the `npm run build` output against the
+baseline from Step 1 — the route list and output shape should be materially the
+same.
+
+### Step 5: Smoke-test the application
+
+Patch releases are low-risk, not no-risk, and a build passing is not the same as
+the app working. Start the dev server (`npm run dev`), log in, and exercise the
+surfaces most likely to notice a framework bump:
+
+1. `/depot` — the React Three Fiber scene renders (heaviest client bundle)
+2. `/manovrs` — a server component with relations renders its table
+3. Record a manovr — a server action with `redirect()` completes and navigates
+4. `/api/events` — the SSE stream connects and stays open (custom
+   `ReadableStream`, the most framework-coupled code in the repo)
+5. Export a report to Excel and to PDF — the two API routes returning binary
+   `NextResponse` bodies
+
+**Verify**: all five work. Record any difference from before, however small.
+
+(4) and (5) are the ones worth the attention: streaming responses and binary
+route handlers are where framework patch releases occasionally shift behaviour.
+
+### Step 6: Note the deliberate exclusion
+
+Add nothing to the codebase for this — record it in your report and in the
+`plans/README.md` status row:
+
+> 9 advisories remain, all in the `exceljs` → `archiver`/`glob`/`minimatch`
+> chain. `npm audit fix --force` would "resolve" them by downgrading `exceljs`
+> from `^4.4.0` to `3.4.0`, an older major. Deliberately not done. Revisit when
+> `exceljs` publishes a release with an updated `archiver`.
+
+This matters so the next person running `npm audit` knows the remaining count is
+a decision, not an oversight.
+
+## Test plan
+
+- No new tests. This plan changes two version strings; there is no new logic to
+  cover.
+- The existing suite from plans 001–010 is the regression net: `npm run test:run`
+  must pass unchanged.
+- The manual smoke test in Step 5 covers what unit tests cannot — SSE streaming
+  and binary route handlers have no automated coverage in this repo.
+- Verification: `npm run test:run` → exit 0, same pass count as before the bump.
+
+## Done criteria
+
+Machine-checkable. ALL must hold:
+
+- [ ] `node -e "const p=require('./package.json');process.exit(p.dependencies.next==='16.2.12'&&p.devDependencies['eslint-config-next']==='16.2.12'?0:1)"` exits 0
+- [ ] `npm ls next` reports `next@16.2.12`
+- [ ] `npm audit --omit=dev` reports 9 vulnerabilities, and
+      `npm audit --omit=dev 2>&1 | grep -cE "^(next|postcss|sharp)\b"` returns 0
+- [ ] `node -e "const p=require('./package.json');process.exit(p.dependencies.exceljs==='^4.4.0'?0:1)"` exits 0 (exceljs untouched)
+- [ ] `npx tsc --noEmit` exits 0
+- [ ] `npm run lint` exits 0
+- [ ] `npm run test:run` exits 0 with the same pass count as the baseline
+- [ ] `npm run build` exits 0
+- [ ] All five Step 5 smoke checks recorded
+- [ ] `git status --porcelain` lists only `package.json` and `package-lock.json`
+- [ ] `plans/README.md` status row for 011 updated, including the remaining-9 note
+
+## STOP conditions
+
+Stop and report back (do not improvise) if:
+
+- `package.json` no longer pins `next` and `eslint-config-next` to `16.2.10`.
+- `npm run build` fails **before** the bump (Step 1). Report the pre-existing
+  failure; do not fix it here.
+- `npm install` resolves `next` to something other than `16.2.12`, or refuses
+  the version. `16.2.12` was the available patch when this plan was written; if
+  it has been unpublished or superseded, report the available versions rather
+  than picking one.
+- After the bump, `npm audit --omit=dev` still lists `next`, `postcss`, or
+  `sharp`. That means the advisory was not fixed by this release; report the
+  actual output.
+- Typecheck, lint, tests, or build fail after the bump. Revert
+  (`git checkout package.json package-lock.json && npm install`) and report the
+  error. Do not start adapting source code to a patch release.
+- Any Step 5 smoke check behaves differently than before.
+- You find yourself editing a file under `src/`, or `next.config.ts`. Neither
+  should be necessary.
+- You are tempted to run `npm audit fix --force`. It downgrades `exceljs` to an
+  older major. Don't.
+
+## Maintenance notes
+
+- **The remaining 9 advisories are a recorded decision, not a backlog item to
+  clear.** They live in `exceljs`'s `archiver`/`glob`/`minimatch` chain and the
+  only fix `npm` offers is a major downgrade of the library behind every Excel
+  export. Anyone who "cleans up" the audit output by running
+  `npm audit fix --force` will silently downgrade `exceljs` and may break
+  `src/lib/export-helpers.ts:113`. That is the thing for a reviewer to watch.
+- `next` and `eslint-config-next` are pinned exactly and must stay in lockstep —
+  a mismatched pair produces confusing lint failures that look like code
+  problems.
+- `sharp` is pulled in by Next for image optimisation and is not imported
+  anywhere in `src/`. If image optimisation is never used in this Electron
+  deployment, excluding it would shrink the install and remove a recurring
+  advisory source — a reasonable follow-up, and a real investigation rather than
+  a chore, since Next's behaviour without it needs checking.
+- Deferred: a scheduled dependency-review cadence. This repo has no CI
+  (`.github/` does not exist), so nothing will surface the next advisory
+  automatically. Worth its own decision.
