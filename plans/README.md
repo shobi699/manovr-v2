@@ -99,7 +99,7 @@ the same standard as 001–016, with every factual claim checked against the cod
 |---|---|---|
 | 017 | **REJECT — do not execute** | Premise inverted; 6 of 9 named functions do not exist |
 | 018 | **REWRITE** | Warning count off by 2.4×; named functions do not exist; premise already resolved |
-| 019 | **REWRITE** | Right concern, wrong file — cited routes contain zero Prisma calls |
+| 019 | **REWRITTEN** | Was: right concern, wrong file. Now targets the real unbounded query in `report-engine.ts` |
 | 020 | Implemented, **tests are weak** | 7 assertions total; at least one passes for the wrong reason |
 | 021 | **FIXED** — was non-functional | Preload bridge was missing entirely; now wired and guarded by tests |
 | 022 | Implemented | Plausible as written |
@@ -121,12 +121,21 @@ removing `@ts-ignore` from `src/lib/export-helpers.ts` — is **already done**;
 `grep` finds none, and `src/types/third-party.d.ts` now supplies the
 declarations.
 
-**019** claims both export routes "execute unbounded
-`prisma.manovr.findMany({ where, include })`". Both routes contain **zero**
-occurrences of `prisma`; they delegate to `runDynamicReport`. The underlying
-concern is real — `executeReportQuery` in `src/lib/report-engine.ts` is genuinely
-unbounded — but every step targets the wrong file, so the plan cannot be executed
-as written.
+**019 has since been rewritten** (2026-07-29). As originally written it claimed
+both export routes "execute unbounded `prisma.manovr.findMany({ where, include })`".
+Both routes contain **zero** occurrences of `prisma`; they delegate to
+`runDynamicReport`. The underlying concern is real — `executeReportQuery` in
+`src/lib/report-engine.ts` is genuinely unbounded — so the plan was rewritten to
+cap the query at its source. The rewrite also caught a live hazard: a prior
+partial fix (commit `2ce9246`) checks `res.records.length > MAX_EXPORT_RECORDS`
+in the export routes **after** the unbounded fetch has already materialized every
+row, so it prevents the giant buffer but not the heap spike — and the moment a
+`take` cap is added, that length check becomes dead code and exports would
+silently truncate. Two of the four report callers (the scheduler and the report
+builder) have no check at all. The rewritten plan moves the cap into
+`executeReportQuery` with `count` + `take`, returns `{ records, total, truncated }`,
+and makes each caller handle truncation explicitly: export routes refuse,
+on-screen shows a notice, scheduler labels.
 
 **021 has since been fixed** (see below). As originally shipped it did not work:
 `main.js:11` registered
