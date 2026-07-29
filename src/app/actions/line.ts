@@ -18,8 +18,8 @@ export async function createLine(
   fd: FormData
 ): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "line.manage")))
-    return { error: "دسترسی ندارید. فقط ادمین اجازه افزودن خط را دارد." };
+  if (!session || !(await hasPerm(session, "line.create")))
+    return { error: "دسترسی ندارید. فقط نقش‌های دارای مجوز مجاز به افزودن خط هستند." };
 
   const name = String(fd.get("name") ?? "").trim();
   const tag = String(fd.get("tag") ?? "").trim() || null;
@@ -68,8 +68,8 @@ export async function updateLine(
   fd: FormData
 ): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "line.manage")))
-    return { error: "دسترسی ندارید. فقط ادمین اجازه ویرایش خط را دارد." };
+  if (!session || !(await hasPerm(session, "line.edit")))
+    return { error: "دسترسی ندارید. فقط نقش‌های دارای مجوز مجاز به ویرایش خط هستند." };
 
   const id = Number(fd.get("id"));
   const name = String(fd.get("name") ?? "").trim();
@@ -119,7 +119,7 @@ export async function updateLine(
 
 export async function deleteLine(id: number) {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "line.manage"))) return { error: "دسترسی ندارید." };
+  if (!session || !(await hasPerm(session, "line.delete"))) return { error: "دسترسی ندارید." };
 
   const trainCount = await prisma.train.count({ where: { lineId: id } });
   if (trainCount > 0) return { error: "این خط دارای قطار است و قابل حذف نیست." };
@@ -178,8 +178,8 @@ export async function saveLinePositions(positions: { id: number; posX: number; p
 
 export async function toggleLineActive(id: number, active: boolean) {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "line.manage"))) {
-    return { error: "دسترسی ندارید. فقط مدیر یا ادمین اجازه فعال/غیرفعال کردن خط را دارد." };
+  if (!session || !(await hasPerm(session, "line.edit"))) {
+    return { error: "دسترسی ندارید. مجوز فعال/غیرفعال کردن خط وجود ندارد." };
   }
   const before = await prisma.line.findUnique({ where: { id } });
 
@@ -212,8 +212,8 @@ export async function importLinesFromExcel(list: {
   isDynamic?: boolean;
 }[]): Promise<{ error?: string; count?: number }> {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "line.manage"))) {
-    return { error: "دسترسی ندارید. فقط ادمین اجازه بارگذاری خط را دارد." };
+  if (!session || !(await hasPerm(session, "line.create"))) {
+    return { error: "دسترسی ندارید. مجوز بارگذاری خط وجود ندارد." };
   }
 
   let count = 0;

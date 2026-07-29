@@ -96,6 +96,10 @@ interface DepotSceneProps {
   canLayout: boolean;
   canCreateManovr: boolean;
   canManageLines: boolean;
+  canEditKafshak?: boolean;
+  canEditAtp?: boolean;
+  canEditRotary?: boolean;
+  canEditLicense?: boolean;
   prefs: { quality: string; refreshSec: number; defaultTerminal: number; view2DMode?: "grid" | "structured" | "map" };
 }
 
@@ -138,6 +142,10 @@ export default function DepotScene({
   canLayout,
   canCreateManovr,
   canManageLines,
+  canEditKafshak,
+  canEditAtp,
+  canEditRotary,
+  canEditLicense,
   prefs,
 }: DepotSceneProps) {
   const router = useRouter();
@@ -149,7 +157,7 @@ export default function DepotScene({
       let meta: any = {};
       try {
         meta = JSON.parse(t.meta || "{}");
-      } catch {}
+      } catch { }
       map[t.code] = {
         x: typeof meta.x === "number" ? meta.x : 0,
         z: typeof meta.z === "number" ? meta.z : 0,
@@ -169,14 +177,14 @@ export default function DepotScene({
       let meta: any = {};
       try {
         meta = JSON.parse(t.meta || "{}");
-      } catch {}
+      } catch { }
       const colIdx = typeof meta.gridCol === "number" ? meta.gridCol : 1;
       const row = meta.gridRow || "full";
-      
+
       if (!cols[colIdx]) cols[colIdx] = [];
       cols[colIdx].push({ ...t, gridRow: row, metaParsed: meta });
     });
-    
+
     // مرتب‌سازی هر ستون: ابتدا ردیف‌های top، سپس full، سپس bottom
     for (const c in cols) {
       cols[c].sort((a, b) => {
@@ -209,6 +217,8 @@ export default function DepotScene({
   const [manovrRahbar2, setManovrRahbar2] = useState<number | "">("");
   const [manovrType, setManovrType] = useState<number>(2);
   const [manovrDesc, setManovrDesc] = useState<string>("");
+
+  const [successMsg, setSuccessMsg] = useState<string>("");
 
   // فیلدهای جابجایی سریع ادمین
   const [relocateTrainId, setRelocateTrainId] = useState<number | "">("");
@@ -353,12 +363,14 @@ export default function DepotScene({
     if (sourceLineId) fd.append("sourceLineId", String(sourceLineId));
     if (destLineId) fd.append("destinationLineId", String(destLineId));
     fd.append("slotIndex", String(targetSlot));
+    fd.append("noRedirect", "1");
 
     const res = await createManovr(null, fd);
     if (res?.error) {
       alert(res.error);
     } else {
       setShowManovrModal(false);
+      setSuccessMsg("مانور با موفقیت ثبت شد و در سیستم قرار گرفت.");
       router.refresh();
     }
   };
@@ -957,52 +969,52 @@ export default function DepotScene({
                                         style={{ borderBottom: "1px solid var(--line-soft)", height: "38px", cursor: "grab" }}
                                       >
                                         <td style={{ padding: "8px", textAlign: "center" }}>
-                                           {(() => {
-                                             const trStyle = STATUS_STYLE[tr.status] || STATUS_STYLE[1];
-                                             return (
-                                               <div
-                                                 onClick={() => setSelectedTrain(tr)}
-                                                 title={`قطار ${tr.code} (${trStyle.label})${tr.hasKafshak ? " - ⚡ وجود کفشک" : ""}${tr.noAtp ? " - 🚨 عدم ATP" : ""}${tr.movadDavvar ? ` - 🔄 موعد دوار ${tr.movadDavvar}` : ""}${tr.noLicense ? " - 🛑 بدون مجوز" : ""}`}
-                                                 style={{
-                                                   display: "inline-flex",
-                                                   alignItems: "center",
-                                                   justifyContent: "center",
-                                                   gap: "5px",
-                                                   fontWeight: "bold",
-                                                   fontSize: "11px",
-                                                   padding: "3px 8px",
-                                                   borderRadius: "6px",
-                                                   backgroundColor: trStyle.badge,
-                                                   color: "#ffffff",
-                                                   cursor: "pointer",
-                                                   boxShadow: "0 1px 2px rgba(0,0,0,0.15)",
-                                                 }}
-                                                 className="num"
-                                               >
-                                                 <trStyle.IconComp size={11} weight="bold" />
-                                                 <span>{tr.code}</span>
-                                                 {tr.hasKafshak && <span title="وجود کفشک" style={{ fontSize: "10px" }}>⚡</span>}
-                                                 {tr.noAtp && <span title="عدم ATP" style={{ fontSize: "10px" }}>🚨</span>}
-                                                 {tr.movadDavvar && (
-                                                   <span
-                                                     title={`موعد دوّار سطح ${tr.movadDavvar}`}
-                                                     style={{
-                                                       fontSize: "9px",
-                                                       padding: "0 3px",
-                                                       borderRadius: "3px",
-                                                       backgroundColor: tr.movadDavvar === "A" ? "#8b5cf6" : tr.movadDavvar === "B" ? "#14b8a6" : "#f59e0b",
-                                                       color: "#ffffff",
-                                                       lineHeight: "1.2"
-                                                     }}
-                                                   >
-                                                     🔄{tr.movadDavvar}
-                                                   </span>
-                                                 )}
-                                                 {tr.noLicense && <span title="بدون مجوز حرکت" style={{ fontSize: "10px" }}>🛑</span>}
-                                               </div>
-                                             );
-                                           })()}
-                                         </td>
+                                          {(() => {
+                                            const trStyle = STATUS_STYLE[tr.status] || STATUS_STYLE[1];
+                                            return (
+                                              <div
+                                                onClick={() => setSelectedTrain(tr)}
+                                                title={`قطار ${tr.code} (${trStyle.label})${tr.hasKafshak ? " - ⚡ وجود کفشک" : ""}${tr.noAtp ? " - 🚨 عدم ATP" : ""}${tr.movadDavvar ? ` - 🔄 موعد دوار ${tr.movadDavvar}` : ""}${tr.noLicense ? " - 🛑 بدون مجوز" : ""}`}
+                                                style={{
+                                                  display: "inline-flex",
+                                                  alignItems: "center",
+                                                  justifyContent: "center",
+                                                  gap: "5px",
+                                                  fontWeight: "bold",
+                                                  fontSize: "11px",
+                                                  padding: "3px 8px",
+                                                  borderRadius: "6px",
+                                                  backgroundColor: trStyle.badge,
+                                                  color: "#ffffff",
+                                                  cursor: "pointer",
+                                                  boxShadow: "0 1px 2px rgba(0,0,0,0.15)",
+                                                }}
+                                                className="num"
+                                              >
+                                                <trStyle.IconComp size={11} weight="bold" />
+                                                <span>{tr.code}</span>
+                                                {tr.hasKafshak && <span title="وجود کفشک" style={{ fontSize: "10px" }}>⚡</span>}
+                                                {tr.noAtp && <span title="عدم ATP" style={{ fontSize: "10px" }}>🚨</span>}
+                                                {tr.movadDavvar && (
+                                                  <span
+                                                    title={`موعد دوّار سطح ${tr.movadDavvar}`}
+                                                    style={{
+                                                      fontSize: "9px",
+                                                      padding: "0 3px",
+                                                      borderRadius: "3px",
+                                                      backgroundColor: tr.movadDavvar === "A" ? "#8b5cf6" : tr.movadDavvar === "B" ? "#14b8a6" : "#f59e0b",
+                                                      color: "#ffffff",
+                                                      lineHeight: "1.2"
+                                                    }}
+                                                  >
+                                                    🔄{tr.movadDavvar}
+                                                  </span>
+                                                )}
+                                                {tr.noLicense && <span title="بدون مجوز حرکت" style={{ fontSize: "10px" }}>🛑</span>}
+                                              </div>
+                                            );
+                                          })()}
+                                        </td>
                                         <td style={{ padding: "8px", textAlign: "center" }}>{tr.type === 0 ? "AC" : "DC"}</td>
                                         <td style={{ padding: "8px", textAlign: "center" }} className="num">{tr.slotIndex + 1}</td>
                                       </tr>
@@ -1157,7 +1169,7 @@ export default function DepotScene({
     // تابع کمکی تبدیل اسامی انگلیسی/تکنیکال ریل‌ها به اسامی فارسی کاملاً خوانا
     const getPersianLineTitle = (line: LineData) => {
       let text = line.name || line.tag || "";
-      
+
       // جایگزینی الگوهای معروف انگلیسی با اسامی فارسی
       text = text
         .replace(/^Dizel_Factory(\d+)/i, "کارخانه $1")
@@ -2678,7 +2690,7 @@ export default function DepotScene({
         backgroundColor: isFocusMode ? "var(--bg)" : undefined,
       }}
     >
-      
+
       {/* دکمه شناور خروج از تمام‌صفحه */}
       {isFocusMode && (
         <button
@@ -2710,84 +2722,84 @@ export default function DepotScene({
 
       {/* هدر بالایی کنترل صحنه دپو — در حالت تمام‌صفحه مخفی */}
       {!isFocusMode && (
-      <div
-        style={{
-          width: "100%",
-          padding: "8px 16px",
-          backgroundColor: "var(--panel)",
-          borderBottom: "1px solid var(--line)",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          zIndex: 10,
-          boxShadow: "var(--sh-1)",
-        }}
-      >
-        <button
-          className="btn primary sm"
-          onClick={() => setCurrentQuality((prev) => (prev === "2d" ? "high" : "2d"))}
-          style={{ fontWeight: "bold", background: "linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)", color: "#fff" }}
+        <div
+          style={{
+            width: "100%",
+            padding: "8px 16px",
+            backgroundColor: "var(--panel)",
+            borderBottom: "1px solid var(--line)",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            zIndex: 10,
+            boxShadow: "var(--sh-1)",
+          }}
         >
-          {currentQuality === "2d" ? "🖥️ نمای سه‌بعدی دپو" : "📋 نمای دوبعدی (نقشه)"}
-        </button>
-
-        {currentQuality === "2d" && (
-          <div style={{ display: "flex", gap: "4px", backgroundColor: "var(--bg)", padding: "2px 4px", borderRadius: "var(--r-sm)", border: "1px solid var(--line)" }}>
-            <button
-              className={`btn sm ${view2DMode === "structured" ? "primary" : ""}`}
-              onClick={() => setView2DMode("structured")}
-              style={{ fontSize: "11.5px", fontWeight: view2DMode === "structured" ? "bold" : "normal" }}
-            >
-              📐 نمای افقی پایانه (جدید)
-            </button>
-            <button
-              className={`btn sm ${view2DMode === "grid" ? "primary" : ""}`}
-              onClick={() => setView2DMode("grid")}
-              style={{ fontSize: "11.5px", fontWeight: view2DMode === "grid" ? "bold" : "normal" }}
-            >
-              🔲 نمای ۵ ستونه (کلاسیک)
-            </button>
-            <button
-              className={`btn sm ${view2DMode === "map" ? "primary" : ""}`}
-              onClick={() => setView2DMode("map")}
-              style={{ fontSize: "11.5px", fontWeight: view2DMode === "map" ? "bold" : "normal" }}
-            >
-              🗺️ نقشه پایانه
-            </button>
-          </div>
-        )}
-
-        {currentQuality === "2d" && (
           <button
-            className={`btn sm ${isFocusMode ? "accent" : ""}`}
-            onClick={toggleFullscreen}
-            style={{ fontSize: "11.5px", fontWeight: "bold" }}
-            title="ورود/خروج از حالت تمام‌صفحه (Fullscreen)"
+            className="btn primary sm"
+            onClick={() => setCurrentQuality((prev) => (prev === "2d" ? "high" : "2d"))}
+            style={{ fontWeight: "bold", background: "linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)", color: "#fff" }}
           >
-            {isFocusMode ? "👁️ خروج از حالت تمام‌صفحه" : "🖥️ حالت تمام‌صفحه (Fullscreen)"}
+            {currentQuality === "2d" ? "🖥️ نمای سه‌بعدی دپو" : "📋 نمای دوبعدی (نقشه)"}
           </button>
-        )}
 
-        {cameraFocusTarget && currentQuality !== "2d" && (
-          <button
-            className="btn accent"
-            onClick={() => setCameraFocusTarget(null)}
-            style={{ fontWeight: "bold" }}
-          >
-            🏠 نمای کلی پایانه
+          {currentQuality === "2d" && (
+            <div style={{ display: "flex", gap: "4px", backgroundColor: "var(--bg)", padding: "2px 4px", borderRadius: "var(--r-sm)", border: "1px solid var(--line)" }}>
+              <button
+                className={`btn sm ${view2DMode === "structured" ? "primary" : ""}`}
+                onClick={() => setView2DMode("structured")}
+                style={{ fontSize: "11.5px", fontWeight: view2DMode === "structured" ? "bold" : "normal" }}
+              >
+                📐 نمای افقی پایانه (جدید)
+              </button>
+              <button
+                className={`btn sm ${view2DMode === "grid" ? "primary" : ""}`}
+                onClick={() => setView2DMode("grid")}
+                style={{ fontSize: "11.5px", fontWeight: view2DMode === "grid" ? "bold" : "normal" }}
+              >
+                🔲 نمای ۵ ستونه (کلاسیک)
+              </button>
+              <button
+                className={`btn sm ${view2DMode === "map" ? "primary" : ""}`}
+                onClick={() => setView2DMode("map")}
+                style={{ fontSize: "11.5px", fontWeight: view2DMode === "map" ? "bold" : "normal" }}
+              >
+                🗺️ نقشه پایانه
+              </button>
+            </div>
+          )}
+
+          {currentQuality === "2d" && (
+            <button
+              className={`btn sm ${isFocusMode ? "accent" : ""}`}
+              onClick={toggleFullscreen}
+              style={{ fontSize: "11.5px", fontWeight: "bold" }}
+              title="ورود/خروج از حالت تمام‌صفحه (Fullscreen)"
+            >
+              {isFocusMode ? "👁️ خروج از حالت تمام‌صفحه" : "🖥️ حالت تمام‌صفحه (Fullscreen)"}
+            </button>
+          )}
+
+          {cameraFocusTarget && currentQuality !== "2d" && (
+            <button
+              className="btn accent"
+              onClick={() => setCameraFocusTarget(null)}
+              style={{ fontWeight: "bold" }}
+            >
+              🏠 نمای کلی پایانه
+            </button>
+          )}
+
+          <button className="btn" onClick={() => setShowSearch(true)} title="جستجوی سریع (Ctrl+K)">
+            🔍 جستجوی سریع
           </button>
-        )}
 
-        <button className="btn" onClick={() => setShowSearch(true)} title="جستجوی سریع (Ctrl+K)">
-          🔍 جستجوی سریع
-        </button>
-
-        {Object.keys(modifiedPositions).length > 0 && currentQuality !== "2d" && (
-          <button className="btn primary" onClick={handleSaveLayout} disabled={isSavingLayout}>
-            {isSavingLayout ? "در حال ثبت چیدمان..." : "ذخیره نهایی چیدمان ریل‌ها"}
-          </button>
-        )}
-      </div>
+          {Object.keys(modifiedPositions).length > 0 && currentQuality !== "2d" && (
+            <button className="btn primary" onClick={handleSaveLayout} disabled={isSavingLayout}>
+              {isSavingLayout ? "در حال ثبت چیدمان..." : "ذخیره نهایی چیدمان ریل‌ها"}
+            </button>
+          )}
+        </div>
       )}
 
       {/* بدنه اصلی صحنه: سه‌بعدی یا دوبعدی */}
@@ -2978,11 +2990,11 @@ export default function DepotScene({
                 {/* نشان مانور فعال — نقطه‌ی سبز نبضی روی ریل، بدون لیبل متنی */}
                 {activeManovrs.some((m) => m.destinationLineId === line.id) &&
                   hoveredLineId !== line.id && selectedLine?.id !== line.id && (
-                  <mesh position={[0, 1.4, 0]} raycast={() => null}>
-                    <sphereGeometry args={[0.55, 12, 12]} />
-                    <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={2.5} />
-                  </mesh>
-                )}
+                    <mesh position={[0, 1.4, 0]} raycast={() => null}>
+                      <sphereGeometry args={[0.55, 12, 12]} />
+                      <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={2.5} />
+                    </mesh>
+                  )}
               </group>
             );
           })}
@@ -3191,6 +3203,7 @@ export default function DepotScene({
           fd.append("type", String(manovrType));
           fd.append("description", manovrDesc);
           fd.append("executionTime", manovrExecutionTime);
+          fd.append("noRedirect", "1");
 
           startTransition(async () => {
             const res = await createManovr(null, fd);
@@ -3198,6 +3211,7 @@ export default function DepotScene({
               alert(res.error);
             } else {
               setSelectedLine(null);
+              setSuccessMsg("مانور سریع با موفقیت ثبت شد.");
               router.refresh();
             }
           });
@@ -3350,12 +3364,12 @@ export default function DepotScene({
               </div>
 
               <div className="card-body" style={{ padding: "12px 16px", overflowY: "auto", flex: 1, position: "relative" }}>
-                
+
                 {/* تب ۱: قطارهای مستقر */}
                 {activeLineTab === "details" && (
                   <div style={{ display: "flex", flexDirection: "column", gap: "12px", overflow: "visible" }}>
                     <h3 style={{ fontSize: "13px", fontWeight: "bold", margin: "0 0 4px 0" }}>فهرست ناوگان پارک شده:</h3>
-                    
+
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "2px" }}>
                       {lineTrains.length === 0 ? (
                         <div className="muted" style={{ padding: "16px", textAlign: "center", backgroundColor: "var(--panel-2)", borderRadius: "6px", fontSize: "12.5px" }}>
@@ -3401,8 +3415,8 @@ export default function DepotScene({
                                 </div>
                                 <div style={{ fontSize: "11px", color: "var(--ink-soft)" }}>
                                   {tr.status === 2 ? "در اختیار تعمیرات" :
-                                   tr.status === 3 ? "غیرفعال / خارج سرویس" :
-                                   tr.status === 4 ? "در حال اعزام" : "آماده به کار / استندبای"}
+                                    tr.status === 3 ? "غیرفعال / خارج سرویس" :
+                                      tr.status === 4 ? "در حال اعزام" : "آماده به کار / استندبای"}
                                 </div>
                               </div>
 
@@ -3449,69 +3463,77 @@ export default function DepotScene({
                             </div>
 
                             {/* نوار کنترل وضعیت فنی و تجهیزات قطار */}
-                            {canManageLines && (
+                            {(canEditKafshak || canEditAtp || canEditRotary || canEditLicense) && (
                               <div style={{ display: "flex", gap: "6px", alignItems: "center", paddingTop: "6px", borderTop: "1px dashed var(--line)", flexWrap: "wrap" }}>
                                 <span style={{ fontSize: "11px", fontWeight: "600", color: "var(--ink-soft)" }}>تغییر وضعیت فنی:</span>
-                                <button
-                                  type="button"
-                                  className={`btn sm ${tr.hasKafshak ? "accent" : ""}`}
-                                  style={{ fontSize: "10px", padding: "2px 6px", height: "24px" }}
-                                  disabled={isPending}
-                                  onClick={() => {
-                                    startTransition(async () => {
-                                      await updateTrainFlags(tr.id, { hasKafshak: !tr.hasKafshak });
-                                      router.refresh();
-                                    });
-                                  }}
-                                >
-                                  {tr.hasKafshak ? "⚡ کفشک دارد" : "⚡ بدون کفشک"}
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`btn sm ${tr.noAtp ? "danger" : ""}`}
-                                  style={{ fontSize: "10px", padding: "2px 6px", height: "24px" }}
-                                  disabled={isPending}
-                                  onClick={() => {
-                                    startTransition(async () => {
-                                      await updateTrainFlags(tr.id, { noAtp: !tr.noAtp });
-                                      router.refresh();
-                                    });
-                                  }}
-                                >
-                                  {tr.noAtp ? "🚨 عدم ATP" : "✅ ATP دارد"}
-                                </button>
-                                <select
-                                  value={tr.movadDavvar || ""}
-                                  className="input sm"
-                                  style={{ fontSize: "10px", padding: "1px 4px", height: "24px", width: "95px" }}
-                                  disabled={isPending}
-                                  onChange={(e) => {
-                                    const val = e.target.value || null;
-                                    startTransition(async () => {
-                                      await updateTrainFlags(tr.id, { movadDavvar: val });
-                                      router.refresh();
-                                    });
-                                  }}
-                                >
-                                  <option value="">بدون دوّار</option>
-                                  <option value="A">دوار A</option>
-                                  <option value="B">دوار B</option>
-                                  <option value="C">دوار C</option>
-                                </select>
-                                <button
-                                  type="button"
-                                  className={`btn sm ${tr.noLicense ? "danger" : ""}`}
-                                  style={{ fontSize: "10px", padding: "2px 6px", height: "24px" }}
-                                  disabled={isPending}
-                                  onClick={() => {
-                                    startTransition(async () => {
-                                      await updateTrainFlags(tr.id, { noLicense: !tr.noLicense });
-                                      router.refresh();
-                                    });
-                                  }}
-                                >
-                                  {tr.noLicense ? "🛑 بدون مجوز" : "🟢 با مجوز"}
-                                </button>
+                                {canEditKafshak && (
+                                  <button
+                                    type="button"
+                                    className={`btn sm ${tr.hasKafshak ? "accent" : ""}`}
+                                    style={{ fontSize: "10px", padding: "2px 6px", height: "24px" }}
+                                    disabled={isPending}
+                                    onClick={() => {
+                                      startTransition(async () => {
+                                        await updateTrainFlags(tr.id, { hasKafshak: !tr.hasKafshak });
+                                        router.refresh();
+                                      });
+                                    }}
+                                  >
+                                    {tr.hasKafshak ? "⚡ کفشک دارد" : "⚡ بدون کفشک"}
+                                  </button>
+                                )}
+                                {canEditAtp && (
+                                  <button
+                                    type="button"
+                                    className={`btn sm ${tr.noAtp ? "danger" : ""}`}
+                                    style={{ fontSize: "10px", padding: "2px 6px", height: "24px" }}
+                                    disabled={isPending}
+                                    onClick={() => {
+                                      startTransition(async () => {
+                                        await updateTrainFlags(tr.id, { noAtp: !tr.noAtp });
+                                        router.refresh();
+                                      });
+                                    }}
+                                  >
+                                    {tr.noAtp ? "🚨 عدم ATP" : "✅ ATP دارد"}
+                                  </button>
+                                )}
+                                {canEditRotary && (
+                                  <select
+                                    value={tr.movadDavvar || ""}
+                                    className="input sm"
+                                    style={{ fontSize: "10px", padding: "1px 4px", height: "24px", width: "95px" }}
+                                    disabled={isPending}
+                                    onChange={(e) => {
+                                      const val = e.target.value || null;
+                                      startTransition(async () => {
+                                        await updateTrainFlags(tr.id, { movadDavvar: val });
+                                        router.refresh();
+                                      });
+                                    }}
+                                  >
+                                    <option value="">بدون دوّار</option>
+                                    <option value="A">دوار A</option>
+                                    <option value="B">دوار B</option>
+                                    <option value="C">دوار C</option>
+                                  </select>
+                                )}
+                                {canEditLicense && (
+                                  <button
+                                    type="button"
+                                    className={`btn sm ${tr.noLicense ? "danger" : ""}`}
+                                    style={{ fontSize: "10px", padding: "2px 6px", height: "24px" }}
+                                    disabled={isPending}
+                                    onClick={() => {
+                                      startTransition(async () => {
+                                        await updateTrainFlags(tr.id, { noLicense: !tr.noLicense });
+                                        router.refresh();
+                                      });
+                                    }}
+                                  >
+                                    {tr.noLicense ? "🛑 بدون مجوز" : "🟢 با مجوز"}
+                                  </button>
+                                )}
                               </div>
                             )}
                           </div>
@@ -3530,7 +3552,7 @@ export default function DepotScene({
                             const trId = Number(fd.get("newTrainId"));
                             const slot = Number(fd.get("newSlotIdx"));
                             if (!trId) return alert("لطفاً قطار را انتخاب کنید.");
-                            
+
                             startTransition(async () => {
                               const res = await relocateTrainDirectly(trId, selectedLine.id, slot);
                               if (res.error) {
@@ -4070,6 +4092,43 @@ export default function DepotScene({
                   </span>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* مودال پیام موفقیت */}
+      {successMsg && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(15,23,42,0.6)",
+            backdropFilter: "blur(6px)",
+            zIndex: 100000,
+            display: "grid",
+            placeItems: "center",
+          }}
+        >
+          <div className="card" style={{ width: "350px", backgroundColor: "var(--panel)", textAlign: "center" }}>
+            <div className="card-head" style={{ justifyContent: "center" }}>
+              <h2 style={{ color: "var(--ok)", display: "flex", alignItems: "center", gap: "8px", justifyContent: "center", width: "100%" }}>
+                <span>✅</span> عملیات موفق
+              </h2>
+            </div>
+            <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: "20px", alignItems: "center", padding: "24px 20px" }}>
+              <p style={{ fontSize: "15px", lineHeight: "1.6" }}>{successMsg}</p>
+              <button
+                className="btn primary"
+                onClick={() => setSuccessMsg("")}
+                style={{ width: "100%", padding: "10px", fontWeight: "bold" }}
+                autoFocus
+              >
+                تایید و ادامه کار
+              </button>
             </div>
           </div>
         </div>

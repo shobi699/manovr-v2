@@ -11,6 +11,8 @@ export default function RolesFormClient({
   allPerms = [],
   permLabels = {},
   isSystem = false,
+  canEdit = true,
+  canDelete = true,
 }: {
   mode: "create" | "edit";
   roleId?: number;
@@ -19,6 +21,8 @@ export default function RolesFormClient({
   allPerms: readonly string[];
   permLabels: Record<string, string>;
   isSystem?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState(roleName);
@@ -31,6 +35,104 @@ export default function RolesFormClient({
       prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm]
     );
   };
+
+  const groupedPerms = React.useMemo(() => {
+    const groups: Record<string, string[]> = {};
+    allPerms.forEach((perm) => {
+      const category = perm.split(".")[0];
+      if (!groups[category]) groups[category] = [];
+      groups[category].push(perm);
+    });
+    return groups;
+  }, [allPerms]);
+
+  const toggleCategory = (category: string, perms: string[]) => {
+    const allSelected = perms.every((p) => selectedPerms.includes(p));
+    if (allSelected) {
+      setSelectedPerms((prev) => prev.filter((p) => !perms.includes(p)));
+    } else {
+      setSelectedPerms((prev) => Array.from(new Set([...prev, ...perms])));
+    }
+  };
+
+  const renderPermsList = (maxHeight = "350px") => (
+    <div
+      style={{
+        maxHeight,
+        overflowY: "auto",
+        border: "1px solid var(--line)",
+        borderRadius: "9px",
+        padding: "10px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "12px",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "8px", borderBottom: "1px solid var(--line-soft)" }}>
+        <label style={{ fontSize: "13px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center" }}>
+          <input
+            type="checkbox"
+            checked={selectedPerms.length === allPerms.length && allPerms.length > 0}
+            onChange={(e) => {
+              if (e.target.checked) {
+                setSelectedPerms([...allPerms]);
+              } else {
+                setSelectedPerms([]);
+              }
+            }}
+            style={{ accentColor: "var(--accent)", marginInlineEnd: "8px" }}
+          />
+          انتخاب همه
+        </label>
+        <span className="muted" style={{ fontSize: "12px" }}>
+          {selectedPerms.length} / {allPerms.length} دسترسی
+        </span>
+      </div>
+      {Object.entries(groupedPerms).map(([category, perms]) => {
+        const allCategorySelected = perms.every((p) => selectedPerms.includes(p));
+        const someCategorySelected = perms.some((p) => selectedPerms.includes(p)) && !allCategorySelected;
+
+        return (
+          <div key={category} style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "8px", backgroundColor: "var(--panel)", borderRadius: "6px" }}>
+            <label style={{ fontSize: "13px", fontWeight: "bold", display: "flex", alignItems: "center", cursor: "pointer", borderBottom: "1px solid var(--line-soft)", paddingBottom: "4px" }}>
+              <input
+                type="checkbox"
+                checked={allCategorySelected}
+                ref={(el) => {
+                  if (el) el.indeterminate = someCategorySelected;
+                }}
+                onChange={() => toggleCategory(category, perms)}
+                style={{ accentColor: "var(--accent)", marginInlineEnd: "8px" }}
+              />
+              {category.toUpperCase()}
+            </label>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", paddingInlineStart: "24px" }}>
+              {perms.map((perm) => (
+                <label
+                  key={perm}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedPerms.includes(perm)}
+                    onChange={() => handleTogglePerm(perm)}
+                    style={{ accentColor: "var(--accent)" }}
+                  />
+                  <span style={{ minWidth: "120px" }}><b>{perm}</b></span> <span className="muted">· {permLabels[perm] || perm}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,39 +186,7 @@ export default function RolesFormClient({
 
         <div className="field">
           <label style={{ marginBottom: "8px" }}>مجوزها و دسترسی‌ها</label>
-          <div
-            style={{
-              maxHeight: "300px",
-              overflowY: "auto",
-              border: "1px solid var(--line)",
-              borderRadius: "9px",
-              padding: "10px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "8px",
-            }}
-          >
-            {allPerms.map((perm) => (
-              <label
-                key={perm}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  fontSize: "13px",
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedPerms.includes(perm)}
-                  onChange={() => handleTogglePerm(perm)}
-                  style={{ accentColor: "var(--accent)" }}
-                />
-                <b>{perm}</b> · {permLabels[perm] || perm}
-              </label>
-            ))}
-          </div>
+          {renderPermsList("300px")}
         </div>
 
         <button type="submit" className="btn primary" style={{ width: "100%" }} disabled={isPending}>
@@ -128,10 +198,12 @@ export default function RolesFormClient({
 
   return (
     <>
-      <button className="btn sm" onClick={() => setIsOpen(true)}>
-        ویرایش نقش
-      </button>
-      {!isSystem && (
+      {canEdit && (
+        <button className="btn sm" onClick={() => setIsOpen(true)}>
+          ویرایش نقش
+        </button>
+      )}
+      {canDelete && !isSystem && (
         <button className="btn sm" style={{ color: "var(--crit)", borderColor: "var(--crit)" }} onClick={handleDelete} disabled={isPending}>
           حذف
         </button>
@@ -190,39 +262,7 @@ export default function RolesFormClient({
 
                 <div className="field">
                   <label style={{ marginBottom: "8px" }}>مجوزها و دسترسی‌ها</label>
-                  <div
-                    style={{
-                      maxHeight: "350px",
-                      overflowY: "auto",
-                      border: "1px solid var(--line)",
-                      borderRadius: "9px",
-                      padding: "10px",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "8px",
-                    }}
-                  >
-                    {allPerms.map((perm) => (
-                      <label
-                        key={perm}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          fontSize: "13px",
-                          cursor: "pointer",
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedPerms.includes(perm)}
-                          onChange={() => handleTogglePerm(perm)}
-                          style={{ accentColor: "var(--accent)" }}
-                        />
-                        <b>{perm}</b> · {permLabels[perm] || perm}
-                      </label>
-                    ))}
-                  </div>
+                  {renderPermsList("350px")}
                 </div>
 
                 <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>

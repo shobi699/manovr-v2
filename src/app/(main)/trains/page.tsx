@@ -16,7 +16,14 @@ export default async function TrainsPage({
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const session = await getSession();
-  const canManage = session ? await hasPerm(session, "train.manage") : false;
+  const canCreate = session ? await hasPerm(session, "train.create") : false;
+  const canEdit = session ? await hasPerm(session, "train.edit") : false;
+  const canDelete = session ? await hasPerm(session, "train.delete") : false;
+
+  const canEditKafshak = session ? await hasPerm(session, "train.status.kafshak") : false;
+  const canEditAtp = session ? await hasPerm(session, "train.status.atp") : false;
+  const canEditRotary = session ? await hasPerm(session, "train.status.rotary") : false;
+  const canEditLicense = session ? await hasPerm(session, "train.status.license") : false;
 
   const resolvedParams = (await searchParams) || {};
   const params = parseListParams(resolvedParams, ALLOWED_SORT);
@@ -105,7 +112,7 @@ export default async function TrainsPage({
       <div className="topbar">
         <h1>مدیریت قطارها</h1>
         <span className="spacer" />
-        {canManage && <Link href="/trains/new" className="btn accent sm">+ افزودن قطار</Link>}
+        {canCreate && <Link href="/trains/new" className="btn accent sm">+ افزودن قطار</Link>}
       </div>
       <div className="content">
         <div className="tiles">
@@ -122,7 +129,13 @@ export default async function TrainsPage({
           params={params}
           allLines={allLines}
           trainTypes={trainTypes}
-          canManage={canManage}
+          canCreate={canCreate}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          canEditKafshak={canEditKafshak}
+          canEditAtp={canEditAtp}
+          canEditRotary={canEditRotary}
+          canEditLicense={canEditLicense}
         />
       </div>
     </>

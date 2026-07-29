@@ -22,7 +22,7 @@ export default async function NewUserPage() {
     getCachedLookup("role"),
   ]);
 
-  const hasManagePerm = await hasPerm(session, "user.manage");
+  const hasManagePerm = await hasPerm(session, "user.create");
   const isShiftSupervisor = currentUser?.orgPosition === ORG_POSITIONS.RESPONSIBLE;
 
   if (!hasManagePerm && !isShiftSupervisor) redirect("/users");

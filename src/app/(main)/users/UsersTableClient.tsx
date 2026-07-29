@@ -19,7 +19,9 @@ interface UsersTableClientProps {
   nonAccounts: any[];
   totalRows?: number;
   params?: ListParams;
-  canManage: boolean;
+  canCreate: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
   currentUserId: number;
   isShiftSupervisor?: boolean;
   todayManeuvers?: any[];
@@ -33,7 +35,9 @@ export default function UsersTableClient({
   nonAccounts,
   totalRows = 0,
   params,
-  canManage,
+  canCreate,
+  canEdit,
+  canDelete,
   currentUserId,
   isShiftSupervisor = false,
   todayManeuvers = [],
@@ -66,7 +70,7 @@ export default function UsersTableClient({
   const [filterRole, setFilterRole] = useState<string>("all");
 
   const userBulkActions: BulkAction<any>[] = useMemo(() => {
-    if (!canManage) return [];
+    if (!canEdit && !canDelete) return [];
 
     return [
       {
@@ -138,7 +142,7 @@ export default function UsersTableClient({
         },
       },
     ];
-  }, [canManage, router]);
+  }, [canEdit, canDelete, router]);
 
   // استخراج تمام نقش‌های متمایز موجود در حساب‌ها برای نمایش در دراپ‌داون فیلتر
   const uniqueRoles = React.useMemo(() => {
@@ -376,12 +380,12 @@ export default function UsersTableClient({
         <span className="pill p-mut">{PersonnelType[p.personnelType] ?? "—"}</span>
       ),
     },
-    ...(canManage
+    ...((canEdit || canDelete)
       ? [
           {
             key: "actions",
             label: "عملیات",
-            render: (p: any) => <UserRowActions id={p.id} currentUserId={currentUserId} />,
+            render: (p: any) => <UserRowActions id={p.id} currentUserId={currentUserId} canEdit={canEdit} canDelete={canDelete} />,
           },
         ]
       : []),
@@ -400,12 +404,12 @@ export default function UsersTableClient({
         <span className="pill p-mut">{PersonnelType[p.personnelType] ?? "—"}</span>
       ),
     },
-    ...(canManage
+    ...((canEdit || canDelete)
       ? [
           {
             key: "actions",
             label: "عملیات",
-            render: (p: any) => <UserRowActions id={p.id} currentUserId={currentUserId} />,
+            render: (p: any) => <UserRowActions id={p.id} currentUserId={currentUserId} canEdit={canEdit} canDelete={canDelete} />,
           },
         ]
       : []),
@@ -478,7 +482,7 @@ export default function UsersTableClient({
 
       {activeTab === "personnel" ? (
         <>
-          {canManage && (
+          {canCreate && (
             <div style={{ display: "flex", gap: "10px", marginBottom: "16px", flexWrap: "wrap", alignItems: "center" }}>
               <button onClick={handleExportExcel} className="btn secondary sm">
                 📥 خروجی اکسل

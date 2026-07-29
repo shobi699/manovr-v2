@@ -26,7 +26,7 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
 
   if (!user) notFound();
 
-  const hasManagePerm = await hasPerm(session, "user.manage");
+  const hasManagePerm = await hasPerm(session, "user.edit");
   const isShiftSupervisor = currentUser?.orgPosition === ORG_POSITIONS.RESPONSIBLE;
 
   if (!hasManagePerm && !isShiftSupervisor) redirect("/users");

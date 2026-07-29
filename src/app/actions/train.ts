@@ -12,18 +12,23 @@ export async function createTrain(
   fd: FormData
 ): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "train.manage")))
-    return { error: "دسترسی ندارید. فقط ادمین اجازه افزودن قطار را دارد." };
+  if (!session || !(await hasPerm(session, "train.create")))
+    return { error: "دسترسی ندارید. فقط نقش‌های دارای مجوز مجاز به افزودن قطار هستند." };
 
   const code = String(fd.get("code") ?? "").trim();
   const type = Number(fd.get("type"));
   const lineId = fd.get("lineId") ? Number(fd.get("lineId")) : null;
   const slotIndex = fd.get("slotIndex") ? Number(fd.get("slotIndex")) : 0;
-  const hasKafshak = fd.get("hasKafshak") === "1";
-  const noAtp = fd.get("noAtp") === "1";
+  let hasKafshak = fd.get("hasKafshak") === "1";
+  let noAtp = fd.get("noAtp") === "1";
   const movadDavvarRaw = String(fd.get("movadDavvar") ?? "").trim();
-  const movadDavvar = ["A", "B", "C"].includes(movadDavvarRaw) ? movadDavvarRaw : null;
-  const noLicense = fd.get("noLicense") === "1";
+  let movadDavvar = ["A", "B", "C"].includes(movadDavvarRaw) ? movadDavvarRaw : null;
+  let noLicense = fd.get("noLicense") === "1";
+
+  if (!(await hasPerm(session, "train.status.kafshak"))) hasKafshak = false;
+  if (!(await hasPerm(session, "train.status.atp"))) noAtp = false;
+  if (!(await hasPerm(session, "train.status.rotary"))) movadDavvar = null;
+  if (!(await hasPerm(session, "train.status.license"))) noLicense = false;
 
   if (!code) return { error: "کد قطار الزامی است." };
   if (isNaN(type)) return { error: "نوع قطار را انتخاب کنید." };
@@ -56,8 +61,8 @@ export async function updateTrain(
   fd: FormData
 ): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "train.manage")))
-    return { error: "دسترسی ندارید. فقط ادمین اجازه ویرایش قطار را دارد." };
+  if (!session || !(await hasPerm(session, "train.edit")))
+    return { error: "دسترسی ندارید. فقط نقش‌های دارای مجوز مجاز به ویرایش قطار هستند." };
 
   const id = Number(fd.get("id"));
   const code = String(fd.get("code") ?? "").trim();
@@ -65,18 +70,24 @@ export async function updateTrain(
   const lineId = fd.get("lineId") ? Number(fd.get("lineId")) : null;
   const slotIndex = fd.get("slotIndex") ? Number(fd.get("slotIndex")) : undefined;
   const isDisposed = fd.get("isDisposed") === "1";
-  const hasKafshak = fd.get("hasKafshak") === "1";
-  const noAtp = fd.get("noAtp") === "1";
+  const before = await prisma.train.findUnique({ where: { id } });
+  if (!before) return { error: "قطار یافت نشد." };
+
+  let hasKafshak = fd.get("hasKafshak") === "1";
+  let noAtp = fd.get("noAtp") === "1";
   const movadDavvarRaw = String(fd.get("movadDavvar") ?? "").trim();
-  const movadDavvar = ["A", "B", "C"].includes(movadDavvarRaw) ? movadDavvarRaw : null;
-  const noLicense = fd.get("noLicense") === "1";
+  let movadDavvar = ["A", "B", "C"].includes(movadDavvarRaw) ? movadDavvarRaw : null;
+  let noLicense = fd.get("noLicense") === "1";
+
+  if (!(await hasPerm(session, "train.status.kafshak"))) hasKafshak = before.hasKafshak;
+  if (!(await hasPerm(session, "train.status.atp"))) noAtp = before.noAtp;
+  if (!(await hasPerm(session, "train.status.rotary"))) movadDavvar = before.movadDavvar;
+  if (!(await hasPerm(session, "train.status.license"))) noLicense = before.noLicense;
 
   if (!code) return { error: "کد قطار الزامی است." };
 
   const dup = await prisma.train.findFirst({ where: { code, NOT: { id } } });
   if (dup) return { error: "قطاری با این کد وجود دارد." };
-
-  const before = await prisma.train.findUnique({ where: { id } });
   const after = await prisma.train.update({
     where: { id },
     data: { code, type, lineId, slotIndex, isDisposed, hasKafshak, noAtp, movadDavvar, noLicense },
@@ -100,7 +111,7 @@ export async function updateTrain(
 
 export async function deleteTrain(id: number) {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "train.manage"))) return { error: "دسترسی ندارید." };
+  if (!session || !(await hasPerm(session, "train.delete"))) return { error: "دسترسی ندارید." };
 
   const before = await prisma.train.findUnique({ where: { id } });
   const hasManovr = await prisma.manovr.count({ where: { trainId: id } });
@@ -141,7 +152,7 @@ export async function relocateTrainDirectly(
   slotIndex: number
 ) {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "train.manage"))) {
+  if (!session || !(await hasPerm(session, "train.edit"))) {
     return { error: "دسترسی ندارید." };
   }
 
@@ -173,8 +184,8 @@ export async function relocateTrainDirectly(
 
 export async function updateTrainStatus(trainId: number, status: number) {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "train.manage"))) {
-    return { error: "دسترسی ندارید. فقط ادمین اجازه تغییر وضعیت قطار را دارد." };
+  if (!session || !(await hasPerm(session, "train.edit"))) {
+    return { error: "دسترسی ندارید. مجوز تغییر وضعیت قطار وجود ندارد." };
   }
 
   try {
@@ -211,8 +222,8 @@ export async function importTrainsFromExcel(list: {
   slotIndex?: number;
 }[]): Promise<{ error?: string; count?: number }> {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "train.manage"))) {
-    return { error: "دسترسی ندارید. فقط ادمین اجازه بارگذاری قطار را دارد." };
+  if (!session || !(await hasPerm(session, "train.create"))) {
+    return { error: "دسترسی ندارید. مجوز بارگذاری قطار وجود ندارد." };
   }
 
   let count = 0;
@@ -258,8 +269,20 @@ export async function updateTrainFlags(
   }
 ) {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "train.manage"))) {
-    return { error: "دسترسی ندارید. فقط ادمین اجازه تغییر وضعیت قطار را دارد." };
+  if (!session) {
+    return { error: "دسترسی ندارید." };
+  }
+  if (flags.hasKafshak !== undefined && !(await hasPerm(session, "train.status.kafshak"))) {
+    return { error: "شما مجوز تغییر وضعیت کفشک را ندارید." };
+  }
+  if (flags.noAtp !== undefined && !(await hasPerm(session, "train.status.atp"))) {
+    return { error: "شما مجوز تغییر وضعیت ATP را ندارید." };
+  }
+  if (flags.movadDavvar !== undefined && !(await hasPerm(session, "train.status.rotary"))) {
+    return { error: "شما مجوز تغییر موعد دوار را ندارید." };
+  }
+  if (flags.noLicense !== undefined && !(await hasPerm(session, "train.status.license"))) {
+    return { error: "شما مجوز تغییر وضعیت مجوز قطار را ندارید." };
   }
 
   try {
@@ -290,8 +313,8 @@ export async function updateTrainFlags(
 
 export async function bulkUpdateTrainStatus(ids: number[], status: number) {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "train.manage"))) {
-    return { error: "دسترسی ندارید. فقط ادمین یا مسئول شیفت اجازه تغییر وضعیت دسته‌جمعی قطارها را دارد." };
+  if (!session || !(await hasPerm(session, "train.edit"))) {
+    return { error: "دسترسی ندارید. مجوز تغییر وضعیت قطارها را ندارید." };
   }
 
   try {
@@ -329,8 +352,20 @@ export async function bulkUpdateTrainFlags(
   }
 ) {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "train.manage"))) {
-    return { error: "دسترسی ندارید. فقط ادمین اجازه تغییر وضعیت فنی دسته‌جمعی را دارد." };
+  if (!session) {
+    return { error: "دسترسی ندارید." };
+  }
+  if (flags.hasKafshak !== undefined && !(await hasPerm(session, "train.status.kafshak"))) {
+    return { error: "شما مجوز تغییر وضعیت کفشک را ندارید." };
+  }
+  if (flags.noAtp !== undefined && !(await hasPerm(session, "train.status.atp"))) {
+    return { error: "شما مجوز تغییر وضعیت ATP را ندارید." };
+  }
+  if (flags.movadDavvar !== undefined && !(await hasPerm(session, "train.status.rotary"))) {
+    return { error: "شما مجوز تغییر موعد دوار را ندارید." };
+  }
+  if (flags.noLicense !== undefined && !(await hasPerm(session, "train.status.license"))) {
+    return { error: "شما مجوز تغییر وضعیت مجوز قطار را ندارید." };
   }
 
   try {
@@ -360,8 +395,8 @@ export async function bulkUpdateTrainFlags(
 
 export async function bulkToggleTrainDisposed(ids: number[], isDisposed: boolean) {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "train.manage"))) {
-    return { error: "دسترسی ندارید. فقط ادمین اجازه تغییر وضعیت سیستم قطارها را دارد." };
+  if (!session || !(await hasPerm(session, "train.delete"))) {
+    return { error: "دسترسی ندارید. مجوز تغییر وضعیت سیستم قطارها را ندارید." };
   }
 
   try {

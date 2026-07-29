@@ -28,7 +28,7 @@ export async function createUser(
   const currentUser = await prisma.personnel.findUnique({
     where: { id: session.id },
   });
-  const hasManagePerm = await hasPerm(session, "user.manage");
+  const hasManagePerm = await hasPerm(session, "user.create");
   const isShiftSupervisor = currentUser?.orgPosition === ORG_POSITIONS.RESPONSIBLE;
 
   if (!hasManagePerm && !isShiftSupervisor) {
@@ -133,7 +133,7 @@ export async function updateUser(
   const currentUser = await prisma.personnel.findUnique({
     where: { id: session.id },
   });
-  const hasManagePerm = await hasPerm(session, "user.manage");
+  const hasManagePerm = await hasPerm(session, "user.edit");
   const isShiftSupervisor = currentUser?.orgPosition === ORG_POSITIONS.RESPONSIBLE;
 
   if (!hasManagePerm && !isShiftSupervisor) {
@@ -251,7 +251,7 @@ export async function resetPassword(
   const currentUser = await prisma.personnel.findUnique({
     where: { id: session.id },
   });
-  const hasManagePerm = await hasPerm(session, "user.manage");
+  const hasManagePerm = await hasPerm(session, "user.delete");
   const isShiftSupervisor = currentUser?.orgPosition === ORG_POSITIONS.RESPONSIBLE;
 
   if (!hasManagePerm && !isShiftSupervisor) {
@@ -303,7 +303,7 @@ export async function deleteUser(id: number) {
   const currentUser = await prisma.personnel.findUnique({
     where: { id: session.id },
   });
-  const hasManagePerm = await hasPerm(session, "user.manage");
+  const hasManagePerm = await hasPerm(session, "user.edit");
   const isShiftSupervisor = currentUser?.orgPosition === ORG_POSITIONS.RESPONSIBLE;
 
   if (!hasManagePerm && !isShiftSupervisor) return { error: "دسترسی ندارید." };
@@ -421,7 +421,7 @@ export async function deletePhonebookContact(id: number): Promise<{ error?: stri
   if (!target) return { error: "مخاطب مورد نظر یافت نشد." };
 
   if (target.hasAccount) {
-    const hasUserManage = await hasPerm(session, "user.manage");
+    const hasUserManage = await hasPerm(session, "user.edit");
     if (!hasUserManage) {
       return { error: "این مخاطب دارای حساب کاربری فعال است. برای حذف آن به دسترسی مدیریت کاربران نیاز دارید." };
     }
@@ -534,7 +534,7 @@ export async function importPersonnelFromExcel(list: {
   if (!session || (
     !(await hasPerm(session, "report.import")) &&
     !(await hasPerm(session, "phonebook.edit")) &&
-    !(await hasPerm(session, "user.manage")) &&
+    !(await hasPerm(session, "user.create")) &&
     !isShiftSupervisor
   )) {
     return { error: "دسترسی ندارید." };
@@ -592,7 +592,7 @@ export async function importPersonnelFromExcel(list: {
 
 export async function bulkUpdateUserShift(ids: number[], shift: number) {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "user.manage"))) {
+  if (!session || !(await hasPerm(session, "user.edit"))) {
     return { error: "دسترسی ندارید. فقط ادمین اجازه تغییر شیفت کاری دسته‌جمعی پرسنل را دارد." };
   }
 
@@ -634,7 +634,7 @@ export async function bulkUpdateUserShift(ids: number[], shift: number) {
 
 export async function bulkUpdateUserOrgPosition(ids: number[], orgPosition: number) {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "user.manage"))) {
+  if (!session || !(await hasPerm(session, "user.edit"))) {
     return { error: "دسترسی ندارید. فقط ادمین اجازه تغییر سمت دسته‌جمعی پرسنل را دارد." };
   }
 
@@ -676,7 +676,7 @@ export async function bulkUpdateUserOrgPosition(ids: number[], orgPosition: numb
 
 export async function bulkDeleteUsers(ids: number[]) {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "user.manage"))) {
+  if (!session || !(await hasPerm(session, "user.delete"))) {
     return { error: "دسترسی ندارید. فقط ادمین اجازه حذف دسته‌جمعی پرسنل را دارد." };
   }
 

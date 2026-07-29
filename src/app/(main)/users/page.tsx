@@ -49,9 +49,12 @@ export default async function UsersPage({
   const roles = roleLookup?.values || [];
 
   const isShiftSupervisor = currentUser?.orgPosition === ORG_POSITIONS.RESPONSIBLE;
-  const canManageAll = await hasPerm(session, "user.manage");
+  const canViewAll = await hasPerm(session, "user.view");
+  const canCreate = await hasPerm(session, "user.create");
+  const canEdit = await hasPerm(session, "user.edit");
+  const canDelete = await hasPerm(session, "user.delete");
 
-  if (!canManageAll && !isShiftSupervisor) {
+  if (!canViewAll && !isShiftSupervisor) {
     redirect("/depot");
   }
 
@@ -171,14 +174,16 @@ export default async function UsersPage({
     ? `مدیریت و عملکرد شیفت ${shiftNames[currentUser.shift as keyof typeof shiftNames]} (${personnelTypeNames[currentUser.personnelType as keyof typeof personnelTypeNames]})`
     : "مدیریت کاربران و پرسنل";
 
-  const canManage = canManageAll || isShiftSupervisor;
+  const _canCreate = canCreate || isShiftSupervisor;
+  const _canEdit = canEdit || isShiftSupervisor;
+  const _canDelete = canDelete || isShiftSupervisor;
 
   return (
     <>
       <div className="topbar">
         <h1>{pageTitle}</h1>
         <span className="spacer" />
-        {canManage && (
+        {_canCreate && (
           <Link href="/users/new" className="btn accent sm">
             + افزودن کاربر
           </Link>
@@ -206,7 +211,9 @@ export default async function UsersPage({
           nonAccounts={nonAccounts}
           totalRows={totalRows}
           params={params}
-          canManage={canManage}
+          canCreate={_canCreate}
+          canEdit={_canEdit}
+          canDelete={_canDelete}
           currentUserId={session.id}
           isShiftSupervisor={isShiftSupervisor}
           todayManeuvers={todayManeuvers}

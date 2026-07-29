@@ -17,7 +17,7 @@ export async function createRole(
   fd: FormData
 ): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "role.manage"))) {
+  if (!session || !(await hasPerm(session, "role.create"))) {
     return { error: "دسترسی ندارید. فقط مدیران اجازه تغییر نقش‌ها را دارند." };
   }
 
@@ -58,7 +58,7 @@ export async function updateRole(
   fd: FormData
 ): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "role.manage"))) {
+  if (!session || !(await hasPerm(session, "role.edit"))) {
     return { error: "دسترسی ندارید." };
   }
 
@@ -105,7 +105,7 @@ export async function updateRole(
 
 export async function deleteRole(id: number) {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "role.manage"))) {
+  if (!session || !(await hasPerm(session, "role.delete"))) {
     return { error: "دسترسی ندارید." };
   }
 

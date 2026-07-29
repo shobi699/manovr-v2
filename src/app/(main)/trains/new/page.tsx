@@ -7,7 +7,7 @@ import NewTrainForm from "./NewTrainForm";
 
 export default async function NewTrainPage() {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "train.manage"))) redirect("/trains");
+  if (!session || !(await hasPerm(session, "train.create"))) redirect("/trains");
 
   const [lines, trainTypeLookup] = await Promise.all([
     prisma.line.findMany({
@@ -23,7 +23,14 @@ export default async function NewTrainPage() {
       <div className="content">
         <div className="card">
           <div className="card-body">
-            <NewTrainForm lines={lines} trainTypes={trainTypeLookup?.values || []} />
+            <NewTrainForm
+              lines={lines}
+              trainTypes={trainTypeLookup?.values || []}
+              canEditKafshak={await hasPerm(session, "train.status.kafshak")}
+              canEditAtp={await hasPerm(session, "train.status.atp")}
+              canEditRotary={await hasPerm(session, "train.status.rotary")}
+              canEditLicense={await hasPerm(session, "train.status.license")}
+            />
           </div>
         </div>
       </div>

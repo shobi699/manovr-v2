@@ -29,10 +29,16 @@ export default function TerminalsClient({
   typeId,
   initialTerminals,
   lines,
+  canCreate,
+  canEdit,
+  canDelete,
 }: {
   typeId: number;
   initialTerminals: TerminalItem[];
   lines: LineItem[];
+  canCreate: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -142,10 +148,12 @@ export default function TerminalsClient({
         title="مدیریت و مهندسی ترمینال‌های پایانه"
         breadcrumb={[{ label: "تحلیل و تنظیمات" }, { label: "مدیریت ترمینال‌ها" }]}
         actions={
-          <button className="btn primary" onClick={handleNewClick}>
-            <Icons.NewManovr size={14} style={{ marginInlineEnd: 4 }} />
-            افزودن ترمینال جدید
-          </button>
+          canCreate ? (
+            <button className="btn primary" onClick={handleNewClick}>
+              <Icons.NewManovr size={14} style={{ marginInlineEnd: 4 }} />
+              افزودن ترمینال جدید
+            </button>
+          ) : undefined
         }
       />
 
@@ -220,18 +228,22 @@ export default function TerminalsClient({
                 label: "عملیات",
                 render: (t) => (
                   <div style={{ display: "inline-flex", gap: "8px" }}>
-                    <button className="btn sm outline" onClick={() => handleEditClick(t)}>
-                      <Icons.Edit size={12} style={{ marginInlineEnd: 4 }} />
-                      ویرایش
-                    </button>
-                    <button
-                      className="btn sm outline text-crit"
-                      style={{ borderColor: "rgba(239, 68, 68, 0.2)" }}
-                      onClick={() => handleDelete(t)}
-                    >
-                      <Icons.Trash size={12} style={{ marginInlineEnd: 4 }} />
-                      حذف
-                    </button>
+                    {canEdit && (
+                      <button className="btn sm outline" onClick={() => handleEditClick(t)}>
+                        <Icons.Edit size={12} style={{ marginInlineEnd: 4 }} />
+                        ویرایش
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        className="btn sm outline text-crit"
+                        style={{ borderColor: "rgba(239, 68, 68, 0.2)" }}
+                        onClick={() => handleDelete(t)}
+                      >
+                        <Icons.Trash size={12} style={{ marginInlineEnd: 4 }} />
+                        حذف
+                      </button>
+                    )}
                   </div>
                 )
               }

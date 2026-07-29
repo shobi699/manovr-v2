@@ -14,10 +14,12 @@ interface LookupValue {
 interface LinesTableClientProps {
   lines: any[];
   terminals: LookupValue[];
-  canManage: boolean;
+  canCreate: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
 }
 
-export default function LinesTableClient({ lines, terminals, canManage }: LinesTableClientProps) {
+export default function LinesTableClient({ lines, terminals, canCreate, canEdit, canDelete }: LinesTableClientProps) {
   const [filterTerminal, setFilterTerminal] = React.useState<string>("all");
   const [filterType, setFilterType] = React.useState<string>("all");
   const [filterStatus, setFilterStatus] = React.useState<string>("all");
@@ -218,12 +220,12 @@ export default function LinesTableClient({ lines, terminals, canManage }: LinesT
       sortable: true,
       render: (l: any) => l.isActive !== false ? <span className="pill p-success">فعال</span> : <span className="pill p-danger">غیرفعال (مسدود)</span>,
     },
-    ...(canManage
+    ...((canEdit || canDelete)
       ? [
           {
             key: "actions",
             label: "عملیات",
-            render: (l: any) => <LineRowActions id={l.id} />,
+            render: (l: any) => <LineRowActions id={l.id} canEdit={canEdit} canDelete={canDelete} />,
           },
         ]
       : []),
@@ -231,7 +233,7 @@ export default function LinesTableClient({ lines, terminals, canManage }: LinesT
 
   return (
     <>
-      {canManage && (
+      {canCreate && (
         <div className="card" style={{ padding: "16px", marginBottom: "20px", display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center" }}>
           <span style={{ fontWeight: 600, fontSize: "14px", color: "var(--ink)" }}>عملیات گروهی اکسل:</span>
           

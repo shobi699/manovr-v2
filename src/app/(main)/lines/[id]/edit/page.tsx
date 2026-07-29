@@ -6,7 +6,7 @@ import EditLineForm from "./EditLineForm";
 
 export default async function EditLinePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "line.manage"))) redirect("/lines");
+  if (!session || !(await hasPerm(session, "line.edit"))) redirect("/lines");
 
   const { id } = await params;
   const [line, terminalType] = await Promise.all([

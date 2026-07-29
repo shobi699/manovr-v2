@@ -12,7 +12,12 @@ import { safeAccentColor, safeLogoImage, safeText } from "@/lib/branding";
 // دریافت لیست تمام دسته‌بندی‌های لوکاپ
 export async function getLookupTypes() {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "lookups.manage"))) {
+  if (!session) return { ok: false, error: "عدم دسترسی" };
+
+  const canLookups = await hasPerm(session, "lookups.manage");
+  const canTerminal = await hasPerm(session, "terminal.view");
+
+  if (!canLookups && !canTerminal) {
     return { ok: false, error: "عدم دسترسی کافی" };
   }
 
@@ -42,15 +47,25 @@ export async function saveLookupValue(data: {
   meta?: string | null;
 }) {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "lookups.manage"))) {
-    return { ok: false, error: "عدم دسترسی کافی" };
-  }
+  if (!session) return { ok: false, error: "عدم دسترسی" };
 
   try {
     const type = await prisma.lookupType.findUnique({
       where: { id: data.typeId },
     });
     if (!type) return { ok: false, error: "دسته بندی یافت نشد" };
+
+    if (type.key === "terminal") {
+      const canEditTerm = await hasPerm(session, "terminal.edit");
+      const canCreateTerm = await hasPerm(session, "terminal.create");
+      if (!canEditTerm && !canCreateTerm) {
+        return { ok: false, error: "شما مجوز ایجاد یا ویرایش ترمینال را ندارید" };
+      }
+    } else {
+      if (!(await hasPerm(session, "lookups.manage"))) {
+        return { ok: false, error: "عدم دسترسی کافی برای مدیریت مقادیر پویا" };
+      }
+    }
 
     const existingVal = await prisma.lookupValue.findUnique({
       where: {
@@ -113,15 +128,23 @@ export async function saveLookupValue(data: {
 // حذف فیزیکی یک مقدار در جدول لوکاپ با بررسی وابستگی‌ها
 export async function deleteLookupValue(typeId: number, code: number) {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "lookups.manage"))) {
-    return { ok: false, error: "عدم دسترسی کافی" };
-  }
+  if (!session) return { ok: false, error: "عدم دسترسی" };
 
   try {
     const type = await prisma.lookupType.findUnique({
       where: { id: typeId },
     });
     if (!type) return { ok: false, error: "دسته بندی یافت نشد" };
+
+    if (type.key === "terminal") {
+      if (!(await hasPerm(session, "terminal.delete"))) {
+        return { ok: false, error: "شما مجوز حذف ترمینال را ندارید" };
+      }
+    } else {
+      if (!(await hasPerm(session, "lookups.manage"))) {
+        return { ok: false, error: "عدم دسترسی کافی برای مدیریت مقادیر پویا" };
+      }
+    }
 
     if (type.key === "terminal") {
       const lineUsing = await prisma.line.findFirst({

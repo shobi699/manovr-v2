@@ -15,7 +15,7 @@ class ManovrError extends Error {}
 export async function createManovr(
   _prev: { error?: string } | null,
   fd: FormData
-): Promise<{ error?: string }> {
+): Promise<{ error?: string, success?: boolean }> {
   const session = await getSession();
   if (!session) return { error: "ابتدا وارد شوید." };
   if (!(await hasPerm(session, "manovr.create")))
@@ -32,6 +32,7 @@ export async function createManovr(
   const description = String(fd.get("description") ?? "").trim() || null;
   const executionTimeRaw = fd.get("executionTime");
   const executionTime = executionTimeRaw ? new Date(String(executionTimeRaw)) : new Date();
+  const noRedirect = fd.get("noRedirect") === "1";
 
   if (!type) return { error: "لطفا نوع مانور را انتخاب کنید." };
   if (!trainId) return { error: "لطفا قطار را انتخاب نمایید." };
@@ -146,6 +147,10 @@ export async function createManovr(
   revalidatePath("/manovrs");
   revalidatePath("/dashboard");
   revalidatePath("/depot");
+  
+  if (noRedirect) {
+    return { success: true };
+  }
   redirect("/manovrs");
 }
 

@@ -43,7 +43,11 @@ export default async function DepotPage() {
   // دسترسی‌های کاربر
   const canLayout = session ? await hasPerm(session, "depot.layout") : false;
   const canCreateManovr = session ? await hasPerm(session, "manovr.create") : false;
-  const canManageLines = session ? await hasPerm(session, "line.manage") : false;
+  const canManageLines = session ? await hasPerm(session, "line.view") : false;
+  const canEditKafshak = session ? await hasPerm(session, "train.status.kafshak") : false;
+  const canEditAtp = session ? await hasPerm(session, "train.status.atp") : false;
+  const canEditRotary = session ? await hasPerm(session, "train.status.rotary") : false;
+  const canEditLicense = session ? await hasPerm(session, "train.status.license") : false;
 
   const isManager = session ? (session.role === 1 || session.role === 2 || session.role === 4) : false;
   const pendingCount = isManager
@@ -106,6 +110,10 @@ export default async function DepotPage() {
           canLayout={canLayout}
           canCreateManovr={canCreateManovr}
           canManageLines={canManageLines}
+          canEditKafshak={canEditKafshak}
+          canEditAtp={canEditAtp}
+          canEditRotary={canEditRotary}
+          canEditLicense={canEditLicense}
           prefs={depotPrefs}
         />
       </div>

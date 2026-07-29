@@ -4,21 +4,23 @@ import { useTransition, useState } from "react";
 import { useRouter } from "next/navigation";
 import { deleteUser } from "@/app/actions/user";
 
-export default function UserRowActions({ id, currentUserId }: { id: number; currentUserId: number }) {
+export default function UserRowActions({ id, currentUserId, canEdit, canDelete }: { id: number; currentUserId: number, canEdit: boolean, canDelete: boolean }) {
   const [pending, start] = useTransition();
   const [err, setErr] = useState("");
   const router = useRouter();
 
   return (
     <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-      <button
-        className="btn sm"
-        disabled={pending}
-        onClick={() => router.push(`/users/${id}/edit`)}
-      >
-        ویرایش
-      </button>
-      {id !== currentUserId && (
+      {canEdit && (
+        <button
+          className="btn sm"
+          disabled={pending}
+          onClick={() => router.push(`/users/${id}/edit`)}
+        >
+          ویرایش
+        </button>
+      )}
+      {canDelete && id !== currentUserId && (
         <button
           className="btn sm"
           disabled={pending}

@@ -10,8 +10,8 @@ export default async function AdminTerminalsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const canManage = await hasPerm(session, "terminal.manage");
-  if (!canManage) {
+  const canView = await hasPerm(session, "terminal.view");
+  if (!canView) {
     return (
       <div className="content" style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "60vh" }}>
         <div className="card" style={{ padding: "40px", textAlign: "center", maxWidth: "450px" }}>
@@ -24,6 +24,10 @@ export default async function AdminTerminalsPage() {
       </div>
     );
   }
+
+  const canCreate = await hasPerm(session, "terminal.create");
+  const canEdit = await hasPerm(session, "terminal.edit");
+  const canDelete = await hasPerm(session, "terminal.delete");
 
   // دریافت اطلاعات نوع لوکاپ ترمینال
   const terminalType = await prisma.lookupType.findUnique({
@@ -49,6 +53,9 @@ export default async function AdminTerminalsPage() {
         typeId={terminalType?.id || 0}
         initialTerminals={terminalType?.values || []}
         lines={lines}
+        canCreate={canCreate}
+        canEdit={canEdit}
+        canDelete={canDelete}
       />
     </div>
   );

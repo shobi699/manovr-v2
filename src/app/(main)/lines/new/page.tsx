@@ -6,7 +6,7 @@ import NewLineForm from "./NewLineForm";
 
 export default async function NewLinePage() {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "line.manage"))) redirect("/lines");
+  if (!session || !(await hasPerm(session, "line.create"))) redirect("/lines");
 
   const terminalType = await prisma.lookupType.findUnique({
     where: { key: "terminal" },

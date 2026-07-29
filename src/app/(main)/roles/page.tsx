@@ -8,9 +8,13 @@ export const dynamic = "force-dynamic";
 
 export default async function RolesPage() {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "role.manage"))) {
+  if (!session || !(await hasPerm(session, "role.view"))) {
     redirect("/dashboard");
   }
+
+  const canCreate = await hasPerm(session, "role.create");
+  const canEdit = await hasPerm(session, "role.edit");
+  const canDelete = await hasPerm(session, "role.delete");
 
   const roles = await prisma.accessRole.findMany({
     orderBy: { id: "asc" },
@@ -72,6 +76,8 @@ export default async function RolesPage() {
                       allPerms={ALL_PERMS}
                       permLabels={PERM_LABELS}
                       isSystem={role.isSystem}
+                      canEdit={canEdit}
+                      canDelete={canDelete}
                     />
                   </div>
                 </div>
@@ -80,20 +86,22 @@ export default async function RolesPage() {
           })}
         </div>
 
-        <div>
-          <div className="card" style={{ position: "sticky", top: "80px" }}>
-            <div className="card-head">
-              <h2>ایجاد نقش جدید</h2>
-            </div>
-            <div className="card-body">
-              <RolesFormClient
-                mode="create"
-                allPerms={ALL_PERMS}
-                permLabels={PERM_LABELS}
-              />
+        {canCreate && (
+          <div>
+            <div className="card" style={{ position: "sticky", top: "80px" }}>
+              <div className="card-head">
+                <h2>ایجاد نقش جدید</h2>
+              </div>
+              <div className="card-body">
+                <RolesFormClient
+                  mode="create"
+                  allPerms={ALL_PERMS}
+                  permLabels={PERM_LABELS}
+                />
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </>
   );

@@ -22,7 +22,13 @@ interface TrainsTableClientProps {
   params: ListParams;
   allLines?: { id: number; name: string }[];
   trainTypes?: LookupValue[];
-  canManage: boolean;
+  canCreate: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canEditKafshak?: boolean;
+  canEditAtp?: boolean;
+  canEditRotary?: boolean;
+  canEditLicense?: boolean;
 }
 
 export default function TrainsTableClient({
@@ -31,7 +37,13 @@ export default function TrainsTableClient({
   params,
   allLines = [],
   trainTypes = [],
-  canManage,
+  canCreate,
+  canEdit,
+  canDelete,
+  canEditKafshak,
+  canEditAtp,
+  canEditRotary,
+  canEditLicense,
 }: TrainsTableClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -267,7 +279,7 @@ export default function TrainsTableClient({
       label: "وضعیت عملیاتی",
       sortable: true,
       render: (t: any) => {
-        if (canManage) {
+        if (canEdit) {
           return (
             <select
               value={t.status}
@@ -342,71 +354,79 @@ export default function TrainsTableClient({
             )}
           </div>
 
-          {canManage && (
+          {canEdit && (canEditKafshak || canEditAtp || canEditRotary || canEditLicense) && (
             <div style={{ display: "flex", gap: "4px", marginTop: "4px", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                className={`btn sm ${t.hasKafshak ? "accent" : ""}`}
-                style={{ fontSize: "10px", padding: "1px 5px", height: "22px" }}
-                title="تغییر وضعیت کفشک"
-                disabled={isPending}
-                onClick={() => {
-                  startTransition(async () => {
-                    await updateTrainFlags(t.id, { hasKafshak: !t.hasKafshak });
-                    router.refresh();
-                  });
-                }}
-              >
-                {t.hasKafshak ? "⚡ کفشک دارد" : "⚡ بدون کفشک"}
-              </button>
-              <button
-                type="button"
-                className={`btn sm ${t.noAtp ? "danger" : ""}`}
-                style={{ fontSize: "10px", padding: "1px 5px", height: "22px" }}
-                title="تغییر وضعیت ATP"
-                disabled={isPending}
-                onClick={() => {
-                  startTransition(async () => {
-                    await updateTrainFlags(t.id, { noAtp: !t.noAtp });
-                    router.refresh();
-                  });
-                }}
-              >
-                {t.noAtp ? "🚨 عدم ATP" : "✅ ATP دار"}
-              </button>
-              <select
-                value={t.movadDavvar || ""}
-                className="input sm"
-                style={{ fontSize: "10px", padding: "1px 4px", height: "22px", width: "85px" }}
-                disabled={isPending}
-                onChange={(e) => {
-                  const val = e.target.value || null;
-                  startTransition(async () => {
-                    await updateTrainFlags(t.id, { movadDavvar: val });
-                    router.refresh();
-                  });
-                }}
-              >
-                <option value="">بدون دوّار</option>
-                <option value="A">دوار A</option>
-                <option value="B">دوار B</option>
-                <option value="C">دوار C</option>
-              </select>
-              <button
-                type="button"
-                className={`btn sm ${t.noLicense ? "danger" : ""}`}
-                style={{ fontSize: "10px", padding: "1px 5px", height: "22px" }}
-                title="تغییر وضعیت مجوز"
-                disabled={isPending}
-                onClick={() => {
-                  startTransition(async () => {
-                    await updateTrainFlags(t.id, { noLicense: !t.noLicense });
-                    router.refresh();
-                  });
-                }}
-              >
-                {t.noLicense ? "🛑 بدون مجوز" : "🟢 با مجوز"}
-              </button>
+              {canEditKafshak && (
+                <button
+                  type="button"
+                  className={`btn sm ${t.hasKafshak ? "accent" : ""}`}
+                  style={{ fontSize: "10px", padding: "1px 5px", height: "22px" }}
+                  title="تغییر وضعیت کفشک"
+                  disabled={isPending}
+                  onClick={() => {
+                    startTransition(async () => {
+                      await updateTrainFlags(t.id, { hasKafshak: !t.hasKafshak });
+                      router.refresh();
+                    });
+                  }}
+                >
+                  {t.hasKafshak ? "⚡ کفشک دارد" : "⚡ بدون کفشک"}
+                </button>
+              )}
+              {canEditAtp && (
+                <button
+                  type="button"
+                  className={`btn sm ${t.noAtp ? "danger" : ""}`}
+                  style={{ fontSize: "10px", padding: "1px 5px", height: "22px" }}
+                  title="تغییر وضعیت ATP"
+                  disabled={isPending}
+                  onClick={() => {
+                    startTransition(async () => {
+                      await updateTrainFlags(t.id, { noAtp: !t.noAtp });
+                      router.refresh();
+                    });
+                  }}
+                >
+                  {t.noAtp ? "🚨 عدم ATP" : "✅ ATP دار"}
+                </button>
+              )}
+              {canEditRotary && (
+                <select
+                  value={t.movadDavvar || ""}
+                  className="input sm"
+                  style={{ fontSize: "10px", padding: "1px 4px", height: "22px", width: "85px" }}
+                  disabled={isPending}
+                  onChange={(e) => {
+                    const val = e.target.value || null;
+                    startTransition(async () => {
+                      await updateTrainFlags(t.id, { movadDavvar: val });
+                      router.refresh();
+                    });
+                  }}
+                >
+                  <option value="">بدون دوّار</option>
+                  <option value="A">دوار A</option>
+                  <option value="B">دوار B</option>
+                  <option value="C">دوار C</option>
+                </select>
+              )}
+              {canEditLicense && (
+                <button
+                  type="button"
+                  className={`btn sm ${t.noLicense ? "danger" : ""}`}
+                  style={{ fontSize: "10px", padding: "1px 5px", height: "22px" }}
+                  title="تغییر وضعیت مجوز"
+                  disabled={isPending}
+                  onClick={() => {
+                    startTransition(async () => {
+                      await updateTrainFlags(t.id, { noLicense: !t.noLicense });
+                      router.refresh();
+                    });
+                  }}
+                >
+                  {t.noLicense ? "🛑 بدون مجوز" : "🟢 با مجوز"}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -423,19 +443,19 @@ export default function TrainsTableClient({
           <span className="pill p-good">فعال</span>
         ),
     },
-    ...(canManage
+    ...((canEdit || canDelete)
       ? [
           {
             key: "actions",
             label: "عملیات",
-            render: (t: any) => <TrainRowActions id={t.id} />,
+            render: (t: any) => <TrainRowActions id={t.id} canEdit={canEdit} canDelete={canDelete} />,
           },
         ]
       : []),
   ];
 
   const trainBulkActions: BulkAction<any>[] = React.useMemo(() => {
-    if (!canManage) return [];
+    if (!canEdit && !canDelete) return [];
 
     return [
       {
@@ -550,11 +570,11 @@ export default function TrainsTableClient({
         },
       },
     ];
-  }, [canManage, router]);
+  }, [canEdit, canDelete, router]);
 
   return (
     <>
-      {canManage && (
+      {canCreate && (
         <div className="card" style={{ padding: "16px", marginBottom: "20px", display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center" }}>
           <span style={{ fontWeight: 600, fontSize: "14px", color: "var(--ink)" }}>عملیات اکسل و ثبت:</span>
           

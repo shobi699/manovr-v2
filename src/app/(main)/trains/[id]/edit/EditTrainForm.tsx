@@ -22,10 +22,18 @@ export default function EditTrainForm({
   train,
   lines,
   trainTypes = [],
+  canEditKafshak,
+  canEditAtp,
+  canEditRotary,
+  canEditLicense,
 }: {
   train: Train;
   lines: LineOpt[];
   trainTypes?: { code: number; label: string; isActive?: boolean }[];
+  canEditKafshak: boolean;
+  canEditAtp: boolean;
+  canEditRotary: boolean;
+  canEditLicense: boolean;
 }) {
   const [state, action, pending] = useActionState(updateTrain, null);
   const router = useRouter();
@@ -83,7 +91,7 @@ export default function EditTrainForm({
       <div className="grid2" style={{ marginBottom: "12px" }}>
         <div className="field">
           <label htmlFor="movadDavvar">موعد دوّار (Wheel Turning)</label>
-          <select id="movadDavvar" name="movadDavvar" className="input" defaultValue={train.movadDavvar || ""}>
+          <select id="movadDavvar" name="movadDavvar" className="input" defaultValue={train.movadDavvar || ""} disabled={!canEditRotary}>
             <option value="">-- بدون موعد دوّار --</option>
             <option value="A">🔄 موعد دوّار - سطح A</option>
             <option value="B">🔄 موعد دوّار - سطح B</option>
@@ -92,18 +100,18 @@ export default function EditTrainForm({
         </div>
 
         <div className="field" style={{ display: "flex", flexDirection: "column", gap: "8px", justifyContent: "center" }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-            <input type="checkbox" name="hasKafshak" value="1" defaultChecked={!!train.hasKafshak} />
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: canEditKafshak ? "pointer" : "not-allowed", opacity: canEditKafshak ? 1 : 0.5 }}>
+            <input type="checkbox" name="hasKafshak" value="1" defaultChecked={!!train.hasKafshak} disabled={!canEditKafshak} />
             <span>⚡ <b>وجود کفشک (Third Rail Collector Shoe)</b></span>
           </label>
 
-          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-            <input type="checkbox" name="noAtp" value="1" defaultChecked={!!train.noAtp} />
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: canEditAtp ? "pointer" : "not-allowed", opacity: canEditAtp ? 1 : 0.5 }}>
+            <input type="checkbox" name="noAtp" value="1" defaultChecked={!!train.noAtp} disabled={!canEditAtp} />
             <span>🚨 <b style={{ color: "var(--crit)" }}>عدم ATP (سیستم حفاظت قطار)</b></span>
           </label>
 
-          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-            <input type="checkbox" name="noLicense" value="1" defaultChecked={!!train.noLicense} />
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: canEditLicense ? "pointer" : "not-allowed", opacity: canEditLicense ? 1 : 0.5 }}>
+            <input type="checkbox" name="noLicense" value="1" defaultChecked={!!train.noLicense} disabled={!canEditLicense} />
             <span>🛑 <b style={{ color: "var(--crit)" }}>بدون مجوز حرکت</b></span>
           </label>
         </div>
