@@ -14,13 +14,13 @@ export type DepotPrefs = {
   quality: "high" | "med" | "2d";
   refreshSec: number;
   defaultTerminal: number; // 0 = نمای کلی
-  view2DMode?: "grid" | "structured"; // "grid" = ۵ ستونی کلاسیک, "structured" = دیاگرام افقی ساختاریافته پایانه
+  view2DMode?: "grid" | "structured" | "map"; // "grid" = ۵ ستونی کلاسیک, "structured" = دیاگرام افقی ساختاریافته, "map" = نقشه پایانه
 };
 
 export const DEFAULT_APPEARANCE: Appearance = {
   theme: "auto", accent: "#d8842a", density: "normal", fontSize: 14, digits: "fa", navPosition: "right",
 };
-export const DEFAULT_DEPOT: DepotPrefs = { quality: "2d", refreshSec: 15, defaultTerminal: 0, view2DMode: "structured" };
+export const DEFAULT_DEPOT: DepotPrefs = { quality: "2d", refreshSec: 15, defaultTerminal: 0, view2DMode: "map" };
 
 export async function getUserSetting<T>(userId: number, key: string, fallback: T): Promise<T> {
   const row = await prisma.appSetting.findUnique({

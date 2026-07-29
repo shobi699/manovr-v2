@@ -21,6 +21,10 @@ export const ManovrType: Record<number, string> = {
   18: "خروجی شهرآفتاب",
   19: "تعویض قطار",
   20: "تعویض کفشک",
+  21: "انتقال دائم به سایر خطوط",
+  22: "انتقال دائم به واگن‌سازی",
+  23: "سایر انتقال‌های دائم",
+  24: "انتقال دائم",
 };
 
 export const ManovrStatus: Record<number, string> = {

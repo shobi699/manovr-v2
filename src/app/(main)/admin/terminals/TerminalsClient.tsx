@@ -4,6 +4,7 @@ import React, { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveLookupValue, deleteLookupValue } from "@/app/actions/lookups";
 import PageHeader from "@/components/PageHeader";
+import DataTable, { Column } from "@/components/DataTable";
 import { Icons } from "@/lib/icons";
 
 interface TerminalItem {
@@ -154,85 +155,90 @@ export default function TerminalsClient({
           <div style={{ fontSize: "14px", fontWeight: "bold", marginBottom: "16px", color: "var(--ink-soft)" }}>
             ترمینال‌های فعال در نمای پایانه (۲بعدی و ۳بعدی)
           </div>
-          <table className="data" style={{ width: "100%", fontSize: "13px" }}>
-            <thead>
-              <tr style={{ borderBottom: "2px solid var(--line)" }}>
-                <th>کد</th>
-                <th>رنگ شناسایی</th>
-                <th>نام ترمینال</th>
-                <th>موقعیت سه‌بعدی (X, Z)</th>
-                <th>ستون ۲بعدی</th>
-                <th>ردیف ۲بعدی</th>
-                <th style={{ textAlign: "center" }}>تعداد خطوط ریل</th>
-                <th style={{ textAlign: "center" }}>عملیات</th>
-              </tr>
-            </thead>
-            <tbody>
-              {terminals.map((t) => {
-                let meta: any = {};
-                try {
-                  meta = JSON.parse(t.meta || "{}");
-                } catch {}
-
-                const connectedLines = lines.filter((l) => l.terminal === t.code);
-
-                return (
-                  <tr key={t.id} style={{ borderBottom: "1px solid var(--line-soft)" }}>
-                    <td className="num" style={{ fontWeight: "bold" }}>{t.code}</td>
-                    <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span
-                          style={{
-                            display: "inline-block",
-                            width: "14px",
-                            height: "14px",
-                            borderRadius: "50%",
-                            backgroundColor: t.color || "#cbd5e1",
-                            border: "1px solid var(--line)",
-                          }}
-                        />
-                        <code className="num" style={{ fontSize: "11px" }}>{t.color || "—"}</code>
-                      </div>
-                    </td>
-                    <td style={{ fontWeight: "bold" }}>{t.label}</td>
-                    <td className="num">
-                      X: {meta.x ?? 0} | Z: {meta.z ?? 0}
-                    </td>
-                    <td className="num">ستون {meta.gridCol ?? 1}</td>
-                    <td>
-                      {meta.gridRow === "top" ? "بالا (Top)" : meta.gridRow === "bottom" ? "پایین (Bottom)" : "کامل (Full)"}
-                    </td>
-                    <td className="num" style={{ textAlign: "center", fontWeight: "bold" }}>
-                      {connectedLines.length}
-                    </td>
-                    <td style={{ textAlign: "center" }}>
-                      <div style={{ display: "inline-flex", gap: "8px" }}>
-                        <button className="btn sm outline" onClick={() => handleEditClick(t)}>
-                          <Icons.Edit size={12} style={{ marginInlineEnd: 4 }} />
-                          ویرایش
-                        </button>
-                        <button
-                          className="btn sm outline text-crit"
-                          style={{ borderColor: "rgba(239, 68, 68, 0.2)" }}
-                          onClick={() => handleDelete(t)}
-                        >
-                          <Icons.Trash size={12} style={{ marginInlineEnd: 4 }} />
-                          حذف
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {terminals.length === 0 && (
-                <tr>
-                  <td colSpan={8} style={{ textAlign: "center", padding: "30px", color: "var(--ink-faint)" }}>
-                    هیچ ترمینالی تعریف نشده است.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <DataTable
+            tableName="adminTerminals"
+            columns={[
+              { key: "code", label: "کد", sortable: true, filterable: true, render: (t) => <span className="num" style={{ fontWeight: "bold" }}>{t.code}</span> },
+              { 
+                key: "color", 
+                label: "رنگ شناسایی", 
+                filterable: true,
+                getValue: (t) => t.color,
+                render: (t) => (
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ display: "inline-block", width: "14px", height: "14px", borderRadius: "50%", backgroundColor: t.color || "#cbd5e1", border: "1px solid var(--line)" }} />
+                    <code className="num" style={{ fontSize: "11px" }}>{t.color || "—"}</code>
+                  </div>
+                )
+              },
+              { key: "label", label: "نام ترمینال", sortable: true, filterable: true, render: (t) => <span style={{ fontWeight: "bold" }}>{t.label}</span> },
+              { 
+                key: "position", 
+                label: "موقعیت سه‌بعدی (X, Z)", 
+                render: (t) => {
+                  let meta: any = {};
+                  try { meta = JSON.parse(t.meta || "{}"); } catch {}
+                  return <span className="num">X: {meta.x ?? 0} | Z: {meta.z ?? 0}</span>;
+                }
+              },
+              {
+                key: "gridCol",
+                label: "ستون ۲بعدی",
+                filterable: true,
+                getValue: (t) => {
+                  try { return JSON.parse(t.meta || "{}").gridCol ?? 1; } catch { return 1; }
+                },
+                render: (t) => {
+                  let meta: any = {};
+                  try { meta = JSON.parse(t.meta || "{}"); } catch {}
+                  return <span className="num">ستون {meta.gridCol ?? 1}</span>;
+                }
+              },
+              {
+                key: "gridRow",
+                label: "ردیف ۲بعدی",
+                filterable: true,
+                getValue: (t) => {
+                  try { const row = JSON.parse(t.meta || "{}").gridRow; return row === "top" ? "بالا (Top)" : row === "bottom" ? "پایین (Bottom)" : "کامل (Full)"; } catch { return "کامل (Full)"; }
+                },
+                render: (t) => {
+                  let meta: any = {};
+                  try { meta = JSON.parse(t.meta || "{}"); } catch {}
+                  return <span>{meta.gridRow === "top" ? "بالا (Top)" : meta.gridRow === "bottom" ? "پایین (Bottom)" : "کامل (Full)"}</span>;
+                }
+              },
+              {
+                key: "lines",
+                label: "تعداد خطوط ریل",
+                render: (t) => {
+                  const connectedLines = lines.filter((l) => l.terminal === t.code);
+                  return <span className="num" style={{ fontWeight: "bold" }}>{connectedLines.length}</span>;
+                }
+              },
+              {
+                key: "actions",
+                label: "عملیات",
+                render: (t) => (
+                  <div style={{ display: "inline-flex", gap: "8px" }}>
+                    <button className="btn sm outline" onClick={() => handleEditClick(t)}>
+                      <Icons.Edit size={12} style={{ marginInlineEnd: 4 }} />
+                      ویرایش
+                    </button>
+                    <button
+                      className="btn sm outline text-crit"
+                      style={{ borderColor: "rgba(239, 68, 68, 0.2)" }}
+                      onClick={() => handleDelete(t)}
+                    >
+                      <Icons.Trash size={12} style={{ marginInlineEnd: 4 }} />
+                      حذف
+                    </button>
+                  </div>
+                )
+              }
+            ]}
+            data={terminals}
+            searchFields={["label", "code"]}
+          />
         </div>
 
         {/* سایدبار ادیتور ترمینال */}

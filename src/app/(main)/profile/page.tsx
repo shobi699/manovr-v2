@@ -6,7 +6,11 @@ import ProfileClient from "./ProfileClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProfilePage() {
+export default async function ProfilePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const session = await getSession();
   if (!session) redirect("/login");
 
@@ -31,12 +35,23 @@ export default async function ProfilePage() {
     }),
   ]);
 
-  // ۳. واکشی آخرین لاگ‌های فعالیت کاربر
-  const recentLogs = await prisma.auditLog.findMany({
-    where: { actorId: session.id },
-    orderBy: { createdAt: "desc" },
-    take: 10,
-  });
+  const resolvedParams = (await searchParams) || {};
+  const logPage = parseInt(resolvedParams.logPage as string) || 1;
+  const logsPerPage = 10;
+  const skipLogs = (logPage - 1) * logsPerPage;
+
+  // ۳. واکشی آخرین لاگ‌های فعالیت کاربر با صفحه‌بندی
+  const [recentLogs, totalLogsCount] = await Promise.all([
+    prisma.auditLog.findMany({
+      where: { actorId: session.id },
+      orderBy: { createdAt: "desc" },
+      skip: skipLogs,
+      take: logsPerPage,
+    }),
+    prisma.auditLog.count({
+      where: { actorId: session.id },
+    }),
+  ]);
 
   return (
     <div>
@@ -72,6 +87,8 @@ export default async function ProfilePage() {
             summary: log.summary,
             createdAt: log.createdAt.toISOString(),
           }))}
+          logPage={logPage}
+          totalLogsCount={totalLogsCount}
         />
       </div>
     </div>

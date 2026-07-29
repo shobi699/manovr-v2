@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useTransition } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
+import DataTable, { Column } from "@/components/DataTable";
 import { saveDashboardLayoutAction } from "@/app/actions/dashboard";
 import {
   sendAdminMessage,
@@ -283,34 +284,17 @@ export default function DashboardClient({
               <Link href="/manovrs" className="btn sm outline">مشاهده تاریخچه مانورها ➔</Link>
             </div>
             <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "right" }}>
-                <thead>
-                  <tr style={{ borderBottom: "1px solid var(--line-soft)", fontSize: "12px", color: "var(--ink-soft)" }}>
-                    <th style={{ padding: "8px" }}>کد مانور</th>
-                    <th style={{ padding: "8px" }}>قطار</th>
-                    <th style={{ padding: "8px" }}>خط مبدأ ← مقصد</th>
-                    <th style={{ padding: "8px" }}>راهبر</th>
-                    <th style={{ padding: "8px" }}>زمان ثبت</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentManovrs.map((m) => (
-                    <tr key={m.id} style={{ borderBottom: "1px dashed var(--line-soft)", fontSize: "13px" }}>
-                      <td style={{ padding: "10px 8px" }} className="num">{m.id}</td>
-                      <td style={{ padding: "10px 8px" }} className="num"><b>{m.train?.code}</b></td>
-                      <td style={{ padding: "10px 8px" }}>
-                        <span className="muted">{m.sourceLine?.name || "—"}</span>
-                        {" ➔ "}
-                        <b>{m.destinationLine?.name}</b>
-                      </td>
-                      <td style={{ padding: "10px 8px" }}>{m.rahbar1 ? `${m.rahbar1.firstName} ${m.rahbar1.lastName}` : "—"}</td>
-                      <td style={{ padding: "10px 8px" }} className="num muted">
-                        {new Date(m.createdAt).toLocaleDateString("fa-IR", { calendar: "persian" })}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+                tableName="dashboardRecentManovrs"
+                columns={[
+                  { key: "id", label: "کد مانور", sortable: true, filterable: true, render: (m) => <span className="num">{m.id}</span> },
+                  { key: "train", label: "قطار", sortable: true, filterable: true, getValue: (m) => m.train?.code, render: (m) => <span className="num"><b>{m.train?.code}</b></span> },
+                  { key: "line", label: "خط مبدأ ← مقصد", filterable: true, getValue: (m) => `${m.sourceLine?.name || "—"} ➔ ${m.destinationLine?.name}`, render: (m) => <><span className="muted">{m.sourceLine?.name || "—"}</span>{" ➔ "}<b>{m.destinationLine?.name}</b></> },
+                  { key: "rahbar", label: "راهبر", filterable: true, getValue: (m) => m.rahbar1 ? `${m.rahbar1.firstName} ${m.rahbar1.lastName}` : "—" },
+                  { key: "createdAt", label: "زمان ثبت", sortable: true, filterable: true, getValue: (m) => new Date(m.createdAt).toLocaleDateString("fa-IR", { calendar: "persian" }), render: (m) => <span className="num muted">{new Date(m.createdAt).toLocaleDateString("fa-IR", { calendar: "persian" })}</span> }
+                ]}
+                data={recentManovrs}
+              />
             </div>
           </div>
         );

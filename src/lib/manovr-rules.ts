@@ -18,3 +18,15 @@ export const KAFSHAK_MANOVR_TYPE = 20;
 export function shouldSetKafshak(manovrType: number): boolean {
   return manovrType === KAFSHAK_MANOVR_TYPE;
 }
+
+/**
+ * کدهای مانورهای انتقال دائم (خروج قطار از نقشه‌های پایانه)
+ * ۲۱: انتقال دائم به سایر خطوط
+ * ۲۲: انتقال دائم به واگن‌سازی
+ * ۲۳: سایر انتقال‌های دائم
+ */
+export const PERMANENT_MANOVR_TYPES = [21, 22, 23, 24];
+
+export function isPermanentTransfer(manovrType: number): boolean {
+  return PERMANENT_MANOVR_TYPES.includes(manovrType);
+}

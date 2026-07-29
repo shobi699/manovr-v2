@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useState, useTransition } from "react";
-import { updatePersonnelPhoneInfo, importPersonnelFromExcel } from "@/app/actions/user";
+import {
+  createPhonebookContact,
+  updatePersonnelPhoneInfo,
+  deletePhonebookContact,
+  importPersonnelFromExcel,
+} from "@/app/actions/user";
 import type { ListParams } from "@/lib/list-query";
 
 interface PersonnelItem {
@@ -37,7 +42,33 @@ export default function PhonebookClient({
   const [search, setSearch] = useState("");
   const [shiftFilter, setShiftFilter] = useState("all");
   const [posFilter, setPosFilter] = useState("all");
+
+  // افزودن مخاطب جدید
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [addFirstName, setAddFirstName] = useState("");
+  const [addLastName, setAddLastName] = useState("");
+  const [addPersonnelCode, setAddPersonnelCode] = useState("");
+  const [addShift, setAddShift] = useState(1);
+  const [addOrgPosition, setAddOrgPosition] = useState(4);
+  const [addPhone1, setAddPhone1] = useState("");
+  const [addPhone2, setAddPhone2] = useState("");
+  const [addInternalTel, setAddInternalTel] = useState("");
+  const [addAddress, setAddAddress] = useState("");
+  const [addAvatarColor, setAddAvatarColor] = useState("#2563eb");
+
+  // ویرایش مخاطب
   const [editingPerson, setEditingPerson] = useState<PersonnelItem | null>(null);
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
+  const [editPersonnelCode, setEditPersonnelCode] = useState("");
+  const [editShift, setEditShift] = useState(1);
+  const [editOrgPosition, setEditOrgPosition] = useState(4);
+  const [editPhone1, setEditPhone1] = useState("");
+  const [editPhone2, setEditPhone2] = useState("");
+  const [editInternalTel, setEditInternalTel] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editAvatarColor, setEditAvatarColor] = useState("");
+
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -82,8 +113,8 @@ export default function PhonebookClient({
       a.download = "phonebook.xlsx";
       a.click();
       URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error(err);
       alert("خطا در خروجی گرفتن اکسل.");
     }
   };
@@ -112,7 +143,7 @@ export default function PhonebookClient({
         firstName: "محمد",
         lastName: "کریمی",
         personnelCode: "99103",
-        userName: "karimi99",
+        userName: "",
         phone1: "09121111111",
         phone2: "",
         internalTel: "135",
@@ -129,8 +160,8 @@ export default function PhonebookClient({
       a.download = "phonebook-sample.xlsx";
       a.click();
       URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error(err);
       alert("خطا در تولید فایل نمونه اکسل.");
     }
   };
@@ -189,7 +220,7 @@ export default function PhonebookClient({
         if (res.error) {
           alert(res.error);
         } else {
-          alert(`تعداد ${res.count} پرسنل جدید با موفقیت درج شدند.`);
+          alert(`تعداد ${res.count} مخاطب جدید با موفقیت درج شدند.`);
           window.location.reload();
         }
       } catch (err) {
@@ -200,20 +231,68 @@ export default function PhonebookClient({
     reader.readAsArrayBuffer(file);
   };
 
-  // فرم موقت برای مودال ویرایش
-  const [phone1, setPhone1] = useState("");
-  const [phone2, setPhone2] = useState("");
-  const [internalTel, setInternalTel] = useState("");
-  const [address, setAddress] = useState("");
-  const [avatarColor, setAvatarColor] = useState("");
+  // ایجاد مخاطب جدید
+  const handleCreateContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
 
+    const fd = new FormData();
+    fd.append("firstName", addFirstName);
+    fd.append("lastName", addLastName);
+    fd.append("personnelCode", addPersonnelCode);
+    fd.append("shift", String(addShift));
+    fd.append("orgPosition", String(addOrgPosition));
+    fd.append("phone1", addPhone1);
+    fd.append("phone2", addPhone2);
+    fd.append("internalTel", addInternalTel);
+    fd.append("address", addAddress);
+    fd.append("avatarColor", addAvatarColor);
+
+    startTransition(async () => {
+      const res = await createPhonebookContact(null, fd);
+      if (res.error) {
+        setError(res.error);
+      } else if (res.contact) {
+        const newContact: PersonnelItem = {
+          id: res.contact.id,
+          firstName: res.contact.firstName,
+          lastName: res.contact.lastName,
+          personnelCode: res.contact.personnelCode || "",
+          shift: res.contact.shift,
+          orgPosition: res.contact.orgPosition,
+          phone1: res.contact.phone1 || "",
+          phone2: res.contact.phone2 || "",
+          internalTel: res.contact.internalTel || "",
+          address: res.contact.address || "",
+          avatarColor: res.contact.avatarColor || "#2563eb",
+        };
+        setList((prev) => [newContact, ...prev]);
+        setIsAddOpen(false);
+        // ریست فرم
+        setAddFirstName("");
+        setAddLastName("");
+        setAddPersonnelCode("");
+        setAddPhone1("");
+        setAddPhone2("");
+        setAddInternalTel("");
+        setAddAddress("");
+      }
+    });
+  };
+
+  // ویرایش مخاطب
   const handleEditClick = (p: PersonnelItem) => {
     setEditingPerson(p);
-    setPhone1(p.phone1);
-    setPhone2(p.phone2);
-    setInternalTel(p.internalTel);
-    setAddress(p.address);
-    setAvatarColor(p.avatarColor);
+    setEditFirstName(p.firstName);
+    setEditLastName(p.lastName);
+    setEditPersonnelCode(p.personnelCode || "");
+    setEditShift(p.shift);
+    setEditOrgPosition(p.orgPosition);
+    setEditPhone1(p.phone1);
+    setEditPhone2(p.phone2);
+    setEditInternalTel(p.internalTel);
+    setEditAddress(p.address);
+    setEditAvatarColor(p.avatarColor || "#2563eb");
     setError(null);
   };
 
@@ -224,26 +303,56 @@ export default function PhonebookClient({
 
     const fd = new FormData();
     fd.append("id", String(editingPerson.id));
-    fd.append("phone1", phone1);
-    fd.append("phone2", phone2);
-    fd.append("internalTel", internalTel);
-    fd.append("address", address);
-    fd.append("avatarColor", avatarColor);
+    fd.append("firstName", editFirstName);
+    fd.append("lastName", editLastName);
+    fd.append("personnelCode", editPersonnelCode);
+    fd.append("shift", String(editShift));
+    fd.append("orgPosition", String(editOrgPosition));
+    fd.append("phone1", editPhone1);
+    fd.append("phone2", editPhone2);
+    fd.append("internalTel", editInternalTel);
+    fd.append("address", editAddress);
+    fd.append("avatarColor", editAvatarColor);
 
     startTransition(async () => {
       const res = await updatePersonnelPhoneInfo(null, fd);
       if (res?.error) {
         setError(res.error);
       } else {
-        // بروزرسانی لوکال لیست
         setList((prev) =>
           prev.map((item) =>
             item.id === editingPerson.id
-              ? { ...item, phone1, phone2, internalTel, address, avatarColor }
+              ? {
+                  ...item,
+                  firstName: editFirstName,
+                  lastName: editLastName,
+                  personnelCode: editPersonnelCode,
+                  shift: editShift,
+                  orgPosition: editOrgPosition,
+                  phone1: editPhone1,
+                  phone2: editPhone2,
+                  internalTel: editInternalTel,
+                  address: editAddress,
+                  avatarColor: editAvatarColor,
+                }
               : item
           )
         );
         setEditingPerson(null);
+      }
+    });
+  };
+
+  // حذف مخاطب
+  const handleDeleteClick = async (p: PersonnelItem) => {
+    if (!confirm(`آیا از حذف مخاطب «${p.firstName} ${p.lastName}» اطمینان دارید؟`)) return;
+
+    startTransition(async () => {
+      const res = await deletePhonebookContact(p.id);
+      if (res.error) {
+        alert(res.error);
+      } else {
+        setList((prev) => prev.filter((item) => item.id !== p.id));
       }
     });
   };
@@ -256,8 +365,10 @@ export default function PhonebookClient({
 
   const filtered = list.filter((p) => {
     const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
+    const code = p.personnelCode ? p.personnelCode.toLowerCase() : "";
     const matchesSearch =
       fullName.includes(search.toLowerCase()) ||
+      code.includes(search.toLowerCase()) ||
       p.phone1.includes(search) ||
       p.phone2.includes(search) ||
       p.internalTel.includes(search);
@@ -274,7 +385,7 @@ export default function PhonebookClient({
       <div className="toolbar" style={{ backgroundColor: "var(--panel)", padding: "16px", borderRadius: "var(--radius)", border: "1px solid var(--line)" }}>
         <input
           type="text"
-          placeholder="جستجو بر اساس نام، شماره تلفن، داخلی..."
+          placeholder="جستجو بر اساس نام، کد پرسنلی، شماره تلفن، داخلی..."
           className="input search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -312,18 +423,31 @@ export default function PhonebookClient({
         </div>
       </div>
 
-      {/* عملیات اکسل */}
+      {/* نوار ابزار اصلی و عملیات مخاطبان */}
       <div className="card" style={{ padding: "16px", display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center" }}>
-        <span style={{ fontWeight: 600, fontSize: "14px", color: "var(--ink)" }}>عملیات اکسل:</span>
+        {canEdit && (
+          <button
+            onClick={() => {
+              setError(null);
+              setIsAddOpen(true);
+            }}
+            className="btn primary sm"
+            style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", fontWeight: "bold" }}
+          >
+            <span style={{ fontSize: "16px" }}>+</span> افزودن مخاطب جدید
+          </button>
+        )}
+
+        <span style={{ fontWeight: 600, fontSize: "14px", color: "var(--ink)", marginRight: "8px" }}>عملیات اکسل:</span>
         
-        <button onClick={handleExportExcel} className="btn primary sm" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+        <button onClick={handleExportExcel} className="btn sm" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <span style={{ fontSize: "16px" }}>📥</span> خروجی اکسل دفتر تلفن
         </button>
         
         {canEdit && (
           <>
             <label className="btn sm" style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", margin: 0, padding: "8px 12px", border: "1px solid var(--line)" }}>
-              <span style={{ fontSize: "16px" }}>📤</span> بارگذاری اکسل پرسنل
+              <span style={{ fontSize: "16px" }}>📤</span> بارگذاری اکسل مخاطبان
               <input type="file" accept=".xlsx" onChange={handleExcelImport} style={{ display: "none" }} />
             </label>
             
@@ -334,7 +458,7 @@ export default function PhonebookClient({
         )}
       </div>
 
-      {/* نمایش کارتی پرسنل */}
+      {/* نمایش کارتی پرسنل و مخاطبان */}
       {filtered.length === 0 ? (
         <div className="card empty">مخاطبی با فیلترهای مشخص شده یافت نشد.</div>
       ) : (
@@ -354,7 +478,7 @@ export default function PhonebookClient({
                     width: "48px",
                     height: "48px",
                     borderRadius: "50%",
-                    backgroundColor: p.avatarColor || "var(--accent)",
+                    backgroundColor: p.avatarColor || "#2563eb",
                     color: "#fff",
                     display: "grid",
                     placeItems: "center",
@@ -371,6 +495,11 @@ export default function PhonebookClient({
                     {p.firstName} {p.lastName}
                   </h3>
                   <div style={{ display: "flex", gap: "6px", marginTop: "4px", flexWrap: "wrap" }}>
+                    {p.personnelCode && (
+                      <span className="pill p-mut" style={{ fontSize: "10px" }}>
+                        کد: {p.personnelCode}
+                      </span>
+                    )}
                     <span className="pill p-rail" style={{ fontSize: "10px" }}>
                       {positions[p.orgPosition] || "سایر"}
                     </span>
@@ -457,9 +586,17 @@ export default function PhonebookClient({
               </div>
 
               {canEdit && (
-                <div style={{ padding: "8px 18px", borderTop: "1px solid var(--line-soft)", display: "flex", justifyContent: "flex-end" }}>
+                <div style={{ padding: "8px 18px", borderTop: "1px solid var(--line-soft)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <button
+                    className="btn sm"
+                    style={{ fontSize: "11px", color: "#ef4444", border: "1px solid var(--line)" }}
+                    onClick={() => handleDeleteClick(p)}
+                    disabled={isPending}
+                  >
+                    حذف
+                  </button>
                   <button className="btn sm" onClick={() => handleEditClick(p)}>
-                    ویرایش تماس
+                    ویرایش کامل
                   </button>
                 </div>
               )}
@@ -468,7 +605,179 @@ export default function PhonebookClient({
         </div>
       )}
 
-      {/* مودال ویرایش اطلاعات تماس */}
+      {/* مودال افزودن مخاطب جدید */}
+      {isAddOpen && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(0,0,0,0.5)",
+            backdropFilter: "blur(4px)",
+            zIndex: 999,
+            display: "grid",
+            placeItems: "center",
+          }}
+        >
+          <div className="card" style={{ width: "480px", maxHeight: "90vh", overflowY: "auto", backgroundColor: "var(--panel)" }}>
+            <div className="card-head">
+              <h2>افزودن مخاطب جدید به دفتر تلفن</h2>
+              <span className="spacer" />
+              <button className="btn sm" onClick={() => setIsAddOpen(false)}>
+                بستن
+              </button>
+            </div>
+            <form onSubmit={handleCreateContact}>
+              <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {error && <div className="err" style={{ color: "#ef4444", fontSize: "13px" }}>{error}</div>}
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <div className="field">
+                    <label>نام *</label>
+                    <input
+                      type="text"
+                      className="input"
+                      required
+                      value={addFirstName}
+                      onChange={(e) => setAddFirstName(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label>نام خانوادگی *</label>
+                    <input
+                      type="text"
+                      className="input"
+                      required
+                      value={addLastName}
+                      onChange={(e) => setAddLastName(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <div className="field">
+                    <label>کد پرسنلی (اختیاری)</label>
+                    <input
+                      type="text"
+                      className="input num"
+                      value={addPersonnelCode}
+                      onChange={(e) => setAddPersonnelCode(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label>شیفت کاری</label>
+                    <select
+                      className="input"
+                      value={addShift}
+                      onChange={(e) => setAddShift(Number(e.target.value))}
+                    >
+                      {Object.entries(shifts).map(([val, name]) => (
+                        <option key={val} value={val}>
+                          شیفت {name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="field">
+                  <label>سمت سازمانی</label>
+                  <select
+                    className="input"
+                    value={addOrgPosition}
+                    onChange={(e) => setAddOrgPosition(Number(e.target.value))}
+                  >
+                    {Object.entries(positions).map(([val, name]) => (
+                      <option key={val} value={val}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <div className="field">
+                    <label>شماره همراه ۱</label>
+                    <input
+                      type="text"
+                      className="input num"
+                      placeholder="0912..."
+                      value={addPhone1}
+                      onChange={(e) => setAddPhone1(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label>شماره همراه ۲</label>
+                    <input
+                      type="text"
+                      className="input num"
+                      placeholder="09..."
+                      value={addPhone2}
+                      onChange={(e) => setAddPhone2(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="field">
+                  <label>شماره داخلی پایانه</label>
+                  <input
+                    type="text"
+                    className="input num"
+                    placeholder="مثال: 120"
+                    value={addInternalTel}
+                    onChange={(e) => setAddInternalTel(e.target.value)}
+                  />
+                </div>
+
+                <div className="field">
+                  <label>آدرس منزل</label>
+                  <textarea
+                    className="input"
+                    rows={2}
+                    value={addAddress}
+                    onChange={(e) => setAddAddress(e.target.value)}
+                  />
+                </div>
+
+                <div className="field">
+                  <label>رنگ آواتار</label>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <input
+                      type="color"
+                      value={addAvatarColor}
+                      onChange={(e) => setAddAvatarColor(e.target.value)}
+                      style={{ width: "40px", height: "40px", padding: 0, border: "0", cursor: "pointer", borderRadius: "4px" }}
+                    />
+                    <input
+                      type="text"
+                      className="input num"
+                      value={addAvatarColor}
+                      onChange={(e) => setAddAvatarColor(e.target.value)}
+                      style={{ flex: 1 }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
+                  <button type="submit" className="btn primary" style={{ flex: 1 }} disabled={isPending}>
+                    {isPending ? "در حال ثبت..." : "ثبت مخاطب"}
+                  </button>
+                  <button type="button" className="btn" style={{ flex: 1 }} onClick={() => setIsAddOpen(false)}>
+                    انصراف
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* مودال ویرایش کامل اطلاعات مخاطب */}
       {editingPerson && (
         <div
           style={{
@@ -484,10 +793,10 @@ export default function PhonebookClient({
             placeItems: "center",
           }}
         >
-          <div className="card" style={{ width: "450px", backgroundColor: "var(--panel)" }}>
+          <div className="card" style={{ width: "480px", maxHeight: "90vh", overflowY: "auto", backgroundColor: "var(--panel)" }}>
             <div className="card-head">
               <h2>
-                ویرایش اطلاعات تماس: {editingPerson.firstName} {editingPerson.lastName}
+                ویرایش اطلاعات مخاطب: {editingPerson.firstName} {editingPerson.lastName}
               </h2>
               <span className="spacer" />
               <button className="btn sm" onClick={() => setEditingPerson(null)}>
@@ -496,26 +805,94 @@ export default function PhonebookClient({
             </div>
             <form onSubmit={handleSavePhonebook}>
               <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {error && <div className="err">{error}</div>}
+                {error && <div className="err" style={{ color: "#ef4444", fontSize: "13px" }}>{error}</div>}
 
-                <div className="field">
-                  <label>شماره همراه ۱</label>
-                  <input
-                    type="text"
-                    className="input num"
-                    value={phone1}
-                    onChange={(e) => setPhone1(e.target.value)}
-                  />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <div className="field">
+                    <label>نام *</label>
+                    <input
+                      type="text"
+                      className="input"
+                      required
+                      value={editFirstName}
+                      onChange={(e) => setEditFirstName(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label>نام خانوادگی *</label>
+                    <input
+                      type="text"
+                      className="input"
+                      required
+                      value={editLastName}
+                      onChange={(e) => setEditLastName(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <div className="field">
+                    <label>کد پرسنلی</label>
+                    <input
+                      type="text"
+                      className="input num"
+                      value={editPersonnelCode}
+                      onChange={(e) => setEditPersonnelCode(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label>شیفت کاری</label>
+                    <select
+                      className="input"
+                      value={editShift}
+                      onChange={(e) => setEditShift(Number(e.target.value))}
+                    >
+                      {Object.entries(shifts).map(([val, name]) => (
+                        <option key={val} value={val}>
+                          شیفت {name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div className="field">
-                  <label>شماره همراه ۲</label>
-                  <input
-                    type="text"
-                    className="input num"
-                    value={phone2}
-                    onChange={(e) => setPhone2(e.target.value)}
-                  />
+                  <label>سمت سازمانی</label>
+                  <select
+                    className="input"
+                    value={editOrgPosition}
+                    onChange={(e) => setEditOrgPosition(Number(e.target.value))}
+                  >
+                    {Object.entries(positions).map(([val, name]) => (
+                      <option key={val} value={val}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <div className="field">
+                    <label>شماره همراه ۱</label>
+                    <input
+                      type="text"
+                      className="input num"
+                      value={editPhone1}
+                      onChange={(e) => setEditPhone1(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label>شماره همراه ۲</label>
+                    <input
+                      type="text"
+                      className="input num"
+                      value={editPhone2}
+                      onChange={(e) => setEditPhone2(e.target.value)}
+                    />
+                  </div>
                 </div>
 
                 <div className="field">
@@ -523,8 +900,8 @@ export default function PhonebookClient({
                   <input
                     type="text"
                     className="input num"
-                    value={internalTel}
-                    onChange={(e) => setInternalTel(e.target.value)}
+                    value={editInternalTel}
+                    onChange={(e) => setEditInternalTel(e.target.value)}
                   />
                 </div>
 
@@ -533,25 +910,25 @@ export default function PhonebookClient({
                   <textarea
                     className="input"
                     rows={2}
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
+                    value={editAddress}
+                    onChange={(e) => setEditAddress(e.target.value)}
                   />
                 </div>
 
                 <div className="field">
-                  <label>رنگ دلخواه آواتار (Hex)</label>
+                  <label>رنگ دلخواه آواتار</label>
                   <div style={{ display: "flex", gap: "8px" }}>
                     <input
                       type="color"
-                      value={avatarColor}
-                      onChange={(e) => setAvatarColor(e.target.value)}
+                      value={editAvatarColor}
+                      onChange={(e) => setEditAvatarColor(e.target.value)}
                       style={{ width: "40px", height: "40px", padding: 0, border: "0", cursor: "pointer", borderRadius: "4px" }}
                     />
                     <input
                       type="text"
                       className="input num"
-                      value={avatarColor}
-                      onChange={(e) => setAvatarColor(e.target.value)}
+                      value={editAvatarColor}
+                      onChange={(e) => setEditAvatarColor(e.target.value)}
                       style={{ flex: 1 }}
                     />
                   </div>

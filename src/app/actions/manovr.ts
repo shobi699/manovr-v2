@@ -6,7 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { hasPerm } from "@/lib/perms";
 import { audit } from "@/lib/audit";
-import { hasRoomOnLine, shouldSetKafshak } from "@/lib/manovr-rules";
+import { ManovrType } from "@/lib/enums";
+import { hasRoomOnLine, shouldSetKafshak, isPermanentTransfer } from "@/lib/manovr-rules";
 
 // خطای دامنه‌ای که باید به پیام کاربر تبدیل شود، نه خطای ۵۰۰
 class ManovrError extends Error {}
@@ -38,32 +39,39 @@ export async function createManovr(
 
   // دریافت اطلاعات قطار برای تعیین خط فعلی
   const train = await prisma.train.findUnique({ where: { id: trainId } });
-  if (!train) return { error: "قطار مورد نظر یافت نشد." };
+  if (!train) return { error: "قطار مورد نظر یافت نمایید." };
 
+  const isPerm = isPermanentTransfer(type);
   let sourceLineId = sourceRaw ? Number(sourceRaw) : train.lineId;
   let destinationLineId = destRaw ? Number(destRaw) : (sourceLineId || train.lineId);
 
-  if (!destinationLineId) return { error: "لطفا مقصد را انتخاب نمایید." };
-  if (!sourceLineId) sourceLineId = destinationLineId;
+  if (!destinationLineId && !isPerm) return { error: "لطفا مقصد را انتخاب نمایید." };
+  if (!sourceLineId) sourceLineId = destinationLineId || 1;
+  if (!destinationLineId) destinationLineId = sourceLineId;
 
   // بررسی ظرفیت و ثبت مانور و جابجایی قطار باید اتمیک باشند تا دو مانور همزمان
   // نتوانند هر دو از یک ظرفیت باقیمانده عبور کنند
   let created;
   try {
     created = await prisma.$transaction(async (tx) => {
-      const dest = await tx.line.findUnique({ where: { id: destinationLineId } });
-      if (!dest) throw new ManovrError("خط مقصد نامعتبر است.");
+      let dest = null;
+      if (destinationLineId) {
+        dest = await tx.line.findUnique({ where: { id: destinationLineId } });
+      }
 
-      // بدون احتساب خود این قطار، تا مانور در محل مسدود نشود
-      const onDest = await tx.train.count({
-        where: {
-          lineId: destinationLineId,
-          isDisposed: false,
-          id: { not: trainId },
-        },
-      });
-      if (!hasRoomOnLine(onDest, dest.capacity)) {
-        throw new ManovrError("ظرفیت خط مقصد پر شده است.");
+      // در مانور انتقال دائم (خروج قطار)، قطار از پایانه خارج می‌شود و ظرفیت اشغال نمی‌کند
+      if (!isPerm && dest) {
+        // بدون احتساب خود این قطار، تا مانور در محل مسدود نشود
+        const onDest = await tx.train.count({
+          where: {
+            lineId: destinationLineId,
+            isDisposed: false,
+            id: { not: trainId },
+          },
+        });
+        if (!hasRoomOnLine(onDest, dest.capacity)) {
+          throw new ManovrError("ظرفیت خط مقصد پر شده است.");
+        }
       }
 
       const manovr = await tx.manovr.create({
@@ -71,7 +79,7 @@ export async function createManovr(
           type,
           status: 1,
           confirmationStatus: 3,
-          description,
+          description: isPerm && !description ? "انتقال دائم و خروج قطار از پایانه" : description,
           sourceLineId,
           destinationLineId,
           trainId,
@@ -87,10 +95,15 @@ export async function createManovr(
         },
       });
 
-      const trainUpdateData: { lineId: number; slotIndex: number; hasKafshak?: boolean } = {
-        lineId: destinationLineId,
-        slotIndex,
-      };
+      const trainUpdateData: {
+        lineId: number | null;
+        slotIndex: number;
+        isDisposed?: boolean;
+        hasKafshak?: boolean;
+      } = isPerm
+        ? { isDisposed: true, lineId: null, slotIndex: 0 }
+        : { lineId: destinationLineId, slotIndex };
+
       if (shouldSetKafshak(type)) {
         trainUpdateData.hasKafshak = true;
       }
@@ -104,15 +117,19 @@ export async function createManovr(
     });
   } catch (err) {
     if (err instanceof ManovrError) return { error: err.message };
-    throw err;
+    console.error("createManovr transaction error:", err);
+    return { error: "خطایی در ثبت مانور در دیتابیس رخ داد." };
   }
 
   // ثبت لاگ وقایع
   const trainCode = created.train?.code || String(trainId);
   const srcName = created.sourceLine?.name || "نامشخص";
   const destName = created.destinationLine?.name || "نامشخص";
+  const typeLabel = ManovrType[type] || `نوع ${type}`;
   const isSameLine = sourceLineId === destinationLineId;
-  const auditMessage = isSameLine
+  const auditMessage = isPerm
+    ? `ثبت مانور ${typeLabel} - خروج دائم قطار کد ${trainCode} از پایانه`
+    : isSameLine
     ? `مانور در محل (ثابت) برای قطار ${trainCode} روی خط ${destName} ثبت گردید.`
     : `مانور جدیدی برای قطار ${trainCode} از خط ${srcName} به خط ${destName} ثبت گردید.`;
 

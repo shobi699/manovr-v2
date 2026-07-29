@@ -39,6 +39,7 @@ import {
   Prohibit,
   ArrowClockwise,
   FloppyDisk,
+  Funnel,
 } from "@phosphor-icons/react";
 
 export const Icons = {
@@ -80,6 +81,7 @@ export const Icons = {
   GearFive: GearFine,
   Refresh: ArrowClockwise,
   Save: FloppyDisk,
+  Funnel: Funnel,
 };
 
 // آیکون‌های وضعیت قطار — استفاده در نمای دوبعدی و سه‌بعدی پایانه

@@ -117,11 +117,11 @@ export const FIELD_LABELS: Record<string, string> = {
 };
 
 // تولید فایل Excel راست‌چین به عنوان بافر
-export async function generateExcelBuffer(entity: string, fields: string[], records: any[], lookups?: Record<string, any[]>): Promise<Uint8Array> {
+export async function generateExcelBuffer(entity: string, fields: string[], records: ExportRecord[], lookups?: Record<string, LookupItem[]>): Promise<Uint8Array> {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("گزارش پایانه");
 
-  worksheet.views = [{ rtl: true } as any];
+  worksheet.views = [{ rtl: true } as Partial<ExcelJS.WorksheetView>];
 
   const columns = fields.map((field) => ({
     header: FIELD_LABELS[field] || field,
@@ -177,7 +177,7 @@ export async function generateExcelBuffer(entity: string, fields: string[], reco
 }
 
 // تولید فایل PDF فارسی و راست‌چین به عنوان بافر
-export async function generatePDFBuffer(entity: string, fields: string[], records: any[], lookups?: Record<string, any[]>): Promise<Uint8Array> {
+export async function generatePDFBuffer(entity: string, fields: string[], records: ExportRecord[], lookups?: Record<string, LookupItem[]>): Promise<Uint8Array> {
   const fonts = {
     Vazirmatn: {
       normal: path.join(process.cwd(), "public/fonts/Vazirmatn-Regular.ttf"),
@@ -185,7 +185,7 @@ export async function generatePDFBuffer(entity: string, fields: string[], record
     },
   };
 
-  const printer = new (PdfPrinter as any)(fonts);
+  const printer = new (PdfPrinter as unknown as new (fonts: unknown) => { createPdfKitDocument: (docDef: unknown) => NodeJS.ReadableStream })(fonts);
   const reversedFields = [...fields].reverse();
 
   const headerRow = reversedFields.map((field) => ({
@@ -222,7 +222,7 @@ export async function generatePDFBuffer(entity: string, fields: string[], record
           body: [headerRow, ...tableRows],
         },
         layout: {
-          hLineWidth: (i: number, node: any) => (i === 0 || i === node.table.body.length ? 1 : 0.5),
+          hLineWidth: (i: number, node: { table: { body: unknown[] } }) => (i === 0 || i === node.table.body.length ? 1 : 0.5),
           vLineWidth: () => 0.5,
           hLineColor: () => "#d9dee4",
           vLineColor: () => "#d9dee4",
@@ -241,8 +241,8 @@ export async function generatePDFBuffer(entity: string, fields: string[], record
     const chunks: Buffer[] = [];
     pdfDoc.on("data", (chunk: Buffer) => chunks.push(chunk));
     pdfDoc.on("end", () => resolve(Buffer.concat(chunks)));
-    pdfDoc.on("error", (err: any) => reject(err));
-    pdfDoc.end();
+    pdfDoc.on("error", (err: Error) => reject(err));
+    (pdfDoc as any).end();
   });
 
   return new Uint8Array(buffer);

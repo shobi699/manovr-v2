@@ -63,6 +63,7 @@ export default function SettingsFormClient({
       quality: "2d",
       refreshSec: 15,
       defaultTerminal: 0,
+      view2DMode: "map",
     };
     setAppearanceLocal(defaultAppearance);
     setDepotLocal(defaultDepot);
@@ -219,14 +220,15 @@ export default function SettingsFormClient({
           <label>حالت چیدمان دو بعدی (۲D Layout Mode)</label>
           <select
             className="input"
-            value={depot.view2DMode || "structured"}
+            value={depot.view2DMode || "map"}
             onChange={(e) => setDepotLocal((p) => ({ ...p, view2DMode: e.target.value as any }))}
           >
-            <option value="structured">📐 نمای ساختاریافته پایانه (افقی و بنتو - جدید)</option>
+            <option value="map">🗺️ نقشه پایانه (پیش‌فرض)</option>
+            <option value="structured">📐 نمای ساختاریافته پایانه (افقی و بنتو)</option>
             <option value="grid">🔲 نمای ۵ ستونه شبکه‌ای (کلاسیک)</option>
           </select>
           <span style={{ fontSize: 11, color: "var(--ink-faint)", marginTop: 4 }}>
-            نمای جدید افقی شامل پارکینگ شمالی و جنوبی به صورت افقی و سایر خطوط به صورت بنتو می‌باشد.
+            نمای نقشه پایانه، چیدمان واقعی دپو را به صورت دو بعدی تعاملی با قابلیت مدیریت خطوط و قطارها نمایش می‌دهد.
           </span>
         </div>
 

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { ORG_POSITIONS } from "@/lib/constants";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
@@ -28,7 +29,7 @@ export async function createUser(
     where: { id: session.id },
   });
   const hasManagePerm = await hasPerm(session, "user.manage");
-  const isShiftSupervisor = currentUser?.orgPosition === 2;
+  const isShiftSupervisor = currentUser?.orgPosition === ORG_POSITIONS.RESPONSIBLE;
 
   if (!hasManagePerm && !isShiftSupervisor) {
     return { error: "دسترسی ندارید. شما مجاز به افزودن کاربر نیستید." };
@@ -62,7 +63,7 @@ export async function createUser(
   if (isShiftSupervisor && currentUser) {
     shift = currentUser.shift;
     personnelType = currentUser.personnelType;
-    if (orgPosition === 2 || orgPosition === 3) {
+    if (orgPosition === ORG_POSITIONS.RESPONSIBLE || orgPosition === ORG_POSITIONS.ADMIN) {
       return { error: "شما مجاز به تعیین سمت مسئول شیفت یا ادمین نیستید." };
     }
   }
@@ -133,7 +134,7 @@ export async function updateUser(
     where: { id: session.id },
   });
   const hasManagePerm = await hasPerm(session, "user.manage");
-  const isShiftSupervisor = currentUser?.orgPosition === 2;
+  const isShiftSupervisor = currentUser?.orgPosition === ORG_POSITIONS.RESPONSIBLE;
 
   if (!hasManagePerm && !isShiftSupervisor) {
     return { error: "دسترسی ندارید." };
@@ -179,7 +180,7 @@ export async function updateUser(
     }
     shift = currentUser.shift;
     personnelType = currentUser.personnelType;
-    if (orgPosition === 2 || orgPosition === 3) {
+    if (orgPosition === ORG_POSITIONS.RESPONSIBLE || orgPosition === ORG_POSITIONS.ADMIN) {
       return { error: "شما مجاز به تعیین سمت مسئول شیفت یا ادمین نیستید." };
     }
     role = targetUser.role;
@@ -251,7 +252,7 @@ export async function resetPassword(
     where: { id: session.id },
   });
   const hasManagePerm = await hasPerm(session, "user.manage");
-  const isShiftSupervisor = currentUser?.orgPosition === 2;
+  const isShiftSupervisor = currentUser?.orgPosition === ORG_POSITIONS.RESPONSIBLE;
 
   if (!hasManagePerm && !isShiftSupervisor) {
     return { error: "دسترسی ندارید." };
@@ -303,7 +304,7 @@ export async function deleteUser(id: number) {
     where: { id: session.id },
   });
   const hasManagePerm = await hasPerm(session, "user.manage");
-  const isShiftSupervisor = currentUser?.orgPosition === 2;
+  const isShiftSupervisor = currentUser?.orgPosition === ORG_POSITIONS.RESPONSIBLE;
 
   if (!hasManagePerm && !isShiftSupervisor) return { error: "دسترسی ندارید." };
 
@@ -320,7 +321,7 @@ export async function deleteUser(id: number) {
     if (targetUser.shift !== currentUser.shift || targetUser.personnelType !== currentUser.personnelType) {
       return { error: "شما فقط مجاز به حذف پرسنل شیفت خود هستید." };
     }
-    if (targetUser.orgPosition === 2 || targetUser.orgPosition === 3) {
+    if (targetUser.orgPosition === ORG_POSITIONS.RESPONSIBLE || targetUser.orgPosition === ORG_POSITIONS.ADMIN) {
       return { error: "شما مجاز به حذف مسئولین یا ادمین‌ها نیستید." };
     }
   }
@@ -349,6 +350,107 @@ export async function deleteUser(id: number) {
   return {};
 }
 
+export async function createPhonebookContact(
+  _prev: { error?: string; ok?: boolean; contact?: any } | null,
+  fd: FormData
+): Promise<{ error?: string; ok?: boolean; contact?: any }> {
+  const session = await getSession();
+  if (!session || !(await hasPerm(session, "phonebook.edit"))) {
+    return { error: "دسترسی ندارید. شما مجاز به افزودن مخاطب در دفتر تلفن نیستید." };
+  }
+
+  const firstName = String(fd.get("firstName") ?? "").trim();
+  const lastName = String(fd.get("lastName") ?? "").trim();
+  const personnelCode = String(fd.get("personnelCode") ?? "").trim() || null;
+  const shift = Number(fd.get("shift") ?? 1);
+  const orgPosition = Number(fd.get("orgPosition") ?? 4);
+  const phone1 = String(fd.get("phone1") ?? "").trim() || null;
+  const phone2 = String(fd.get("phone2") ?? "").trim() || null;
+  const internalTel = String(fd.get("internalTel") ?? "").trim() || null;
+  const address = String(fd.get("address") ?? "").trim() || null;
+  const avatarColor = String(fd.get("avatarColor") ?? "").trim() || "hsla(" + Math.floor(Math.random() * 360) + ", 70%, 45%, 0.85)";
+
+  if (!firstName) return { error: "نام الزامی است." };
+  if (!lastName) return { error: "نام خانوادگی الزامی است." };
+
+  if (personnelCode) {
+    const dupCode = await prisma.personnel.findFirst({ where: { personnelCode } });
+    if (dupCode) return { error: "این کد پرسنلی قبلاً برای فرد دیگری ثبت شده است." };
+  }
+
+  const created = await prisma.personnel.create({
+    data: {
+      firstName,
+      lastName,
+      personnelCode,
+      shift,
+      orgPosition,
+      phone1,
+      phone2,
+      internalTel,
+      address,
+      avatarColor,
+      hasAccount: false,
+      role: 0,
+      personnelType: 1,
+    },
+  });
+
+  await audit(
+    session,
+    "personnel",
+    created.id,
+    "CREATE",
+    null,
+    created,
+    personnelCreatedSummary(created)
+  );
+
+  revalidatePath("/phonebook");
+  revalidatePath("/users");
+  return { ok: true, contact: created };
+}
+
+export async function deletePhonebookContact(id: number): Promise<{ error?: string; ok?: boolean }> {
+  const session = await getSession();
+  if (!session || !(await hasPerm(session, "phonebook.edit"))) {
+    return { error: "دسترسی ندارید. شما مجاز به حذف مخاطب نیستید." };
+  }
+
+  const target = await prisma.personnel.findUnique({ where: { id } });
+  if (!target) return { error: "مخاطب مورد نظر یافت نشد." };
+
+  if (target.hasAccount) {
+    const hasUserManage = await hasPerm(session, "user.manage");
+    if (!hasUserManage) {
+      return { error: "این مخاطب دارای حساب کاربری فعال است. برای حذف آن به دسترسی مدیریت کاربران نیاز دارید." };
+    }
+  }
+
+  const manovrCount = await prisma.manovr.count({
+    where: { OR: [{ rahbar1Id: id }, { rahbar2Id: id }, { creatorId: id }] },
+  });
+  if (manovrCount > 0) {
+    return { error: "این مخاطب در مانورها ثبت شده و امکان حذف آن وجود ندارد." };
+  }
+
+  await prisma.personnel.delete({ where: { id } });
+
+  await audit(
+    session,
+    "personnel",
+    id,
+    "DELETE",
+    target,
+    null,
+    personnelDeletedSummary(target)
+  );
+
+  revalidatePath("/phonebook");
+  revalidatePath("/users");
+  return { ok: true };
+}
+
 export async function updatePersonnelPhoneInfo(
   _prev: { error?: string; ok?: boolean } | null,
   fd: FormData
@@ -358,17 +460,46 @@ export async function updatePersonnelPhoneInfo(
     return { error: "دسترسی ندارید. شما مجاز به ویرایش دفتر تلفن نیستید." };
   }
   const id = Number(fd.get("id"));
-  const phone1 = String(fd.get("phone1") ?? "").trim() || null;
-  const phone2 = String(fd.get("phone2") ?? "").trim() || null;
-  const internalTel = String(fd.get("internalTel") ?? "").trim() || null;
-  const address = String(fd.get("address") ?? "").trim() || null;
-  const avatarColor = String(fd.get("avatarColor") ?? "").trim() || null;
-
   const before = await prisma.personnel.findUnique({ where: { id } });
+  if (!before) return { error: "مخاطب مورد نظر یافت نشد." };
+
+  const firstName = fd.has("firstName") ? String(fd.get("firstName") ?? "").trim() : before.firstName;
+  const lastName = fd.has("lastName") ? String(fd.get("lastName") ?? "").trim() : before.lastName;
+  const personnelCode = fd.has("personnelCode") ? (String(fd.get("personnelCode") ?? "").trim() || null) : before.personnelCode;
+  const shift = fd.has("shift") ? Number(fd.get("shift")) : before.shift;
+  const orgPosition = fd.has("orgPosition") ? Number(fd.get("orgPosition")) : before.orgPosition;
+
+  const phone1 = fd.has("phone1") ? (String(fd.get("phone1") ?? "").trim() || null) : before.phone1;
+  const phone2 = fd.has("phone2") ? (String(fd.get("phone2") ?? "").trim() || null) : before.phone2;
+  const internalTel = fd.has("internalTel") ? (String(fd.get("internalTel") ?? "").trim() || null) : before.internalTel;
+  const address = fd.has("address") ? (String(fd.get("address") ?? "").trim() || null) : before.address;
+  const avatarColor = fd.has("avatarColor") ? (String(fd.get("avatarColor") ?? "").trim() || null) : before.avatarColor;
+
+  if (firstName.length === 0 || lastName.length === 0) {
+    return { error: "نام و نام خانوادگی الزامی است." };
+  }
+
+  if (personnelCode && personnelCode !== before.personnelCode) {
+    const dupCode = await prisma.personnel.findFirst({
+      where: { personnelCode, NOT: { id } },
+    });
+    if (dupCode) return { error: "این کد پرسنلی قبلاً برای مخاطب دیگری ثبت شده است." };
+  }
 
   const updated = await prisma.personnel.update({
     where: { id },
-    data: { phone1, phone2, internalTel, address, avatarColor },
+    data: {
+      firstName,
+      lastName,
+      personnelCode,
+      shift,
+      orgPosition,
+      phone1,
+      phone2,
+      internalTel,
+      address,
+      avatarColor,
+    },
   });
 
   await audit(
@@ -399,7 +530,7 @@ export async function importPersonnelFromExcel(list: {
   orgPosition?: number;
 }[]): Promise<{ error?: string; count?: number }> {
   const session = await getSession();
-  const isShiftSupervisor = session ? (await prisma.personnel.findUnique({ where: { id: session.id } }))?.orgPosition === 2 : false;
+  const isShiftSupervisor = session ? (await prisma.personnel.findUnique({ where: { id: session.id } }))?.orgPosition === ORG_POSITIONS.RESPONSIBLE : false;
   if (!session || (
     !(await hasPerm(session, "report.import")) &&
     !(await hasPerm(session, "phonebook.edit")) &&
@@ -413,7 +544,7 @@ export async function importPersonnelFromExcel(list: {
   for (const row of list) {
     if (!row.firstName || !row.lastName) continue;
 
-    const rowRole = row.orgPosition === 3 ? 1 : row.orgPosition === 2 ? 2 : 3;
+    const rowRole = row.orgPosition === ORG_POSITIONS.ADMIN ? 1 : row.orgPosition === ORG_POSITIONS.RESPONSIBLE ? 2 : 3;
     if (!isRoleAllowedToManage(session.role, rowRole)) {
       row.orgPosition = 4;
     }

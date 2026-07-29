@@ -9,6 +9,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pi
 import { ManovrType, ManovrStatus, ConfirmationStatus, TrainType, Terminal, Shift, OrgPosition, PersonnelType } from "@/lib/enums";
 import ExcelJS from "exceljs";
 import JalaliDateTimePicker from "@/components/JalaliDateTimePicker";
+import DataTable, { Column } from "@/components/DataTable";
 
 const CHART_COLORS = ["#1f3a5f", "#d8842a", "#2e7d5b", "#b23b3b", "#6d28d9", "#4b5563"];
 
@@ -145,15 +146,65 @@ export default function ReportBuilderClient({
   const [rahbarToDate, setRahbarToDate] = useState<string>(() => new Date().toISOString());
   const [rahbarIsToday, setRahbarIsToday] = useState<boolean>(false);
 
-  // واچر برای اعمال زنده فیلترهای تاریخچه مانورها، قطارهای بادگیری شده و مثلث شده
+  const getFieldValue = useCallback((r: any, f: string, ent: string) => {
+    let val = r[f];
+    if (ent === "manovr") {
+      if (f === "type") val = ManovrType[r.type];
+      else if (f === "status") val = ManovrStatus[r.status];
+      else if (f === "confirmationStatus") val = ConfirmationStatus[r.confirmationStatus];
+      else if (f === "train") val = r.train?.code;
+      else if (f === "sourceLine") val = r.sourceLine?.name;
+      else if (f === "destinationLine") val = r.destinationLine?.name;
+      else if (f === "rahbar1") val = r.rahbar1 ? `${r.rahbar1.firstName} ${r.rahbar1.lastName}` : "";
+      else if (f === "creator") val = r.creator ? `${r.creator.firstName} ${r.creator.lastName}` : "سیستم";
+      else if (f === "createdAt") val = new Date(r.createdAt).toLocaleString("fa-IR", { timeZone: "Asia/Tehran", calendar: "persian" });
+      else if (f === "finishedAt") val = r.finishedAt ? new Date(r.finishedAt).toLocaleString("fa-IR", { timeZone: "Asia/Tehran", calendar: "persian" }) : "";
+      else if (f === "executionTime") val = r.executionTime ? new Date(r.executionTime).toLocaleString("fa-IR", { timeZone: "Asia/Tehran", calendar: "persian" }) : "";
+    } else if (ent === "train") {
+      if (f === "type") val = TrainType[r.type];
+      else if (f === "line") val = r.line?.name;
+      else if (f === "isDisposed") val = r.isDisposed ? "غیرفعال" : "فعال";
+    } else if (ent === "line") {
+      if (f === "terminal") val = Terminal[r.terminal];
+      else if (f === "isDynamic") val = r.isDynamic ? "دینامیک" : "ثابت";
+    } else if (ent === "personnel") {
+      if (f === "shift") val = Shift[r.shift];
+      else if (f === "orgPosition") val = OrgPosition[r.orgPosition];
+      else if (f === "personnelType") val = PersonnelType[r.personnelType];
+      else if (f === "personnelCode") val = r.personnelCode;
+    }
+    return val;
+  }, []);
+
+  const tableColumns = React.useMemo<Column<any>[]>(() => {
+    return fields.map(f => ({
+      key: f,
+      label: ENTITY_FIELDS[entity].find((x) => x.key === f)?.label || f,
+      sortable: true,
+      filterable: true,
+      getValue: (r) => getFieldValue(r, f, entity),
+      render: (r) => {
+        const val = getFieldValue(r, f, entity);
+        return <span className={typeof val === "number" || (typeof val === "string" && val.includes("/")) ? "num" : ""}>{val ?? "—"}</span>;
+      }
+    }));
+  }, [fields, entity, getFieldValue]);
+
+  // واچر برای اعمال زنده فیلترهای تاریخچه مانورها، قطارهای بادگیری شده، مثلث شده و انتقال‌های دائم
   useEffect(() => {
-    if (activeReportTab === "history" || activeReportTab === "triangulated" || activeReportTab === "air_charged") {
+    if (activeReportTab === "history" || activeReportTab === "triangulated" || activeReportTab === "air_charged" || activeReportTab === "permanent_transfers") {
       const activeFilters: ReportFilter[] = [];
 
       if (activeReportTab === "triangulated") {
         activeFilters.push({ field: "type", operator: "equals", value: "3" });
       } else if (activeReportTab === "air_charged") {
         activeFilters.push({ field: "type", operator: "equals", value: "11" });
+      } else if (activeReportTab === "permanent_transfers") {
+        if (historyType) {
+          activeFilters.push({ field: "type", operator: "equals", value: historyType });
+        } else {
+          activeFilters.push({ field: "type", operator: "between", value: "21", value2: "24" });
+        }
       } else if (historyType) {
         activeFilters.push({ field: "type", operator: "equals", value: historyType });
       }
@@ -258,6 +309,14 @@ export default function ReportBuilderClient({
       setEntity("manovr");
       setFields(["id", "train", "type", "sourceLine", "destinationLine", "executionTime", "status"]);
       setFilters([{ field: "type", operator: "equals", value: "11" }]);
+      setGroupBy("");
+      setChart("table");
+      setSortField("id");
+      setSortDirection("desc");
+    } else if (type === "permanent_transfers") {
+      setEntity("manovr");
+      setFields(["id", "train", "type", "sourceLine", "destinationLine", "rahbar1", "creator", "executionTime", "status"]);
+      setFilters([{ field: "type", operator: "between", value: "21", value2: "24" }]);
       setGroupBy("");
       setChart("table");
       setSortField("id");
@@ -731,6 +790,16 @@ export default function ReportBuilderClient({
               )
             },
             {
+              id: "permanent_transfers",
+              title: "گزارش انتقال‌های دائم",
+              desc: "مانورهای انتقال دائم و خروج قطار از پایانه در بازه زمانی",
+              icon: (
+                <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              )
+            },
+            {
               id: "rahbaran",
               title: "عملکرد راهبران",
               desc: "خلاصه مانورهای انجام شده به تفکیک راهبران",
@@ -848,11 +917,11 @@ export default function ReportBuilderClient({
         </div>
 
         {/* پنل‌های فیلتر پیشرفته بر اساس الگوها */}
-        {(activeReportTab === "history" || activeReportTab === "triangulated" || activeReportTab === "air_charged") && (
+        {(activeReportTab === "history" || activeReportTab === "triangulated" || activeReportTab === "air_charged" || activeReportTab === "permanent_transfers") && (
           <div className="card" style={{ padding: "16px", borderRadius: "12px", background: "var(--panel)", overflow: "visible" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px", borderBottom: "1px solid var(--line)", paddingBottom: "8px" }}>
               <span style={{ fontSize: "14px", fontWeight: "bold", color: "var(--accent)" }}>
-                🔍 فیلترهای پیشرفته تاریخچه مانورها {activeReportTab === "triangulated" && " (قطارهای مثلث شده)"} {activeReportTab === "air_charged" && " (قطارهای بادگیری شده)"}:
+                🔍 فیلترهای پیشرفته تاریخچه مانورها {activeReportTab === "triangulated" && " (قطارهای مثلث شده)"} {activeReportTab === "air_charged" && " (قطارهای بادگیری شده)"} {activeReportTab === "permanent_transfers" && " (گزارش انتقال‌های دائم)"}:
               </span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "12px" }}>
@@ -873,19 +942,30 @@ export default function ReportBuilderClient({
                 />
               </div>
               {/* نوع */}
-              <div className="field" style={{ marginBottom: 0, opacity: (activeReportTab === "history") ? 1 : 0.5 }}>
+              <div className="field" style={{ marginBottom: 0, opacity: (activeReportTab === "history" || activeReportTab === "permanent_transfers") ? 1 : 0.5 }}>
                 <label style={{ fontSize: "11px" }}>نوع مانور:</label>
                 <select
                   className="input sm"
                   style={{ height: "38px" }}
                   value={activeReportTab === "triangulated" ? "3" : activeReportTab === "air_charged" ? "11" : historyType}
                   onChange={(e) => setHistoryType(e.target.value)}
-                  disabled={activeReportTab !== "history"}
+                  disabled={activeReportTab === "triangulated" || activeReportTab === "air_charged"}
                 >
-                  <option value="">-- همه --</option>
-                  {Object.entries(ManovrType).map(([k, v]) => (
-                    <option key={k} value={k}>{v}</option>
-                  ))}
+                  <option value="">
+                    {activeReportTab === "permanent_transfers" ? "-- همه انتقال‌های دائم --" : "-- همه --"}
+                  </option>
+                  {activeReportTab === "permanent_transfers" ? (
+                    <>
+                      <option value="21">انتقال دائم به سایر خطوط</option>
+                      <option value="22">انتقال دائم به واگن‌سازی</option>
+                      <option value="23">سایر انتقال‌های دائم</option>
+                      <option value="24">انتقال دائم</option>
+                    </>
+                  ) : (
+                    Object.entries(ManovrType).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))
+                  )}
                 </select>
               </div>
               {/* قطار */}
@@ -1433,58 +1513,18 @@ export default function ReportBuilderClient({
                     </div>
                   )}
 
-                  {/* جدول داده‌ها همواره به همراه نمودارها یا به تنهایی نمایش داده می‌شود */}
+                  {/* جدول داده‌ها */}
                   <div className="tbl-wrap">
                     {chart !== "table" && (
                       <h3 style={{ fontSize: "13px", fontWeight: "bold", marginBottom: "12px", color: "var(--accent)" }}>
                         📋 جدول داده‌های تفصیلی گزارش (Data Table)
                       </h3>
                     )}
-                    <table className="data">
-                      <thead>
-                        <tr>
-                          {fields.map((f) => (
-                            <th key={f}>{ENTITY_FIELDS[entity].find((x) => x.key === f)?.label || f}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {displayRecords.map((r, i) => (
-                          <tr key={i}>
-                            {fields.map((f) => {
-                              let val = r[f];
-                              // فرمت‌دهی مقادیر خاص
-                              if (entity === "manovr") {
-                                if (f === "type") val = ManovrType[r.type];
-                                else if (f === "status") val = ManovrStatus[r.status];
-                                else if (f === "confirmationStatus") val = ConfirmationStatus[r.confirmationStatus];
-                                else if (f === "train") val = r.train?.code;
-                                else if (f === "sourceLine") val = r.sourceLine?.name;
-                                else if (f === "destinationLine") val = r.destinationLine?.name;
-                                else if (f === "rahbar1") val = r.rahbar1 ? `${r.rahbar1.firstName} ${r.rahbar1.lastName}` : "";
-                                else if (f === "creator") val = r.creator ? `${r.creator.firstName} ${r.creator.lastName}` : "سیستم";
-                                else if (f === "createdAt") val = new Date(r.createdAt).toLocaleString("fa-IR", { timeZone: "Asia/Tehran", calendar: "persian" });
-                                else if (f === "finishedAt") val = r.finishedAt ? new Date(r.finishedAt).toLocaleString("fa-IR", { timeZone: "Asia/Tehran", calendar: "persian" }) : "";
-                                else if (f === "executionTime") val = r.executionTime ? new Date(r.executionTime).toLocaleString("fa-IR", { timeZone: "Asia/Tehran", calendar: "persian" }) : "";
-                              } else if (entity === "train") {
-                                if (f === "type") val = TrainType[r.type];
-                                else if (f === "line") val = r.line?.name;
-                                else if (f === "isDisposed") val = r.isDisposed ? "غیرفعال" : "فعال";
-                              } else if (entity === "line") {
-                                if (f === "terminal") val = Terminal[r.terminal];
-                                else if (f === "isDynamic") val = r.isDynamic ? "دینامیک" : "ثابت";
-                              } else if (entity === "personnel") {
-                                if (f === "shift") val = Shift[r.shift];
-                                else if (f === "orgPosition") val = OrgPosition[r.orgPosition];
-                                else if (f === "personnelType") val = PersonnelType[r.personnelType];
-                                else if (f === "personnelCode") val = r.personnelCode;
-                              }
-                              return <td key={f} className={typeof val === "number" || (val && val.includes("/")) ? "num" : ""}>{val ?? "—"}</td>;
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <DataTable
+                      tableName="reportBuilder"
+                      columns={tableColumns}
+                      data={displayRecords}
+                    />
                   </div>
                 </div>
 

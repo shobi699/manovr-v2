@@ -223,6 +223,9 @@ const LOOKUPS = {
       { code: 18, label: "خروجی شهرآفتاب", color: "#075985" },
       { code: 19, label: "تعویض قطار", color: "#ca8a04" },
       { code: 20, label: "تعویض کفشک", color: "#eab308", meta: JSON.stringify({ isStatic: true }) },
+      { code: 21, label: "انتقال دائم به سایر خطوط", color: "#dc2626", meta: JSON.stringify({ isPermanent: true }) },
+      { code: 22, label: "انتقال دائم به واگن‌سازی", color: "#ea580c", meta: JSON.stringify({ isPermanent: true }) },
+      { code: 23, label: "سایر انتقال‌های دائم", color: "#b91c1c", meta: JSON.stringify({ isPermanent: true }) },
     ]
   },
   manovr_status: {

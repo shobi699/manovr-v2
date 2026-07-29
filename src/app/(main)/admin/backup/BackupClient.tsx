@@ -2,6 +2,7 @@
 
 import React, { useState, useTransition } from "react";
 import { triggerManualBackup, triggerSourceCodeBackup, deleteBackup, updateBackupSettings, restoreDatabaseAction } from "@/app/actions/backup";
+import DataTable, { Column } from "@/components/DataTable";
 
 interface BackupRecord {
   id: number;
@@ -380,128 +381,95 @@ export default function BackupClient({
               <p style={{ marginTop: "8px", fontSize: "14px" }}>هیچ فایل پشتیبانی ثبت نشده است.</p>
             </div>
           ) : (
-            <table className="table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "right" }}>
-              <thead>
-                <tr style={{ borderBottom: "2px solid var(--line)" }}>
-                  <th style={{ padding: "12px" }}>شناسه</th>
-                  <th style={{ padding: "12px" }}>تاریخ و زمان ایجاد</th>
-                  <th style={{ padding: "12px" }}>نوع پشتیبان</th>
-                  <th style={{ padding: "12px" }}>حجم فایل</th>
-                  <th style={{ padding: "12px" }}>وضعیت روی دیسک</th>
-                  <th style={{ padding: "12px", textAlign: "left" }}>دانلود و عملیات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {backups.map((b) => {
-                  const isCodeType = b.backupType === "source_code";
-                  return (
-                    <tr key={b.id} style={{ borderBottom: "1px solid var(--line-soft)" }}>
-                      <td style={{ padding: "12px", fontFamily: "var(--mono)" }}>{b.id}</td>
-                      <td style={{ padding: "12px" }}>{formatDate(b.createdAt)}</td>
-                      <td style={{ padding: "12px" }}>
-                        {isCodeType ? (
-                          <span className="pill" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent-ink)", fontSize: "11px" }}>سورس‌کد</span>
-                        ) : b.backupType === "manual" ? (
-                          <span className="pill p-info" style={{ fontSize: "11px" }}>دستی (دیتابیس)</span>
-                        ) : (
-                          <span className="pill p-good" style={{ fontSize: "11px" }}>
-                            خودکار ({b.schedule === "daily" ? "روزانه" : b.schedule === "weekly" ? "هفتگی" : "ماهانه"})
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ padding: "12px" }}>{formatBytes(b.fileSize)}</td>
-                      <td style={{ padding: "12px" }}>
-                        {isCodeType ? (
-                          <span className={`pill ${b.appExists ? "p-good" : "p-crit"}`} style={{ fontSize: "11px" }}>
-                            سورس‌کد: {b.appExists ? "موجود ✅" : "حذف‌شده ❌"}
-                          </span>
-                        ) : (
-                          <span className={`pill ${b.dbExists ? "p-good" : "p-crit"}`} style={{ fontSize: "11px" }}>
-                            دیتابیس: {b.dbExists ? "موجود ✅" : "حذف‌شده ❌"}
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ padding: "12px", textAlign: "left" }}>
-                        <div style={{ display: "inline-flex", gap: "8px", alignItems: "center" }}>
-                          
-                          {/* دانلود دیتابیس */}
-                          {!isCodeType && (
-                            <a
-                              href={b.dbExists ? `/api/admin/backups?id=${b.id}&type=db` : "#"}
-                              onClick={(e) => !b.dbExists && e.preventDefault()}
-                              className={`btn sm ${b.dbExists ? "" : "disabled"}`}
-                              style={{
-                                padding: "4px 8px",
-                                fontSize: "11px",
-                                backgroundColor: "var(--rail-soft)",
-                                color: "var(--rail)",
-                                opacity: b.dbExists ? 1 : 0.5,
-                              }}
-                              title="دانلود فایل دیتابیس sqlite"
-                            >
-                              📥 دانلود دیتابیس
-                            </a>
-                          )}
-
-                          {/* دکمه بازگردانی دیتابیس (فقط برای سوپرادمین و در صورت وجود فیزیکی فایل) */}
-                          {!isCodeType && isSuperAdmin && b.dbExists && (
-                            <button
-                              onClick={() => openRestoreModal(b.id)}
-                              className="btn sm"
-                              style={{
-                                padding: "4px 8px",
-                                fontSize: "11px",
-                                backgroundColor: "var(--warn-soft)",
-                                color: "var(--warn)",
-                                border: "none",
-                              }}
-                              title="بازگردانی دیتابیس سیستم به این نسخه"
-                            >
-                              ⏪ بازگردانی دیتابیس
-                            </button>
-                          )}
-
-                          {/* دانلود سورس کد (فقط برای سوپرادمین و در صورت کد بودن بکاپ) */}
-                          {isCodeType && isSuperAdmin && (
-                            <a
-                              href={b.appExists ? `/api/admin/backups?id=${b.id}&type=app` : "#"}
-                              onClick={(e) => !b.appExists && e.preventDefault()}
-                              className={`btn sm ${b.appExists ? "" : "disabled"}`}
-                              style={{
-                                padding: "4px 8px",
-                                fontSize: "11px",
-                                backgroundColor: "var(--accent-soft)",
-                                color: "var(--accent)",
-                                opacity: b.appExists ? 1 : 0.5,
-                              }}
-                              title="دانلود سورس کد zip"
-                            >
-                              📦 دانلود سورس‌کد
-                            </a>
-                          )}
-
-                          {/* دکمه حذف */}
-                          <button
-                            onClick={() => handleDelete(b.id)}
-                            className="btn sm"
-                            style={{
-                              padding: "4px 8px",
-                              fontSize: "11px",
-                              border: "1px solid var(--crit)",
-                              color: "var(--crit)",
-                              background: "transparent",
-                            }}
+            <DataTable
+              tableName="adminBackups"
+              columns={[
+                { key: "id", label: "شناسه", sortable: true, filterable: true, render: (b) => <span style={{ fontFamily: "var(--mono)" }}>{b.id}</span> },
+                { key: "createdAt", label: "تاریخ و زمان ایجاد", sortable: true, filterable: true, getValue: (b) => formatDate(b.createdAt), render: (b) => formatDate(b.createdAt) },
+                { 
+                  key: "backupType", 
+                  label: "نوع پشتیبان", 
+                  filterable: true,
+                  getValue: (b) => {
+                    const isCodeType = b.backupType === "source_code";
+                    return isCodeType ? "سورس‌کد" : b.backupType === "manual" ? "دستی (دیتابیس)" : `خودکار (${b.schedule === "daily" ? "روزانه" : b.schedule === "weekly" ? "هفتگی" : "ماهانه"})`;
+                  },
+                  render: (b) => {
+                    const isCodeType = b.backupType === "source_code";
+                    if (isCodeType) return <span className="pill" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent-ink)", fontSize: "11px" }}>سورس‌کد</span>;
+                    if (b.backupType === "manual") return <span className="pill p-info" style={{ fontSize: "11px" }}>دستی (دیتابیس)</span>;
+                    return <span className="pill p-good" style={{ fontSize: "11px" }}>خودکار ({b.schedule === "daily" ? "روزانه" : b.schedule === "weekly" ? "هفتگی" : "ماهانه"})</span>;
+                  }
+                },
+                { key: "fileSize", label: "حجم فایل", sortable: true, getValue: (b) => b.fileSize, render: (b) => formatBytes(b.fileSize) },
+                {
+                  key: "status",
+                  label: "وضعیت روی دیسک",
+                  filterable: true,
+                  getValue: (b) => {
+                    const isCodeType = b.backupType === "source_code";
+                    if (isCodeType) return b.appExists ? "سورس‌کد: موجود ✅" : "سورس‌کد: حذف‌شده ❌";
+                    return b.dbExists ? "دیتابیس: موجود ✅" : "دیتابیس: حذف‌شده ❌";
+                  },
+                  render: (b) => {
+                    const isCodeType = b.backupType === "source_code";
+                    if (isCodeType) return <span className={`pill ${b.appExists ? "p-good" : "p-crit"}`} style={{ fontSize: "11px" }}>سورس‌کد: {b.appExists ? "موجود ✅" : "حذف‌شده ❌"}</span>;
+                    return <span className={`pill ${b.dbExists ? "p-good" : "p-crit"}`} style={{ fontSize: "11px" }}>دیتابیس: {b.dbExists ? "موجود ✅" : "حذف‌شده ❌"}</span>;
+                  }
+                },
+                {
+                  key: "actions",
+                  label: "دانلود و عملیات",
+                  render: (b) => {
+                    const isCodeType = b.backupType === "source_code";
+                    return (
+                      <div style={{ display: "inline-flex", gap: "8px", alignItems: "center" }}>
+                        {!isCodeType && (
+                          <a
+                            href={b.dbExists ? `/api/admin/backups?id=${b.id}&type=db` : "#"}
+                            onClick={(e) => !b.dbExists && e.preventDefault()}
+                            className={`btn sm ${b.dbExists ? "" : "disabled"}`}
+                            style={{ padding: "4px 8px", fontSize: "11px", backgroundColor: "var(--rail-soft)", color: "var(--rail)", opacity: b.dbExists ? 1 : 0.5 }}
+                            title="دانلود فایل دیتابیس sqlite"
                           >
-                            🗑️ حذف
+                            📥 دانلود دیتابیس
+                          </a>
+                        )}
+                        {!isCodeType && isSuperAdmin && b.dbExists && (
+                          <button
+                            onClick={() => openRestoreModal(b.id)}
+                            className="btn sm"
+                            style={{ padding: "4px 8px", fontSize: "11px", backgroundColor: "var(--warn-soft)", color: "var(--warn)", border: "none" }}
+                            title="بازگردانی دیتابیس سیستم به این نسخه"
+                          >
+                            ⏪ بازگردانی دیتابیس
                           </button>
-
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        )}
+                        {isCodeType && isSuperAdmin && (
+                          <a
+                            href={b.appExists ? `/api/admin/backups?id=${b.id}&type=app` : "#"}
+                            onClick={(e) => !b.appExists && e.preventDefault()}
+                            className={`btn sm ${b.appExists ? "" : "disabled"}`}
+                            style={{ padding: "4px 8px", fontSize: "11px", backgroundColor: "var(--accent-soft)", color: "var(--accent)", opacity: b.appExists ? 1 : 0.5 }}
+                            title="دانلود سورس کد zip"
+                          >
+                            📦 دانلود سورس‌کد
+                          </a>
+                        )}
+                        <button
+                          onClick={() => handleDelete(b.id)}
+                          className="btn sm"
+                          style={{ padding: "4px 8px", fontSize: "11px", border: "1px solid var(--crit)", color: "var(--crit)", background: "transparent" }}
+                        >
+                          🗑️ حذف
+                        </button>
+                      </div>
+                    );
+                  }
+                }
+              ]}
+              data={backups}
+            />
           )}
         </div>
       </div>

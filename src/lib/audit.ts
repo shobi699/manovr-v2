@@ -3,8 +3,8 @@ import type { Session } from "@/lib/auth";
 import { emitSSEEvent, emitEntityChanged } from "@/lib/events";
 
 // محاسبه تفاوت‌های دو شیء
-export function computeDiff(before: any, after: any) {
-  const diff: Record<string, { old: any; new: any }> = {};
+export function computeDiff(before: Record<string, unknown> | null, after: Record<string, unknown> | null) {
+  const diff: Record<string, { old: unknown; new: unknown }> = {};
   
   const allKeys = Array.from(new Set([...Object.keys(before || {}), ...Object.keys(after || {})]));
   
@@ -35,8 +35,8 @@ export async function audit(
   entity: string,
   entityId: number,
   action: "CREATE" | "UPDATE" | "DELETE" | "CONFIRM",
-  before: any,
-  after: any,
+  before: Record<string, unknown> | null,
+  after: Record<string, unknown> | null,
   customSummary?: string
 ) {
   const actorId = session?.id ?? null;
@@ -91,8 +91,8 @@ async function handleAutoNotifications(
   entity: string,
   entityId: number,
   action: string,
-  before: any,
-  after: any,
+  before: Record<string, unknown> | null,
+  after: Record<string, unknown> | null,
   summary: string
 ) {
   // سناریو ۱: ثبت مانور جدید -> اعلان به تمام دارندگان مجوز تایید مانور (مسئولین شیفت و ادمین‌ها)
@@ -130,7 +130,7 @@ async function handleAutoNotifications(
 
   // سناریو ۲: تایید یا رد مانور -> اعلان به ثبت‌کننده مانور
   if (entity === "manovr" && action === "CONFIRM") {
-    const creatorId = after?.creatorId || before?.creatorId;
+    const creatorId = Number(after?.creatorId || before?.creatorId);
     if (creatorId && creatorId !== session?.id) {
       const isApproved = after?.confirmationStatus === 1;
       const notif = await prisma.notification.create({

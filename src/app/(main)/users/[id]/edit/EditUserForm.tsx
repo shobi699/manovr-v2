@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useActionState, useState } from "react";
+import { ORG_POSITIONS } from "@/lib/constants";
 import { useRouter } from "next/navigation";
 import { updateUser, resetPassword } from "@/app/actions/user";
 import { Role, OrgPosition, Shift, PersonnelType } from "@/lib/enums";
@@ -67,7 +68,7 @@ export default function EditUserForm({
 
   const actorLevel = getRoleLevel(currentUser?.role ?? 0);
 
-  const isShiftSupervisor = currentUser?.orgPosition === 2;
+  const isShiftSupervisor = currentUser?.orgPosition === ORG_POSITIONS.RESPONSIBLE;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>

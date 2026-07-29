@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useActionState, useState } from "react";
+import { ORG_POSITIONS } from "@/lib/constants";
 import { useRouter } from "next/navigation";
 import { createUser } from "@/app/actions/user";
 import { Role, OrgPosition, Shift, PersonnelType } from "@/lib/enums";
@@ -49,7 +50,7 @@ export default function NewUserForm({
     () => "hsla(" + Math.floor(Math.random() * 360) + ", 70%, 45%, 0.85)"
   );
 
-  const isShiftSupervisor = currentUser?.orgPosition === 2;
+  const isShiftSupervisor = currentUser?.orgPosition === ORG_POSITIONS.RESPONSIBLE;
 
   return (
     <form action={action}>

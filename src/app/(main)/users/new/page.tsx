@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { ORG_POSITIONS } from "@/lib/constants";
 import { getSession } from "@/lib/auth";
 import { hasPerm } from "@/lib/perms";
 import { redirect } from "next/navigation";
@@ -22,7 +23,7 @@ export default async function NewUserPage() {
   ]);
 
   const hasManagePerm = await hasPerm(session, "user.manage");
-  const isShiftSupervisor = currentUser?.orgPosition === 2;
+  const isShiftSupervisor = currentUser?.orgPosition === ORG_POSITIONS.RESPONSIBLE;
 
   if (!hasManagePerm && !isShiftSupervisor) redirect("/users");
 

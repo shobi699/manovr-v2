@@ -2,6 +2,7 @@
 
 import React, { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { updateUserProfile, updateUserSecurity } from "@/app/actions/profile";
 import { Role, OrgPosition, Shift } from "@/lib/enums";
 
@@ -51,11 +52,18 @@ export default function ProfileClient({
   user,
   stats,
   recentLogs,
+  logPage = 1,
+  totalLogsCount = 0,
 }: {
   user: UserProfile;
   stats: UserStats;
   recentLogs: ActivityLog[];
+  logPage?: number;
+  totalLogsCount?: number;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [profileForm, setProfileForm] = useState({
     phone1: user.phone1,
     phone2: user.phone2,
@@ -410,7 +418,7 @@ export default function ProfileClient({
               <h2>📜 لاگ آخرین فعالیت‌های شما</h2>
             </div>
             
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxHeight: "250px", overflowY: "auto", paddingInlineStart: "4px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px", minHeight: "250px" }}>
               {recentLogs.length === 0 ? (
                 <div style={{ padding: "24px", textAlign: "center", color: "var(--ink-soft)", fontSize: "12px" }}>
                   هیچ لاگ فعالیتی اخیراً ثبت نشده است.
@@ -444,6 +452,38 @@ export default function ProfileClient({
                 ))
               )}
             </div>
+
+            {totalLogsCount > 10 && (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px", paddingTop: "12px", borderTop: "1px solid var(--line)" }}>
+                <button 
+                  className="btn outline"
+                  style={{ padding: "4px 8px", fontSize: "12px" }}
+                  disabled={logPage <= 1}
+                  onClick={() => {
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.set("logPage", (logPage - 1).toString());
+                    router.push(pathname + "?" + params.toString(), { scroll: false });
+                  }}
+                >
+                  صفحه قبل
+                </button>
+                <span style={{ fontSize: "12px", color: "var(--ink-soft)" }}>
+                  صفحه {logPage} از {Math.ceil(totalLogsCount / 10)}
+                </span>
+                <button 
+                  className="btn outline"
+                  style={{ padding: "4px 8px", fontSize: "12px" }}
+                  disabled={logPage >= Math.ceil(totalLogsCount / 10)}
+                  onClick={() => {
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.set("logPage", (logPage + 1).toString());
+                    router.push(pathname + "?" + params.toString(), { scroll: false });
+                  }}
+                >
+                  صفحه بعد
+                </button>
+              </div>
+            )}
           </div>
 
         </div>

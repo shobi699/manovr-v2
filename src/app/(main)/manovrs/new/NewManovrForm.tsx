@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createManovr } from "@/app/actions/manovr";
 import { ManovrType } from "@/lib/enums";
+import { isPermanentTransfer } from "@/lib/manovr-rules";
 import JalaliDateTimePicker from "@/components/JalaliDateTimePicker";
 
 type LineOpt = { id: number; name?: string };
@@ -36,6 +37,8 @@ export default function NewManovrForm({
   const [destinationLineId, setDestinationLineId] = useState<string>("");
   const [isStaticMode, setIsStaticMode] = useState<boolean>(false);
 
+  const isPermType = isPermanentTransfer(Number(selectedType));
+
   // بررسی اینکه آیا نوع مانور انتخابی استاتیک یا تعویض کفشک است
   const isStaticType = (typeVal: string) => {
     const code = Number(typeVal);
@@ -50,7 +53,7 @@ export default function NewManovrForm({
     if (train && train.lineId) {
       const srcId = String(train.lineId);
       setSourceLineId(srcId);
-      if (isStaticMode || isStaticType(selectedType)) {
+      if (isStaticMode || isStaticType(selectedType) || isPermType) {
         setDestinationLineId(srcId);
       }
     }
@@ -61,6 +64,11 @@ export default function NewManovrForm({
     const isStatic = isStaticType(typeStr);
     if (isStatic) {
       setIsStaticMode(true);
+      if (sourceLineId) {
+        setDestinationLineId(sourceLineId);
+      }
+    } else if (isPermanentTransfer(Number(typeStr))) {
+      setIsStaticMode(false);
       if (sourceLineId) {
         setDestinationLineId(sourceLineId);
       }
@@ -91,18 +99,39 @@ export default function NewManovrForm({
           required
         >
           <option value="" disabled>انتخاب کنید…</option>
-          {manovrTypes && manovrTypes.length > 0
-            ? manovrTypes
-                .filter((v) => v.isActive)
-                .map((v) => (
-                  <option key={v.code} value={v.code}>{v.label}</option>
-                ))
-            : Object.entries(ManovrType).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))
-          }
+          {(() => {
+            const list = manovrTypes ? manovrTypes.filter((v) => v.isActive !== false) : [];
+            const existingCodes = new Set(list.map((v) => v.code));
+            for (const [k, v] of Object.entries(ManovrType)) {
+              const code = Number(k);
+              if (!existingCodes.has(code)) {
+                list.push({ code, label: v, isActive: true });
+              }
+            }
+            return list.sort((a, b) => a.code - b.code).map((v) => (
+              <option key={v.code} value={v.code}>{v.label}</option>
+            ));
+          })()}
         </select>
       </div>
+
+      {isPermType && (
+        <div
+          style={{
+            margin: "12px 0",
+            padding: "12px 14px",
+            borderRadius: "8px",
+            backgroundColor: "rgba(225, 29, 72, 0.08)",
+            border: "1px solid rgba(225, 29, 72, 0.3)",
+            color: "#e11d48",
+            fontSize: "12.5px",
+            lineHeight: 1.5,
+          }}
+        >
+          <strong style={{ display: "block", marginBottom: "4px" }}>🛑 مانور انتقال دائم (خروج از پایانه):</strong>
+          قطار انتخاب‌شده پس از ثبت این مانور، از تمامی نقشه‌های ۲بعدی و ۳بعدی پایانه خارج شده و وضعیت آن به خروج دائم/غیرفعال تغییر می‌یابد. گزارش این انتقال در سوابق مانورها محفوظ خواهد ماند.
+        </div>
+      )}
 
       <div className="field">
         <label htmlFor="trainId">قطار *</label>
@@ -124,31 +153,33 @@ export default function NewManovrForm({
       </div>
 
       {/* چک‌باکس و توضیحات مانور در محل (ثابت) */}
-      <div
-        style={{
-          margin: "12px 0",
-          padding: "12px 14px",
-          borderRadius: "8px",
-          backgroundColor: isStaticMode ? "rgba(59, 130, 246, 0.09)" : "var(--bg-subtle, #f8fafc)",
-          border: isStaticMode ? "1px solid rgba(59, 130, 246, 0.3)" : "1px solid var(--border-color, #e2e8f0)",
-          transition: "all 0.2s ease",
-        }}
-      >
-        <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", fontWeight: 600 }}>
-          <input
-            type="checkbox"
-            checked={isStaticMode}
-            onChange={(e) => handleStaticToggle(e.target.checked)}
-            style={{ width: 16, height: 16, accentColor: "#3b82f6" }}
-          />
-          <span>⚡ مانور در محل (ثبت روی همان خط بدون جابه‌جایی قطار)</span>
-        </label>
-        {isStaticMode && (
-          <div style={{ fontSize: "12.5px", color: "var(--color-primary, #2563eb)", marginTop: "6px", lineHeight: 1.5 }}>
-            عملیات (مانند تست استاتیک، تعویض کفشک و...) روی همان خط فعلی ثبت می‌شود و نیازی به انتقال قطار به خط مقصد دیگر نیست.
-          </div>
-        )}
-      </div>
+      {!isPermType && (
+        <div
+          style={{
+            margin: "12px 0",
+            padding: "12px 14px",
+            borderRadius: "8px",
+            backgroundColor: isStaticMode ? "rgba(59, 130, 246, 0.09)" : "var(--bg-subtle, #f8fafc)",
+            border: isStaticMode ? "1px solid rgba(59, 130, 246, 0.3)" : "1px solid var(--border-color, #e2e8f0)",
+            transition: "all 0.2s ease",
+          }}
+        >
+          <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", fontWeight: 600 }}>
+            <input
+              type="checkbox"
+              checked={isStaticMode}
+              onChange={(e) => handleStaticToggle(e.target.checked)}
+              style={{ width: 16, height: 16, accentColor: "#3b82f6" }}
+            />
+            <span>⚡ مانور در محل (ثبت روی همان خط بدون جابه‌جایی قطار)</span>
+          </label>
+          {isStaticMode && (
+            <div style={{ fontSize: "12.5px", color: "var(--color-primary, #2563eb)", marginTop: "6px", lineHeight: 1.5 }}>
+              عملیات (مانند تست استاتیک، تعویض کفشک و...) روی همان خط فعلی ثبت می‌شود و نیازی به انتقال قطار به خط مقصد دیگر نیست.
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid2">
         <div className="field">
@@ -161,7 +192,7 @@ export default function NewManovrForm({
             onChange={(e) => {
               const val = e.target.value;
               setSourceLineId(val);
-              if (isStaticMode) setDestinationLineId(val);
+              if (isStaticMode || isPermType) setDestinationLineId(val);
             }}
           >
             <option value="">— انتخاب مبدأ —</option>
@@ -172,21 +203,21 @@ export default function NewManovrForm({
         </div>
 
         <div className="field">
-          <label htmlFor="destinationLineId">مقصد *</label>
+          <label htmlFor="destinationLineId">مقصد {isPermType ? "(خروج دائم)" : "*"}</label>
           <select
             id="destinationLineId"
             name="destinationLineId"
             className="input"
             value={destinationLineId}
             onChange={(e) => setDestinationLineId(e.target.value)}
-            required
+            required={!isPermType}
           >
-            <option value="" disabled>انتخاب مقصد…</option>
+            <option value="" disabled={!isPermType}>{isPermType ? "— خروج دائم از پایانه —" : "انتخاب مقصد…"}</option>
             {lines.map((l) => {
               const isSame = sourceLineId && String(l.id) === sourceLineId;
               return (
                 <option key={l.id} value={l.id}>
-                  {l.name} {isSame ? " (همین خط - ثبت در محل)" : ""}
+                  {l.name} {isSame ? " (همین خط)" : ""}
                 </option>
               );
             })}

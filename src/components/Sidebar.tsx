@@ -11,6 +11,31 @@ import { motion } from "motion/react";
 import { useTheme } from "@/components/ThemeProvider";
 import { safeAccentColor } from "@/lib/branding";
 
+const DYNAMIC_NAV = [
+  { grp: "عملیات پایانه" },
+  { href: "/depot", icKey: "Depot", label: "نمای پایانه", perm: "depot.view" },
+  { href: "/dashboard", icKey: "Dashboard", label: "داشبورد و آمار", perm: "dashboard.view" },
+  { href: "/manovrs/approvals", icKey: "Approvals", label: "تأیید و کنترل مانورها", perm: "manovr.confirm" },
+  { href: "/manovrs", icKey: "History", label: "تاریخچه مانورها", perm: "manovr.view" },
+  { href: "/manovrs/new", icKey: "NewManovr", label: "ثبت مانور جدید", perm: "manovr.create" },
+  { grp: "اطلاعات پایه" },
+  { href: "/trains", icKey: "Trains", label: "مدیریت قطارها", perm: "train.manage" },
+  { href: "/lines", icKey: "Lines", label: "مدیریت خطوط ریل", perm: "line.manage" },
+  { href: "/users", icKey: "Users", label: "کاربران و پرسنل", perm: "user.manage" },
+  { href: "/roles", icKey: "Roles", label: "مدیریت نقش‌ها", perm: "role.manage" },
+  { href: "/phonebook", icKey: "Phonebook", label: "دفتر تلفن پرسنل", perm: "phonebook.view" },
+  { grp: "تحلیل و تنظیمات" },
+  { href: "/profile", icKey: "Profile", label: "پروفایل من" },
+  { href: "/tickets", icKey: "Tickets", label: "تیکت‌های پشتیبانی", perm: "ticket.create" },
+  { href: "/reports", icKey: "Reports", label: "گزارش‌ساز پویا", perm: "report.build" },
+  { href: "/settings", icKey: "Settings", label: "شخصی‌سازی تم" },
+  { href: "/admin/terminals", icKey: "Lookups", label: "مدیریت ترمینال‌ها", perm: "terminal.manage" },
+  { href: "/admin/lookups", icKey: "Lookups", label: "مدیریت مقادیر پویا", perm: "lookups.manage" },
+  { href: "/admin/branding", icKey: "Branding", label: "تنظیمات برندینگ", perm: "branding.manage" },
+  { href: "/admin/audit", icKey: "Audit", label: "لاگ وقایع سیستم", perm: "audit.view" },
+  { href: "/admin/backup", icKey: "Backup", label: "پشتیبان‌گیری سیستم", perm: "backup.manage" },
+];
+
 export default function Sidebar({
   userId,
   fullName,
@@ -93,34 +118,6 @@ export default function Sidebar({
     }
   };
 
-  const isManager = role === 1 || role === 2 || role === 4;
-  const isAdmin = role === 1 || role === 4;
-
-  const dynamicNav = [
-    { grp: "عملیات پایانه" },
-    { href: "/depot", icKey: "Depot", label: "نمای پایانه", perm: "depot.view" },
-    { href: "/dashboard", icKey: "Dashboard", label: "داشبورد و آمار", perm: "dashboard.view" },
-    { href: "/manovrs/approvals", icKey: "Approvals", label: "تأیید و کنترل مانورها", perm: "manovr.confirm" },
-    { href: "/manovrs", icKey: "History", label: "تاریخچه مانورها", perm: "manovr.view" },
-    { href: "/manovrs/new", icKey: "NewManovr", label: "ثبت مانور جدید", perm: "manovr.create" },
-    { grp: "اطلاعات پایه" },
-    { href: "/trains", icKey: "Trains", label: "مدیریت قطارها", perm: "train.manage" },
-    { href: "/lines", icKey: "Lines", label: "مدیریت خطوط ریل", perm: "line.manage" },
-    { href: "/users", icKey: "Users", label: "کاربران و پرسنل", perm: "user.manage" },
-    { href: "/roles", icKey: "Roles", label: "مدیریت نقش‌ها", perm: "role.manage" },
-    { href: "/phonebook", icKey: "Phonebook", label: "دفتر تلفن پرسنل", perm: "phonebook.view" },
-    { grp: "تحلیل و تنظیمات" },
-    { href: "/profile", icKey: "Profile", label: "پروفایل من" },
-    { href: "/tickets", icKey: "Tickets", label: "تیکت‌های پشتیبانی", perm: "ticket.create" },
-    { href: "/reports", icKey: "Reports", label: "گزارش‌ساز پویا", perm: "report.build" },
-    { href: "/settings", icKey: "Settings", label: "شخصی‌سازی تم" },
-    { href: "/admin/terminals", icKey: "Lookups", label: "مدیریت ترمینال‌ها", perm: "terminal.manage" },
-    { href: "/admin/lookups", icKey: "Lookups", label: "مدیریت مقادیر پویا", perm: "lookups.manage" },
-    { href: "/admin/branding", icKey: "Branding", label: "تنظیمات برندینگ", perm: "branding.manage" },
-    { href: "/admin/audit", icKey: "Audit", label: "لاگ وقایع سیستم", perm: "audit.view" },
-    { href: "/admin/backup", icKey: "Backup", label: "پشتیبان‌گیری سیستم", perm: "backup.manage" },
-  ];
-
   // بررسی دسترسی کاربر به یک لینک خاص
   const hasPermission = (perm?: string) => {
     if (role === 4) return true; // سوپرادمین به همه جا دسترسی دارد
@@ -130,7 +127,7 @@ export default function Sidebar({
 
   // فیلتر کردن منوهای ناوبری بر اساس مجوزها
   const filteredNav = React.useMemo(() => {
-    const allowedItems = dynamicNav.filter((n) => {
+    const allowedItems = DYNAMIC_NAV.filter((n) => {
       if ("href" in n && n.perm) {
         return hasPermission(n.perm);
       }

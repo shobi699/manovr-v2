@@ -3,6 +3,7 @@
 import React, { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveLookupValue, deleteLookupValue } from "@/app/actions/lookups";
+import DataTable, { Column } from "@/components/DataTable";
 
 interface LookupValue {
   id: number;
@@ -48,8 +49,10 @@ export default function LookupsClient({ initialTypes }: LookupsClientProps) {
     const maxCode = selectedType.values.reduce((max, v) => (v.code > max ? v.code : max), 0);
     const maxSort = selectedType.values.reduce((max, v) => (v.sortIdx > max ? v.sortIdx : max), 0);
     
+    const nextCode = selectedType.key === "manovr_type" ? Math.max(30, maxCode + 1) : maxCode + 1;
+
     setEditValue({
-      code: maxCode + 1,
+      code: nextCode,
       label: "",
       color: "#64748b",
       icon: "",
@@ -178,93 +181,97 @@ export default function LookupsClient({ initialTypes }: LookupsClientProps) {
 
             {/* جدول مقادیر */}
             <div className="table-w">
-              <table>
-                <thead>
-                  <tr>
-                    <th>کد (ID)</th>
-                    <th>عنوان فارسی</th>
-                    {selectedType.key === "manovr_type" && <th>رفتار عملیاتی</th>}
-                    <th>رنگ نشان‌گر</th>
-                    <th>ترتیب نمایش</th>
-                    <th>وضعیت</th>
-                    <th>اقدام</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedType.values.map((v) => {
-                    let isStatic = false;
-                    try {
-                      const metaParsed = JSON.parse(v.meta || "{}");
-                      isStatic = !!metaParsed.isStatic;
-                    } catch {}
-
-                    return (
-                      <tr key={v.id} style={{ opacity: v.isActive ? 1 : 0.5 }}>
-                        <td className="num">{v.code}</td>
-                        <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            {v.color && (
-                              <span 
-                                style={{ 
-                                  width: "12px", 
-                                  height: "12px", 
-                                  borderRadius: "50%", 
-                                  backgroundColor: v.color,
-                                  border: "1px solid var(--line)"
-                                }} 
-                              />
-                            )}
-                            <b>{v.label}</b>
-                          </div>
-                        </td>
-                        {selectedType.key === "manovr_type" && (
-                          <td>
-                            <span
-                              style={{
-                                fontSize: "11px",
-                                padding: "2px 8px",
-                                borderRadius: "6px",
-                                backgroundColor: isStatic ? "rgba(59, 130, 246, 0.15)" : "rgba(148, 163, 184, 0.12)",
-                                color: isStatic ? "#3b82f6" : "var(--fg-muted, #94a3b8)",
-                                border: isStatic ? "1px solid rgba(59, 130, 246, 0.3)" : "1px solid rgba(148, 163, 184, 0.2)",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {isStatic ? "⚡ ثابت (در محل)" : "🚀 داینامیک (انتقال)"}
-                            </span>
-                          </td>
+              <DataTable
+                tableName="adminLookups"
+                columns={[
+                  { key: "code", label: "کد (ID)", sortable: true, filterable: true, render: (v) => <span className="num">{v.code}</span> },
+                  { 
+                    key: "label", 
+                    label: "عنوان فارسی", 
+                    sortable: true, 
+                    filterable: true, 
+                    render: (v) => (
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", opacity: v.isActive ? 1 : 0.5 }}>
+                        {v.color && (
+                          <span 
+                            style={{ 
+                              width: "12px", 
+                              height: "12px", 
+                              borderRadius: "50%", 
+                              backgroundColor: v.color,
+                              border: "1px solid var(--line)"
+                            }} 
+                          />
                         )}
-                        <td className="num">{v.color || "—"}</td>
-                        <td className="num">{v.sortIdx}</td>
-                        <td>
-                          <span className={`pill ${v.isActive ? "p-good" : "p-mut"}`}>
-                            {v.isActive ? "فعال" : "غیرفعال"}
-                          </span>
-                        </td>
-                        <td>
-                          <div style={{ display: "flex", gap: "6px" }}>
-                            <button 
-                              onClick={() => handleEditClick(v)} 
-                              className="btn sm outline"
-                            >
-                              ✏️ ویرایش
-                            </button>
-                            {!selectedType.isSystem && (
-                              <button 
-                                onClick={() => handleDeleteClick(v)} 
-                                className="btn sm outline text-crit"
-                                style={{ borderColor: "rgba(239, 68, 68, 0.3)" }}
-                              >
-                                🗑️ حذف
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        <b>{v.label}</b>
+                      </div>
+                    )
+                  },
+                  ...(selectedType.key === "manovr_type" ? [{
+                    key: "behavior",
+                    label: "رفتار عملیاتی",
+                    filterable: true,
+                    getValue: (v: any) => {
+                      let isStatic = false;
+                      let isPermanent = false;
+                      try {
+                        const metaParsed = JSON.parse(v.meta || "{}");
+                        isStatic = !!metaParsed.isStatic;
+                        isPermanent = !!metaParsed.isPermanent || (v.code >= 21 && v.code <= 24);
+                      } catch {}
+                      return isPermanent ? "انتقال دائم" : isStatic ? "ثابت (در محل)" : "داینامیک (انتقال)";
+                    },
+                    render: (v: any) => {
+                      let isStatic = false;
+                      let isPermanent = false;
+                      try {
+                        const metaParsed = JSON.parse(v.meta || "{}");
+                        isStatic = !!metaParsed.isStatic;
+                        isPermanent = !!metaParsed.isPermanent || (v.code >= 21 && v.code <= 24);
+                      } catch {}
+                      
+                      if (isPermanent) {
+                        return <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "6px", backgroundColor: "rgba(225, 29, 72, 0.15)", color: "#e11d48", border: "1px solid rgba(225, 29, 72, 0.3)", fontWeight: 600 }}>🛑 انتقال دائم</span>;
+                      } else if (isStatic) {
+                        return <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "6px", backgroundColor: "rgba(59, 130, 246, 0.15)", color: "#3b82f6", border: "1px solid rgba(59, 130, 246, 0.3)", fontWeight: 600 }}>⚡ ثابت (در محل)</span>;
+                      } else {
+                        return <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "6px", backgroundColor: "rgba(148, 163, 184, 0.12)", color: "var(--fg-muted, #94a3b8)", border: "1px solid rgba(148, 163, 184, 0.2)", fontWeight: 600 }}>🚀 داینامیک (انتقال)</span>;
+                      }
+                    }
+                  } as Column<any>] : []),
+                  { key: "color", label: "رنگ نشان‌گر", filterable: true, render: (v) => <span className="num">{v.color || "—"}</span> },
+                  { key: "sortIdx", label: "ترتیب نمایش", sortable: true, render: (v) => <span className="num">{v.sortIdx}</span> },
+                  { 
+                    key: "status", 
+                    label: "وضعیت", 
+                    filterable: true,
+                    getValue: (v) => v.isActive ? "فعال" : "غیرفعال",
+                    render: (v) => (
+                      <span className={`pill ${v.isActive ? "p-good" : "p-mut"}`}>
+                        {v.isActive ? "فعال" : "غیرفعال"}
+                      </span>
+                    )
+                  },
+                  {
+                    key: "actions",
+                    label: "اقدام",
+                    render: (v) => (
+                      <div style={{ display: "flex", gap: "6px" }}>
+                        <button onClick={() => handleEditClick(v)} className="btn sm outline">
+                          ✏️ ویرایش
+                        </button>
+                        {!selectedType.isSystem && (
+                          <button onClick={() => handleDeleteClick(v)} className="btn sm outline text-crit" style={{ borderColor: "rgba(239, 68, 68, 0.3)" }}>
+                            🗑️ حذف
+                          </button>
+                        )}
+                      </div>
+                    )
+                  }
+                ]}
+                data={selectedType.values}
+                searchFields={["label", "code"]}
+              />
             </div>
           </div>
         )}
@@ -405,30 +412,42 @@ export default function LookupsClient({ initialTypes }: LookupsClientProps) {
                       <label className="label" style={{ fontWeight: 600, color: "var(--color-primary, #2563eb)", marginBottom: "6px", display: "block" }}>
                         رفتار عملیاتی این نوع مانور:
                       </label>
-                      <div style={{ display: "flex", gap: "20px", marginTop: "6px" }}>
+                      <div style={{ display: "flex", gap: "14px", marginTop: "6px", flexWrap: "wrap" }}>
                         <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "13px" }}>
                           <input
                             type="radio"
-                            name="isStaticRadio"
-                            checked={!!metaObj.isStatic}
+                            name="behaviorRadio"
+                            checked={!metaObj.isStatic && !metaObj.isPermanent}
                             onChange={() => {
-                              const updated = { ...metaObj, isStatic: true };
+                              const updated = { ...metaObj, isStatic: false, isPermanent: false };
                               setEditValue((prev) => ({ ...prev, meta: JSON.stringify(updated) }));
                             }}
                           />
-                          <span>⚡ <b>مانور در محل / ثابت</b> (روی همان خط بدون جابه‌جایی)</span>
+                          <span>🚀 <b>مانور داینامیک</b> (جابه‌جایی به ریل دیگر)</span>
                         </label>
                         <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "13px" }}>
                           <input
                             type="radio"
-                            name="isStaticRadio"
-                            checked={!metaObj.isStatic}
+                            name="behaviorRadio"
+                            checked={!!metaObj.isStatic}
                             onChange={() => {
-                              const updated = { ...metaObj, isStatic: false };
+                              const updated = { ...metaObj, isStatic: true, isPermanent: false };
                               setEditValue((prev) => ({ ...prev, meta: JSON.stringify(updated) }));
                             }}
                           />
-                          <span>🚀 <b>مانور داینامیک</b> (نیازمند جابه‌جایی به ریل دیگر)</span>
+                          <span>⚡ <b>مانور در محل / ثابت</b> (روی همان خط)</span>
+                        </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "13px" }}>
+                          <input
+                            type="radio"
+                            name="behaviorRadio"
+                            checked={!!metaObj.isPermanent}
+                            onChange={() => {
+                              const updated = { ...metaObj, isStatic: false, isPermanent: true };
+                              setEditValue((prev) => ({ ...prev, meta: JSON.stringify(updated) }));
+                            }}
+                          />
+                          <span>🛑 <b>انتقال دائم</b> (خروج قطار از پایانه)</span>
                         </label>
                       </div>
                     </div>

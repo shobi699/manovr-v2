@@ -9,6 +9,8 @@ export interface Column<T> {
   key: string;
   label: string;
   sortable?: boolean;
+  filterable?: boolean;
+  getValue?: (item: T) => any;
   render?: (item: T) => React.ReactNode;
 }
 
@@ -79,6 +81,11 @@ export default function DataTable<T extends Record<string, any>>({
   });
   const [showConfig, setShowConfig] = useState(false);
 
+  // وضعیت‌های فیلتر ستون‌ها
+  const [columnFilters, setColumnFilters] = useState<Record<string, Set<any>>>({});
+  const [openFilterCol, setOpenFilterCol] = useState<string | null>(null);
+  const [colSearchTerm, setColSearchTerm] = useState("");
+
   // وضعیت‌های فعال بستگی به حالت کلاینت یا سرور دارند
   const activeSearch = isServerMode ? server.search : search;
   const activeSortCol = isServerMode ? server.sortCol : sortCol;
@@ -127,13 +134,26 @@ export default function DataTable<T extends Record<string, any>>({
   const filtered = isServerMode
     ? data
     : data.filter((item) => {
-        if (!search || searchFields.length === 0) return true;
-        const term = search.toLowerCase();
-        return searchFields.some((field) => {
-          const val = item[field];
-          if (val === undefined || val === null) return false;
-          return String(val).toLowerCase().includes(term);
-        });
+        // جستجوی سراسری
+        if (search && searchFields.length > 0) {
+          const term = search.toLowerCase();
+          const matchesGlobal = searchFields.some((field) => {
+            const val = item[field];
+            if (val === undefined || val === null) return false;
+            return String(val).toLowerCase().includes(term);
+          });
+          if (!matchesGlobal) return false;
+        }
+
+        // فیلترهای ستونی
+        for (const [colKey, activeValues] of Object.entries(columnFilters)) {
+          if (activeValues.size === 0) continue;
+          const colDef = columns.find((c) => c.key === colKey);
+          let val = colDef?.getValue ? colDef.getValue(item) : item[colKey];
+          if (!activeValues.has(val)) return false;
+        }
+
+        return true;
       });
 
   // مرتب‌سازی
@@ -171,7 +191,7 @@ export default function DataTable<T extends Record<string, any>>({
     if (!isServerMode) {
       setCurrentPage(1);
     }
-  }, [search, sortCol, sortDir, pageSize, isServerMode]);
+  }, [search, sortCol, sortDir, pageSize, isServerMode, columnFilters]);
 
   const hasSelection = enableSelection || bulkActions.length > 0;
 
@@ -395,16 +415,135 @@ export default function DataTable<T extends Record<string, any>>({
               {activeColumns.map((col) => (
                 <th
                   key={col.key}
-                  onClick={() => col.sortable && handleSort(col.key)}
                   style={{
-                    cursor: col.sortable ? "pointer" : "default",
+                    position: "relative",
                     userSelect: "none",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    {col.label}
-                    {col.sortable && activeSortCol === col.key && (
-                      <span style={{ fontSize: "10px" }}>{activeSortDir === "asc" ? "▲" : "▼"}</span>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
+                    <div
+                      onClick={() => col.sortable && handleSort(col.key)}
+                      style={{ display: "flex", alignItems: "center", gap: "6px", cursor: col.sortable ? "pointer" : "default", flex: 1 }}
+                    >
+                      {col.label}
+                      {col.sortable && activeSortCol === col.key && (
+                        <span style={{ fontSize: "10px" }}>{activeSortDir === "asc" ? "▲" : "▼"}</span>
+                      )}
+                    </div>
+                    {col.filterable && (
+                      <div style={{ position: "relative" }}>
+                        <button
+                          type="button"
+                          className="btn icon sm"
+                          style={{
+                            padding: "4px",
+                            background: columnFilters[col.key]?.size > 0 ? "var(--accent-soft)" : "transparent",
+                            color: columnFilters[col.key]?.size > 0 ? "var(--accent)" : "var(--ink-soft)",
+                            border: "none",
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (openFilterCol === col.key) {
+                              setOpenFilterCol(null);
+                            } else {
+                              setOpenFilterCol(col.key);
+                              setColSearchTerm("");
+                            }
+                          }}
+                        >
+                          <Icons.Funnel size={14} weight={columnFilters[col.key]?.size > 0 ? "fill" : "regular"} />
+                        </button>
+                        {openFilterCol === col.key && (
+                          <>
+                            <div 
+                              style={{ position: "fixed", inset: 0, zIndex: 99 }} 
+                              onClick={(e) => { e.stopPropagation(); setOpenFilterCol(null); }} 
+                            />
+                            <div
+                              className="card"
+                              style={{
+                                position: "absolute",
+                                top: "100%",
+                                right: 0,
+                                marginTop: "4px",
+                                zIndex: 100,
+                                width: "220px",
+                                padding: "12px",
+                                boxShadow: "var(--shadow-lg)",
+                                fontWeight: "normal",
+                                cursor: "default",
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div style={{ fontSize: "12px", fontWeight: "bold", marginBottom: "8px" }}>فیلتر {col.label}</div>
+                              {col.sortable && (
+                                <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "12px", borderBottom: "1px solid var(--line-soft)", paddingBottom: "8px" }}>
+                                  <button type="button" className="btn sm outline" onClick={() => handleSort(col.key)} style={{ justifyContent: "flex-start", fontSize: "11px" }}>
+                                    {activeSortCol === col.key && activeSortDir === "asc" ? "▼ مرتب‌سازی نزولی" : "▲ مرتب‌سازی صعودی"}
+                                  </button>
+                                </div>
+                              )}
+                              {!isServerMode && (
+                                <>
+                                  <input
+                                    type="text"
+                                    placeholder="جستجو در مقادیر..."
+                                    className="input search sm"
+                                    style={{ width: "100%", marginBottom: "8px", fontSize: "11px", padding: "4px 8px" }}
+                                    value={colSearchTerm}
+                                    onChange={(e) => setColSearchTerm(e.target.value)}
+                                  />
+                                  <div style={{ maxHeight: "150px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "6px", marginBottom: "8px" }}>
+                                    {(() => {
+                                      const allVals = Array.from(new Set(data.map(item => col.getValue ? col.getValue(item) : item[col.key])));
+                                      const filteredVals = allVals.filter(v => v !== undefined && v !== null && String(v).toLowerCase().includes(colSearchTerm.toLowerCase()));
+                                      const activeSet = columnFilters[col.key] || new Set();
+                                      
+                                      return filteredVals.map((v, i) => (
+                                        <label key={i} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", cursor: "pointer" }}>
+                                          <input
+                                            type="checkbox"
+                                            checked={activeSet.has(v)}
+                                            onChange={(e) => {
+                                              const nextSet = new Set(activeSet);
+                                              if (e.target.checked) nextSet.add(v);
+                                              else nextSet.delete(v);
+                                              setColumnFilters(prev => ({ ...prev, [col.key]: nextSet }));
+                                            }}
+                                            style={{ accentColor: "var(--accent)", width: "12px", height: "12px", flexShrink: 0 }}
+                                          />
+                                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{String(v)}</span>
+                                        </label>
+                                      ));
+                                    })()}
+                                  </div>
+                                  <div style={{ display: "flex", gap: "6px", justifyContent: "space-between" }}>
+                                    <button
+                                      type="button"
+                                      className="btn sm"
+                                      style={{ fontSize: "11px", padding: "2px 6px" }}
+                                      onClick={() => {
+                                        const allVals = new Set(data.map(item => col.getValue ? col.getValue(item) : item[col.key]).filter(v => v !== undefined && v !== null));
+                                        setColumnFilters(prev => ({ ...prev, [col.key]: allVals }));
+                                      }}
+                                    >
+                                      انتخاب همه
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn sm"
+                                      style={{ fontSize: "11px", padding: "2px 6px", color: "var(--crit-soft)" }}
+                                      onClick={() => setColumnFilters(prev => ({ ...prev, [col.key]: new Set() }))}
+                                    >
+                                      پاک کردن
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
                     )}
                   </div>
                 </th>

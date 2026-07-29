@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { ORG_POSITIONS } from "@/lib/constants";
 import { getSession } from "@/lib/auth";
 import { hasPerm } from "@/lib/perms";
 import { redirect } from "next/navigation";
@@ -47,7 +48,7 @@ export default async function UsersPage({
   const shifts = shiftLookup?.values || [];
   const roles = roleLookup?.values || [];
 
-  const isShiftSupervisor = currentUser?.orgPosition === 2;
+  const isShiftSupervisor = currentUser?.orgPosition === ORG_POSITIONS.RESPONSIBLE;
   const canManageAll = await hasPerm(session, "user.manage");
 
   if (!canManageAll && !isShiftSupervisor) {
