@@ -101,7 +101,7 @@ the same standard as 001–016, with every factual claim checked against the cod
 | 018 | **REWRITE** | Warning count off by 2.4×; named functions do not exist; premise already resolved |
 | 019 | **REWRITE** | Right concern, wrong file — cited routes contain zero Prisma calls |
 | 020 | Implemented, **tests are weak** | 7 assertions total; at least one passes for the wrong reason |
-| 021 | Implemented, **but non-functional** | No preload script, so the IPC path is dead code |
+| 021 | **FIXED** — was non-functional | Preload bridge was missing entirely; now wired and guarded by tests |
 | 022 | Implemented | Plausible as written |
 
 **017** claims `train.ts`, `manovr.ts`, `lookups.ts`, and `tickets.ts` "mutate
@@ -128,13 +128,22 @@ concern is real — `executeReportQuery` in `src/lib/report-engine.ts` is genuin
 unbounded — but every step targets the wrong file, so the plan cannot be executed
 as written.
 
-**021** is implemented but does not work. `main.js:11` registers
+**021 has since been fixed** (see below). As originally shipped it did not work:
+`main.js:11` registered
 `ipcMain.handle('show-notification', …)` and `src/lib/electron-notify.ts` calls
 `window.electronAPI.showNotification(…)`, but `webPreferences` sets
 `contextIsolation: true` with **no `preload` script**, and no `contextBridge`
 call exists anywhere in the repo. `window.electronAPI` is therefore permanently
-`undefined`: the Electron branch is unreachable and every notification silently
-falls through to the Web Notification API. The `ipcMain` handler is dead code.
+`undefined`: the Electron branch was unreachable and every notification silently
+fell through to the Web Notification API. The `ipcMain` handler was dead code.
+
+The fix adds `preload.js` exposing a minimal, length-bounded `electronAPI`
+surface via `contextBridge`, wires it into `webPreferences`, registers it in
+`package.json > build.files` so it actually ships, hardens the IPC handler
+against malformed payloads and non-main-window senders, and adds
+`src/lib/__tests__/electron-wiring.test.ts` to guard all three legs of the
+bridge. Verified by mutation: removing the `preload:` line fails one test,
+dropping `preload.js` from `build.files` fails another.
 
 **020**'s three files hold 7 tests and 7 assertions between them. The
 hierarchy test in `user-actions.test.ts` asserts only

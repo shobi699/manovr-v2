@@ -8,7 +8,7 @@ const eslintConfig = defineConfig([
   {
     // main.js پروسه اصلی الکترون است و مستقیماً توسط Node اجرا می‌شود، نه از طریق
     // باندلر. بنابراین require در آن درست است و خطای واقعی محسوب نمی‌شود.
-    files: ["main.js"],
+    files: ["main.js", "preload.js"],
     rules: {
       "@typescript-eslint/no-require-imports": "off",
     },

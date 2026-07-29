@@ -88,6 +88,7 @@
     ],
     "files": [
       "main.js",
+      "preload.js",
       ".next/standalone/**/*",
       "!.next/standalone/**/.env*",
       "public/**/*",

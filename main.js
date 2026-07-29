@@ -7,18 +7,27 @@ const http = require('http');
 let mainWindow = null;
 let serverProcess = null;
 
-// ثبت handler اعلانات نیتیو سیستم‌عامل در الکترون
-ipcMain.handle('show-notification', (event, { title, body }) => {
-  if (Notification.isSupported()) {
-    const notif = new Notification({
-      title: title || 'سامانه مدیریت مانور',
-      body: body || '',
-      silent: false,
-    });
-    notif.show();
-    return { ok: true };
+// ثبت handler اعلانات نیتیو سیستم‌عامل در الکترون.
+// ورودی از سمت رندرر می‌آید و نباید مورد اعتماد فرض شود؛ payload ممکن است
+// undefined یا با نوع نادرست باشد، بنابراین destructuring مستقیم انجام نمی‌شود.
+ipcMain.handle('show-notification', (event, payload) => {
+  // فقط پنجره اصلی برنامه مجاز به فراخوانی این API نیتیو است
+  if (!mainWindow || event.sender !== mainWindow.webContents) {
+    return { ok: false, error: 'Unauthorized sender' };
   }
-  return { ok: false, error: 'Notifications not supported' };
+
+  if (!Notification.isSupported()) {
+    return { ok: false, error: 'Notifications not supported' };
+  }
+
+  const title = typeof payload?.title === 'string' && payload.title.trim()
+    ? payload.title.slice(0, 120)
+    : 'سامانه مدیریت مانور';
+  const body = typeof payload?.body === 'string' ? payload.body.slice(0, 500) : '';
+
+  const notif = new Notification({ title, body, silent: false });
+  notif.show();
+  return { ok: true };
 });
 
 // آدرس لوکال دیتابیس در پوشه AppData کاربر
@@ -172,6 +181,11 @@ function createWindow(port) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      // بدون این preload، پل contextBridge ساخته نمی‌شود و window.electronAPI
+      // هرگز در رندرر وجود نخواهد داشت — یعنی مسیر اعلان نیتیو به‌صورت خاموش
+      // از کار می‌افتد. اگر این خط حذف شود، preload.js نیز باید از
+      // package.json > build.files حذف گردد.
+      preload: path.join(__dirname, 'preload.js'),
     },
     title: 'سامانه مدیریت مانور دپو',
     autoHideMenuBar: true, // پنهان کردن منوهای بالای صفحه
