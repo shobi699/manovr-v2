@@ -258,9 +258,14 @@ export function useLiveRefresh(channels: string[]) {
   // باعث بستن و باز کردن دوباره اتصال SSE نشود
   const channelKey = useMemo(() => [...channels].sort().join("|"), [channels]);
 
-  // آخرین لیست کانال‌ها بدون ایجاد وابستگی در افکت
+  // آخرین لیست کانال‌ها بدون ایجاد وابستگی در افکت اصلی.
+  // نوشتن در ref باید داخل افکت انجام شود، نه در بدنه‌ی رندر — قانون
+  // react-hooks/refs کامپایلر ری‌اکت نوشتن در زمان رندر را خطا می‌داند.
   const channelsRef = useRef(channels);
-  channelsRef.current = channels;
+
+  useEffect(() => {
+    channelsRef.current = channels;
+  });
 
   useEffect(() => {
     const eventSource = new EventSource("/api/events");
@@ -296,10 +301,20 @@ Three things to get right:
 Also drop the `console.log` at the old line 14. It fires on every matched event
 on every open page; it is debug output that shipped.
 
-Note `eslint-plugin-react-hooks` may warn that `channels` is used inside the
-effect via the ref. It is not a dependency in the meaningful sense — the ref is
-read at call time. If the rule fires, silence it at that line with a comment
-explaining why, rather than adding `channels` back to the array.
+**The ref write must be inside an effect, not in the render body.** Writing
+`channelsRef.current = channels` directly during render is a
+`react-hooks/refs` error under `eslint-plugin-react-hooks` v6 ("Cannot access
+refs during render") — it is an **error**, not a warning, so it breaks the lint
+gate. The dependency-free `useEffect` shown above runs after every render, which
+is exactly the semantics wanted: the ref always holds the latest list by the
+time any message arrives.
+
+Note the second effect reads `channelsRef.current`, not `channels`. That is
+deliberate — the ref is read at message-delivery time, so `channels` is not a
+dependency of that effect in any meaningful sense. If
+`react-hooks/exhaustive-deps` warns, silence it at that line with a comment
+explaining why, rather than adding `channels` back to the array and restoring
+the reconnect loop.
 
 **Verify**:
 - `npx tsc --noEmit` → exit 0

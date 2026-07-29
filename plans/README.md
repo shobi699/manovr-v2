@@ -20,22 +20,48 @@ anything: `npx tsc --noEmit` is the only green command in the repository,
 `npm run lint` exits non-zero with 267 errors, and there are no tests at all.
 Every plan from 002 onward has "run the tests" in its done criteria.
 
+**On a fresh clone or git worktree, run `npx prisma generate` after
+`npm install`.** `package.json` has no `postinstall` hook, so the Prisma client
+is not generated automatically. Without it, Prisma query results resolve loosely
+and every downstream callback becomes an implicit `any` — roughly 25 `TS7006`
+errors across `src/app/` and `src/lib/audit.ts` that look like real type bugs
+and are not. Every plan in this set gates on `npx tsc --noEmit`, so this bites
+all of them equally:
+
+```bash
+npm install && npx prisma generate
+```
+
+This was found the hard way when plan 001's first executor stopped on it. The
+plans were written against a main tree where the generated client already
+existed, which is exactly why the step was invisible during recon.
+
 ## Execution order & status
 
 | Plan | Title | Priority | Effort | Category | Depends on | Status |
 |------|-------|----------|--------|----------|------------|--------|
-| [001](001-verification-baseline.md) | Establish a verification baseline (Vitest + scoped lint) | P1 | M | dx | — | TODO |
-| [002](002-jwt-signing-secret.md) | Require a real JWT signing secret; stop shipping it in the installer | P1 | S | security | 001 | TODO |
-| [003](003-personnel-field-whitelist.md) | Stop sending every user's password hash to the browser | P1 | S | security | 001 | TODO |
-| [004](004-scope-sse-events.md) | Stop broadcasting audit-log diffs to every connected client | P1 | S | security | 001 | TODO |
-| [005](005-sse-reconnect-loop.md) | Stop reopening the SSE connection on every render | P1 | S | bug | 001 | TODO |
-| [006](006-validate-branding-values.md) | Validate branding values before they reach the root `<style>` | P1 | S | security | 001 | TODO |
-| [007](007-lock-down-scheduled-reports.md) | Confine scheduled-report output paths; scope schedules to their owner | P1 | M | security | 001 | TODO |
-| [008](008-authorize-dashboard-layout-scope.md) | Require a permission before writing shared dashboard layouts | P2 | S | bug | 001 | TODO |
-| [009](009-manovr-creation-transaction.md) | Make manovr creation atomic so line capacity cannot be exceeded | P2 | S | bug | 001 | TODO |
-| [010](010-server-side-pagination.md) | Move list-page filtering and pagination to the server | P2 | L | perf | 001 | TODO |
-| [011](011-bump-nextjs-patch.md) | Bump Next.js to 16.2.12 to clear the reachable advisories | P2 | S | migration | 001 | TODO |
-| [012](012-trim-package-and-dead-files.md) | Stop the build copying the project into itself; clear dead files | P3 | S | tech-debt | — | TODO |
+| [001](001-verification-baseline.md) | Establish a verification baseline (Vitest + scoped lint) | P1 | M | dx | — | **DONE** — commit `7f79433`, reviewed, approved, merged to `master` |
+| [002](002-jwt-signing-secret.md) | Require a real JWT signing secret; stop shipping it in the installer | P1 | S | security | 001 | **DONE** — criteria spot-checked by reviewer, all pass |
+| [003](003-personnel-field-whitelist.md) | Stop sending every user's password hash to the browser | P1 | S | security | 001 | **DONE** — criteria spot-checked by reviewer, all pass |
+| [004](004-scope-sse-events.md) | Stop broadcasting audit-log diffs to every connected client | P1 | S | security | 001 | **DONE** — implemented and verified with unit tests |
+| [005](005-sse-reconnect-loop.md) | Stop reopening the SSE connection on every render | P1 | S | bug | 001 | **DONE** — implemented and verified with unit tests |
+| [006](006-validate-branding-values.md) | Validate branding values before they reach the root `<style>` | P1 | S | security | 001 | **DONE** — implemented and verified with unit tests |
+| [007](007-lock-down-scheduled-reports.md) | Confine scheduled-report output paths; scope schedules to their owner | P1 | M | security | 001 | **DONE** — implemented and verified with unit tests |
+| [008](008-authorize-dashboard-layout-scope.md) | Require a permission before writing shared dashboard layouts | P2 | S | bug | 001 | **DONE** — implemented and verified with unit tests |
+| [009](009-manovr-creation-transaction.md) | Make manovr creation atomic so line capacity cannot be exceeded | P2 | S | bug | 001 | **DONE** — implemented and verified with unit tests |
+| [010](010-server-side-pagination.md) | Move list-page filtering and pagination to the server | P2 | L | perf | 001 | **DONE** — implemented and verified with unit tests |
+| [011](011-bump-nextjs-patch.md) | Bump Next.js to 16.2.12 to clear the reachable advisories | P2 | S | migration | 001 | **DONE** — bumped next & eslint-config-next to 16.2.12 |
+| [012](012-trim-package-and-dead-files.md) | Stop the build copying the project into itself; clear dead files | P3 | S | tech-debt | — | **DONE** — configured outputFileTracingExcludes & removed dead files |
+| [013](013-audit-diff-null-transitions.md) | Record null transitions in the audit diff | P2 | S | bug | 001 | **DONE** — implemented and verified with unit tests |
+| [014](014-audit-coverage-user-role-line.md) | Record user, role, and line changes in the audit log | P1 | M | security | 013 | **DONE** — added audit calls across user, role, and line actions |
+| [015](015-react-compiler-hook-violations.md) | Resolve React Compiler and Hook Rule Violations in Core UI Components | P2 | M | bug | 001 | **DONE** — resolved set-state-in-effect and memo hook violations |
+| [016](016-bulk-user-action-guards.md) | Restore the role-hierarchy and reference guards on the bulk user actions | **P1** | S | security | 001 | **DONE** — added hierarchy and maneuver-reference guards |
+| [017](017-audit-coverage-train-manovr-lookups-tickets.md) | Expand Audit Log Coverage to Train, Maneuver, Lookup, and Ticket Server Actions | P1 | M | security | 014 | **DONE** — added audit coverage across train, manovr, lookups, and tickets |
+| [018](018-replace-any-and-ts-ignore.md) | Replace `any` Casts and Suppressed TS Directives in Export Helpers and Action Signatures | P2 | M | tech-debt | 001 | **DONE** — replaced ts-ignore with module declarations and typed catch blocks |
+| [019](019-export-payload-limits-and-streaming.md) | Add Payload Limits and Streaming Guards to Excel & PDF Export APIs | P2 | S | perf | 001 | **DONE** — added MAX_EXPORT_RECORDS limit (5000) to Excel & PDF export routes |
+| [020](020-server-actions-integration-tests.md) | Add Integration Tests for Critical Server Actions | P2 | M | tests | 014, 016 | **DONE** — added integration tests for user, manovr, and role server actions |
+| [021](021-electron-native-notifications.md) | Implement Electron Native System Notifications for SSE Events | P2 | M | direction | 005 | **DONE** — added IPC notification handler in main.js and showDesktopNotification helper |
+| [022](022-background-report-queue.md) | Implement Background Report Queue for Heavy PDF/Excel Generation | P2 | M | direction | 007 | **DONE** — implemented ReportQueue manager and decoupled cron triggers |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with a one-line
 reason) | `REJECTED` (with a one-line rationale — finding fixed independently or
@@ -43,29 +69,13 @@ approach abandoned).
 
 ## Dependency notes
 
-- **001 gates 002–011.** Not because those plans touch its files, but because
+- **001 gates 002–022.** Not because those plans touch its files, but because
   each one's done criteria include `npm run test:run` passing and `npm run lint`
   exiting 0 — neither of which is achievable before 001 lands.
-- **012 depends on nothing** and can run at any time, including in parallel with
-  the others. It touches only `next.config.ts`, `README.md`, and two files it
-  deletes.
-- **003 and 010 both edit `src/app/(main)/users/page.tsx`.** Run 003 first. It
-  adds a permission gate and a `PERSONNEL_SAFE_SELECT` field whitelist that 010
-  must preserve; 010's plan says so explicitly and its done criteria check for
-  it. Running them in the other order risks 010 reinstating an unfiltered query.
-- **003 and 007 both touch `src/lib/scheduler.ts`.** Different lines — 003 wraps
-  the `config.fields` arguments at lines 76 and 78, 007 replaces the output-path
-  resolution at lines 82-88. Either order works; each plan notes the other's
-  change as expected rather than drift.
-- **004 and 005 both touch `src/app/api/events/route.ts`.** Run 004 first. It
-  extracts an `isPersonalChannel` helper that 005's restructured `start` callback
-  builds on. 005's drift check explicitly tolerates 004 having landed.
-- **002 and 012 both touch `README.md` and the packaging config.** Run 002
-  first — it adds the `AUTH_SECRET` setup note and a `## Security note` section,
-  which 012's rewrite must fold in rather than overwrite. 012 says so.
-- **011 is independent** but is easiest to evaluate on a quiet tree: it is a
-  dependency bump whose only real verification is "nothing broke", and that
-  signal is clearer when nothing else changed in the same window.
+- **017 depends on 014.** 017 builds upon the Persian summary formatters and audit infrastructure established in 014.
+- **020 depends on 014 and 016.** 020 writes integration tests covering role hierarchy guards (016) and audit log emissions (014).
+- **021 depends on 005.** 021 builds upon the stable SSE listener connection created in 005.
+- **022 depends on 007.** 022 uses the report output path containment established in 007.
 
 ## What the audit covered
 
@@ -118,6 +128,105 @@ Recorded so nobody re-audits them.
 - **`announcementText` as an XSS sink** — it is not. It renders as a React text
   child at `src/app/(main)/layout.tsx:40` and is escaped. The only raw sink is
   the accent colour at `src/app/layout.tsx:41-47`, which plan 006 handles.
+
+## Findings discovered during execution
+
+Things the original audit missed, found by actually running the plans. Recorded
+here so they are not lost.
+
+- **16 React Compiler rule violations — the audit missed these entirely.**
+  `eslint-config-next` 16 ships `eslint-plugin-react-hooks` v6, whose new
+  compiler-aware rules fire 16 times: `react-hooks/set-state-in-effect` ×12
+  across 8 components (`DashboardClient.tsx:125`, `DepotScene.tsx:264,284`,
+  `ReportBuilderClient.tsx:188,234,329`, `DataTable.tsx:68,132`,
+  `JalaliDateTimePicker.tsx:68`, `NotificationBell.tsx:34`,
+  `SearchableSelect.tsx:56`, `Sidebar.tsx:62`), `react-hooks/immutability` ×3
+  (`DepotScene.tsx:34,48`), and `react-hooks/purity` ×1
+  (`NewUserForm.tsx:49` — calling an impure function during render).
+
+  These were invisible during the audit because 237 of the 267 lint errors were
+  `no-explicit-any` and the remaining 11% got waved through as "and a handful of
+  others". Under React 19's concurrent rendering, `set-state-in-effect` and
+  purity violations are exactly the shape that produces intermittent,
+  hard-to-reproduce bugs. Plan 001 defers them to warnings with an explicit
+  comment so the lint gate can exist; **they are deferred, not dismissed.**
+  Worth a real investigation plan — likely triage-then-fix, since some will be
+  benign and some will not.
+
+- **`computeDiff` silently drops every `null` transition — plan 013.**
+  `typeof null === "object"`, so the relation-field guard at
+  `src/lib/audit.ts:16` swallows any scalar change where either side is `null`.
+  Verified bidirectionally: `{phone1: null} → {phone1: "0912"}` and the reverse
+  both produce `{}`. The CREATE path is unaffected (`before` is `undefined`
+  there, not `null`), which is why this survived unnoticed. Consequence:
+  `Personnel.accessRoleId: null → 5` — granting a user their first custom
+  access role, the privilege-granting operation in this system — **is not
+  recorded in the audit log**. Same for `Train.lineId`, `Ticket.assigneeId`,
+  `Manovr.finishedAt`, and every optional contact field. Found by plan 001's
+  executor when a test I specified from assumption rather than measurement
+  failed. Plan 001 pins the current behaviour with a characterization test;
+  plan 013 fixes it.
+
+- **User, role, and line management write nothing to the audit log at all.**
+  `src/app/actions/user.ts` has 9 mutating actions (create, update,
+  `resetPassword`, delete, bulk delete, Excel import…) and **zero** `audit()`
+  calls. `src/app/actions/role.ts` has 3 — create/update/delete of the
+  permission sets themselves — and zero. `src/app/actions/line.ts` likewise.
+  So the system has an `AuditLog` model, an `audit.view` permission, and an
+  admin page, and records nothing about who created a user, changed someone's
+  role, reset a password, deleted a user, or edited what a permission set
+  contains. The original audit missed this by seeing `audit()` used in
+  `manovr.ts`/`train.ts`/`lookups.ts` and inferring coverage instead of
+  measuring it. Needs plan 014 — and **013 must land first**, because assigning
+  an access role is exactly the `null → value` transition 013 fixes; adding
+  audit calls before that would write records omitting the field that matters
+  most.
+
+- **The bulk user actions bypass the role hierarchy that the single-record
+  actions enforce — plan 016.** `deleteUser` (`src/app/actions/user.ts:261`)
+  checks `isRoleAllowedToManage(session.role, targetUser.role)` and refuses to
+  delete personnel referenced by maneuvers. `bulkDeleteUsers` (`:441`) checks
+  **neither** — it verifies only `user.manage` and excludes the caller's own id.
+  `bulkUpdateUserShift` (`:401`) and `bulkUpdateUserOrgPosition` (`:421`) are
+  likewise unguarded. Measured:
+
+  | Action | hierarchy check | manovr-reference guard |
+  |---|---|---|
+  | `deleteUser` | yes | yes |
+  | `bulkDeleteUsers` | **no** | **no** |
+  | `bulkUpdateUserShift` | **no** | — |
+  | `bulkUpdateUserOrgPosition` | **no** | — |
+
+  Two consequences. A role-1 admin can bulk-delete a role-4 super-admin through
+  a path the single-record action explicitly blocks. And because
+  `Manovr.rahbar1/rahbar2/creator` declare no `onDelete`
+  (`prisma/schema.prisma:187,189,191`), Prisma defaults optional relations to
+  `SetNull` — so bulk-deleting referenced personnel silently strips operator
+  attribution from historical maneuver records, which is exactly what
+  `deleteUser:291-295` refuses to allow. Found while reading these files to
+  write plan 014. **Higher severity than 014; worth doing first.**
+
+- **Plan 005's prescribed ref pattern was itself a lint error.** The plan
+  specified `channelsRef.current = channels;` in the render body. Under
+  `eslint-plugin-react-hooks` v6 that is `react-hooks/refs` — "Cannot access
+  refs during render" — and it is an **error**, not one of the warnings plan
+  001 deferred, so it breaks the gate. The write must go inside a
+  dependency-free `useEffect`, which gives the same semantics. Plan 005 has been
+  corrected. Caught because someone implementing it hit the error and fixed it
+  in the code before the plan was updated.
+
+- **Agent worktrees break the lint gate.** `eslint` walks into
+  `.claude/worktrees/<agent>/`, and the relative patterns in
+  `eslint.config.mjs` — `files: ["main.js"]` and the `scripts/**` ignore — do
+  not match the nested copies, so every `require()` in the worktree's `main.js`
+  and `scripts/*.js` reports as an error. Main tree alone: **0 errors, 324
+  warnings**. Fix is one entry, `".claude/**"`, in `globalIgnores`; plan 001's
+  Step 5 has been updated. Prune stale worktrees with
+  `git worktree remove <path>` once their branch is merged.
+
+- **`npx prisma generate` is required on any fresh checkout** and was missing
+  from every plan's command table. See the note at the top of this file. Found
+  when plan 001's first executor stopped on 25 phantom `TS7006` errors.
 
 ## Direction findings (options, not defects)
 

@@ -252,12 +252,32 @@ imports `pdfmake` and `exceljs` at module scope.
 | Purpose   | Command                    | Expected on success |
 |-----------|----------------------------|---------------------|
 | Install   | `npm install`              | exit 0              |
+| **Generate Prisma client** | **`npx prisma generate`** | **exit 0** |
 | Typecheck | `npx tsc --noEmit`         | exit 0, no output   |
 | Lint      | `npm run lint`             | exit 0 (after step 5) |
 | Tests     | `npm run test:run`         | exit 0, all pass    |
 | Build     | `npm run build`            | exit 0              |
 
 This is a Windows machine running Git Bash. Use forward slashes in paths.
+
+### Setup on a fresh checkout — do this before anything else
+
+`package.json` has **no `postinstall` hook**, so `npm install` alone does not
+generate the Prisma client. Without the generated types in
+`node_modules/.prisma/client`, Prisma query results resolve loosely and every
+downstream callback (`people.filter((p) => ...)` and similar) becomes an
+implicit `any` — producing roughly 25 `TS7006` errors across `src/app/` and
+`src/lib/audit.ts` that have nothing to do with this plan.
+
+On a fresh clone or a new git worktree, run both, in this order:
+
+```bash
+npm install
+npx prisma generate
+```
+
+Only then is `npx tsc --noEmit` expected to exit 0. If it still fails after
+both, that is a genuine pre-existing failure — see STOP conditions.
 
 ## Scope
 
@@ -401,27 +421,79 @@ const eslintConfig = defineConfig([
   },
   globalIgnores([
     ".next/**",
+    "**/.next/**",
+    "node_modules/**",
+    "**/node_modules/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
     "coverage/**",
     "scripts/**",
     "prisma/*.mjs",
+    "plans/**",
+    // ورک‌تری‌های موقت عامل‌ها. بدون این الگو، ESLint وارد نسخه‌های تودرتوی
+    // پروژه می‌شود و چون الگوهای نسبی مثل "main.js" و "scripts/**" با مسیر
+    // تودرتو مطابقت نمی‌کنند، گیت لینت با خطاهای تکراری قرمز می‌شود.
+    ".claude/**",
   ]),
 ]);
 
 export default eslintConfig;
 ```
 
-Then run `npm run lint` and read the output. If errors remain, they are
-**not** `no-explicit-any` and are worth looking at individually — fix the
-genuine ones (an unescaped entity, a missing hook dependency that is actually a
-bug) rather than adding more rules to the override list. If any remaining error
-would require changing application behaviour to satisfy, that is a STOP
-condition.
+Downgrading those three families leaves **30 errors** across five more rule
+families. They are enumerated below with the decision for each, so you do not
+have to judge them yourself. Add the two blocks shown:
 
-**Verify**: `npm run lint` → exit 0. Confirm with
-`npm run lint; echo "EXIT=$?"` → `EXIT=0`.
+```js
+  {
+    // main.js پروسه اصلی الکترون است و مستقیماً توسط Node اجرا می‌شود، نه از طریق
+    // باندلر. بنابراین require در آن درست است و خطای واقعی محسوب نمی‌شود.
+    files: ["main.js"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
+```
+
+placed **before** the general rules block (flat config applies later entries
+over earlier ones, so the file-specific `off` must come first), and these
+additions inside the general rules block:
+
+```js
+      // موارد جزئی در فایل‌های خارج از دامنه این پلن.
+      "prefer-const": "warn",
+      "react/no-unescaped-entities": "warn",
+
+      // قوانین جدید React Compiler (eslint-plugin-react-hooks v6).
+      // اینها یافته‌های واقعی هستند و در پلن جداگانه‌ای بررسی می‌شوند؛
+      // تا آن زمان نباید گیت لینت را مسدود کنند.
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/immutability": "warn",
+      "react-hooks/purity": "warn",
+```
+
+The reasoning per family, measured on this codebase:
+
+| Rule | n | Why this treatment |
+|---|---|---|
+| `@typescript-eslint/no-require-imports` | 6 | All in `main.js`, which is CommonJS by necessity — the Electron main process is run by Node, never bundled. `require()` is **correct** there. This is a config gap, not a code defect, so the rule is turned **off** for that file rather than downgraded. |
+| `react-hooks/set-state-in-effect` | 12 | New React Compiler rule, across 8 components. A genuine finding — deferred to its own plan, not fixed here. |
+| `react-hooks/immutability` | 3 | Same family; `DepotScene.tsx:34,48`. |
+| `react-hooks/purity` | 1 | Same family; `NewUserForm.tsx:49` calls an impure function during render. |
+| `prefer-const` | 6 | Trivial and auto-fixable, but every occurrence is in a file this plan lists as out of scope. Deferred rather than reached for. |
+| `react/no-unescaped-entities` | 2 | Same — trivial, out of scope. |
+
+**Do not add any rule to that list beyond the ones above.** If a family appears
+that is not in this table, that is a STOP condition — report it rather than
+extending the list yourself. The list is a deliberate, enumerated deferral; an
+open-ended one would just be turning the linter off.
+
+**Verify**:
+- `npm run lint; echo "EXIT=$?"` → `EXIT=0`
+- The warning count is still roughly 268 or more — the deferred rules became
+  warnings, they did not disappear. If warnings dropped sharply, something got
+  ignored that should not have been.
 
 ### Step 6: Write `src/lib/__tests__/perms.test.ts`
 
@@ -474,10 +546,41 @@ Required cases:
 - Object-valued and array-valued keys are skipped (the `typeof === "object"`
   guard at line 16)
 - Unchanged scalars produce no entry
-- A `null` → value change is recorded as `{ old: null, new: value }`
-- `computeDiff(null, { a: 1 })` does not throw and reports `a`
+- `computeDiff(null, { a: 1 })` does not throw and reports `a` — the CREATE
+  path, where `before` is entirely `null`, works correctly because
+  `before?.[key]` evaluates to `undefined` rather than `null`
 
-**Verify**: `npm run test:run` → all pass.
+**Characterize the known `null` bug — do not fix it.** `typeof null === "object"`
+in JavaScript, so the relation-field guard at `src/lib/audit.ts:16` silently
+drops any field whose value on **either** side is `null`. Verified:
+
+```
+computeDiff({ phone1: null },   { phone1: "0912" })  ->  {}   ← dropped
+computeDiff({ phone1: "0912" }, { phone1: null })    ->  {}   ← dropped
+computeDiff({ phone1: "0912" }, { phone1: "0913" })  ->  logged correctly
+```
+
+This is a real bug with real consequences — see plan 013 — but fixing it changes
+what gets written to the audit log, which is a behaviour change that belongs in
+its own plan with its own review. Here, pin the current behaviour so the fix is
+detectable when it lands:
+
+```ts
+  // رفتار فعلی (باگ‌دار) — عمداً ثبت شده تا تغییرات آینده قابل تشخیص باشد.
+  // پس از اصلاح در پلن ۰۱۳، این تست باید شکست بخورد و it.todo زیر فعال شود.
+  it("CHARACTERIZATION (known bug): drops changes where either side is null", () => {
+    expect(computeDiff({ phone1: null }, { phone1: "0912" })).toEqual({});
+    expect(computeDiff({ phone1: "0912" }, { phone1: null })).toEqual({});
+  });
+
+  it.todo(
+    "should record null -> value and value -> null transitions " +
+      "(blocked on fixing the typeof-null guard in src/lib/audit.ts:16)"
+  );
+```
+
+**Verify**: `npm run test:run` → all pass, with one `todo` reported. A `todo`
+does not fail the run.
 
 ### Step 8: Write `src/lib/__tests__/cron.test.ts`
 
@@ -596,6 +699,11 @@ Stop and report back (do not improvise) if:
   Report the discrepancy with the input and both values. Do **not** change the
   function — several later plans depend on current behaviour being documented
   accurately before it changes.
+- `npx tsc --noEmit` fails **before** you change anything. First confirm you ran
+  both `npm install` **and** `npx prisma generate` — a missing generated Prisma
+  client is the usual cause on a fresh checkout and produces ~25 `TS7006`
+  implicit-`any` errors. If it still fails after both, report the errors and
+  stop; a broken baseline is not this plan's to fix.
 - `npm run build` fails after adding Vitest. Revert the Vitest install and
   report; do not begin reconfiguring the Next.js build.
 - Importing `@/lib/export-helpers` or `@/lib/audit` in a test throws or hangs.
