@@ -9,6 +9,7 @@ import NotificationBell from "@/components/NotificationBell";
 import { Icons } from "@/lib/icons";
 import { motion } from "motion/react";
 import { useTheme } from "@/components/ThemeProvider";
+import { safeAccentColor } from "@/lib/branding";
 
 export default function Sidebar({
   userId,
@@ -24,7 +25,12 @@ export default function Sidebar({
   const { appearance } = useTheme();
   const navPos = appearance.navPosition || "right";
   const path = usePathname();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("sidebar_collapsed") === "true";
+    }
+    return false;
+  });
   const [branding, setBranding] = useState({
     title: "سامانه مدیریت مانور",
     footer: "پایانه فتح‌آباد · v3",
@@ -49,7 +55,7 @@ export default function Sidebar({
         if (payload && payload.channel === "branding_changed") {
           setBranding(payload.data);
           // اعمال داینامیک رنگ تم در لحظه
-          const accentColor = payload.data.accentColor || "#d8842a";
+          const accentColor = safeAccentColor(payload.data?.accentColor);
           document.documentElement.style.setProperty("--accent", accentColor, "important");
           document.documentElement.style.setProperty("--accent-soft", `${accentColor}14`, "important");
           document.documentElement.style.setProperty("--accent-hover", `${accentColor}d9`, "important");
@@ -57,9 +63,8 @@ export default function Sidebar({
       } catch {}
     };
 
-    // بارگذاری حالت جمع‌شده از لوکال استوریج
+    // همگام‌سازی کلاس‌های منوی جمع‌شده با پوسته
     const stored = localStorage.getItem("sidebar_collapsed") === "true";
-    setIsCollapsed(stored);
     const shell = document.querySelector(".shell");
     if (shell) {
       if (stored) {

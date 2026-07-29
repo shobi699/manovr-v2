@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { hasPerm } from "@/lib/perms";
 import { runDynamicReport } from "@/app/actions/report";
-import { generatePDFBuffer } from "@/lib/export-helpers";
+import { generatePDFBuffer, MAX_EXPORT_RECORDS } from "@/lib/export-helpers";
 import { getCachedLookup } from "@/lib/lookups";
+import { sanitizeReportFields } from "@/lib/report-engine";
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
@@ -26,6 +27,10 @@ export async function POST(req: NextRequest) {
     return new NextResponse(res.error || "خطا در دریافت داده‌ها", { status: 400 });
   }
 
+  if (res.records.length > MAX_EXPORT_RECORDS) {
+    return new NextResponse(`تعداد رکوردهای درخواستی (${res.records.length}) از سقف مجاز خروجی (${MAX_EXPORT_RECORDS}) بیشتر است. لطفاً فیلترهای محدودکننده‌تری اعمال نمایید.`, { status: 400 });
+  }
+
   const lookupsMap = {
     manovr_type: manovrTypeL?.values || [],
     train_type: trainTypeL?.values || [],
@@ -35,7 +40,7 @@ export async function POST(req: NextRequest) {
     role: roleL?.values || [],
   };
 
-  const buffer = await generatePDFBuffer(config.entity, config.fields, res.records, lookupsMap);
+  const buffer = await generatePDFBuffer(config.entity, sanitizeReportFields(config.entity, config.fields), res.records, lookupsMap);
 
   return new NextResponse(buffer as any, {
     headers: {

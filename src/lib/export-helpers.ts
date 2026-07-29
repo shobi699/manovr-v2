@@ -1,10 +1,17 @@
 import ExcelJS from "exceljs";
-// @ts-ignore
 import PdfPrinter from "pdfmake/js/Printer";
 import path from "path";
-// @ts-ignore
 import { PersianShaper } from "arabic-persian-reshaper";
 import { ManovrType, ManovrStatus, ConfirmationStatus, TrainType, Terminal, Shift, OrgPosition, PersonnelType, Role } from "@/lib/enums";
+
+export const MAX_EXPORT_RECORDS = 5000;
+
+export interface LookupItem {
+  code: number;
+  label: string;
+}
+
+export type ExportRecord = Record<string, any>;
 
 // شبیه‌ساز فونت و چینش راست‌چین فارسی در PDF
 function isPersianChar(char: string) {
@@ -26,11 +33,11 @@ export function farsi(text: string): string {
   return processed.reverse().join(" ");
 }
 
-export function getVal(entity: string, item: any, col: string, lookups?: Record<string, any[]>) {
+export function getVal(entity: string, item: ExportRecord, col: string, lookups?: Record<string, LookupItem[]>) {
   const lookupVal = (key: string, code: number) => {
     const list = lookups?.[key];
     if (list && Array.isArray(list)) {
-      const found = list.find((v: any) => v.code === code);
+      const found = list.find((v) => v.code === code);
       if (found) return found.label;
     }
     return null;

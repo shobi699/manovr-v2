@@ -6,6 +6,10 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { hasPerm } from "@/lib/perms";
 import { audit } from "@/lib/audit";
+import { hasRoomOnLine, shouldSetKafshak } from "@/lib/manovr-rules";
+
+// خطای دامنه‌ای که باید به پیام کاربر تبدیل شود، نه خطای ۵۰۰
+class ManovrError extends Error {}
 
 export async function createManovr(
   _prev: { error?: string } | null,
@@ -42,53 +46,66 @@ export async function createManovr(
   if (!destinationLineId) return { error: "لطفا مقصد را انتخاب نمایید." };
   if (!sourceLineId) sourceLineId = destinationLineId;
 
-  // بررسی ظرفیت خط مقصد (بدون احتساب خود این قطار اگر روی همان خط است)
-  const dest = await prisma.line.findUnique({ where: { id: destinationLineId } });
-  if (!dest) return { error: "خط مقصد نامعتبر است." };
-  const onDest = await prisma.train.count({
-    where: {
-      lineId: destinationLineId,
-      isDisposed: false,
-      id: { not: trainId },
-    },
-  });
-  if (onDest >= dest.capacity)
-    return { error: "ظرفیت خط مقصد پر شده است." };
+  // بررسی ظرفیت و ثبت مانور و جابجایی قطار باید اتمیک باشند تا دو مانور همزمان
+  // نتوانند هر دو از یک ظرفیت باقیمانده عبور کنند
+  let created;
+  try {
+    created = await prisma.$transaction(async (tx) => {
+      const dest = await tx.line.findUnique({ where: { id: destinationLineId } });
+      if (!dest) throw new ManovrError("خط مقصد نامعتبر است.");
 
-  const created = await prisma.manovr.create({
-    data: {
-      type,
-      status: 1,
-      confirmationStatus: 3,
-      description,
-      sourceLineId,
-      destinationLineId,
-      trainId,
-      rahbar1Id,
-      rahbar2Id,
-      creatorId: session.id,
-      executionTime,
-    },
-    include: {
-      train: true,
-      sourceLine: true,
-      destinationLine: true,
-    }
-  });
+      // بدون احتساب خود این قطار، تا مانور در محل مسدود نشود
+      const onDest = await tx.train.count({
+        where: {
+          lineId: destinationLineId,
+          isDisposed: false,
+          id: { not: trainId },
+        },
+      });
+      if (!hasRoomOnLine(onDest, dest.capacity)) {
+        throw new ManovrError("ظرفیت خط مقصد پر شده است.");
+      }
 
-  // به‌روزرسانی خط و اسلات قطار (در صورت مانور در تعویض کفشک نوع 20، پرچم کفشک قطار نیز فعال/به‌روز می‌شود)
-  const trainUpdateData: { lineId: number; slotIndex: number; hasKafshak?: boolean } = {
-    lineId: destinationLineId,
-    slotIndex,
-  };
-  if (type === 20) {
-    trainUpdateData.hasKafshak = true;
+      const manovr = await tx.manovr.create({
+        data: {
+          type,
+          status: 1,
+          confirmationStatus: 3,
+          description,
+          sourceLineId,
+          destinationLineId,
+          trainId,
+          rahbar1Id,
+          rahbar2Id,
+          creatorId: session.id,
+          executionTime,
+        },
+        include: {
+          train: true,
+          sourceLine: true,
+          destinationLine: true,
+        },
+      });
+
+      const trainUpdateData: { lineId: number; slotIndex: number; hasKafshak?: boolean } = {
+        lineId: destinationLineId,
+        slotIndex,
+      };
+      if (shouldSetKafshak(type)) {
+        trainUpdateData.hasKafshak = true;
+      }
+
+      await tx.train.update({
+        where: { id: trainId },
+        data: trainUpdateData,
+      });
+
+      return manovr;
+    });
+  } catch (err) {
+    if (err instanceof ManovrError) return { error: err.message };
+    throw err;
   }
-
-  await prisma.train.update({
-    where: { id: trainId },
-    data: trainUpdateData,
-  });
 
   // ثبت لاگ وقایع
   const trainCode = created.train?.code || String(trainId);

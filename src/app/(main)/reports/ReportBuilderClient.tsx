@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useTransition } from "react";
+import React, { useState, useEffect, useTransition, useCallback } from "react";
 import { runDynamicReport, saveReportAction, deleteSavedReportAction } from "@/app/actions/report";
 import { type ReportConfig, type ReportFilter } from "@/lib/report-engine";
 import { createScheduledReport, toggleScheduledReport, deleteScheduledReport } from "@/app/actions/scheduled-report";
@@ -98,7 +98,7 @@ export default function ReportBuilderClient({
   const [cron, setCron] = useState("0 8 * * *");
   const [format, setFormat] = useState("excel");
   const [recipients, setRecipients] = useState(String(userId));
-  const [outputDir, setOutputDir] = useState("public/exports/scheduled");
+  const [outputDir, setOutputDir] = useState("");
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
   // کانفیگ جاری گزارش‌ساز
@@ -324,20 +324,8 @@ export default function ReportBuilderClient({
     }, 50);
   };
 
-  // لود گزارش پیش‌فرض در شروع کار
-  useEffect(() => {
-    loadTemplate("history");
-  }, []);
-
-  // اجرای خودکار کوئری با تغییر تریگر
-  useEffect(() => {
-    if (queryTrigger > 0) {
-      handleQuery();
-    }
-  }, [queryTrigger]);
-
   // اجرای کوئری گزارش
-  const handleQuery = async () => {
+  const handleQuery = useCallback(async () => {
     setError(null);
     const config: ReportConfig = {
       entity,
@@ -357,7 +345,19 @@ export default function ReportBuilderClient({
         setRecords(res.records || []);
       }
     });
-  };
+  }, [entity, fields, filters, groupBy, chart, sortField, sortDirection]);
+
+  // لود گزارش پیش‌فرض در شروع کار
+  useEffect(() => {
+    loadTemplate("history");
+  }, []);
+
+  // اجرای خودکار کوئری با تغییر تریگر
+  useEffect(() => {
+    if (queryTrigger > 0) {
+      handleQuery();
+    }
+  }, [queryTrigger, handleQuery]);
 
   // ذخیره گزارش جاری
   const handleSaveReport = async () => {
@@ -1632,10 +1632,11 @@ export default function ReportBuilderClient({
             </div>
 
             <div className="field">
-              <label>پوشه محلی ذخیره خروجی *</label>
+              <label>نام پوشه فرعی خروجی (اختیاری — داخل پوشه عمومی سامانه)</label>
               <input
                 type="text"
                 className="input num"
+                placeholder="مانند: daily یا e.g. monthly"
                 value={outputDir}
                 onChange={(e) => setOutputDir(e.target.value)}
                 style={{ direction: "ltr", textAlign: "left" }}

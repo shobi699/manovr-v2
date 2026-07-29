@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { saveSetting } from "@/app/actions/settings";
 import { Icons } from "@/lib/icons";
+import { PAGE_SIZE_OPTIONS } from "@/lib/list-query";
 
 export interface Column<T> {
   key: string;
@@ -19,6 +20,19 @@ export interface BulkAction<T> {
   onClick: (selectedItems: T[], clearSelection: () => void) => void | Promise<void>;
 }
 
+export interface ServerPagination {
+  page: number;
+  pageSize: number;
+  totalRows: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
+  search: string;
+  onSearchChange: (value: string) => void;
+  sortCol: string | null;
+  sortDir: "asc" | "desc";
+  onSortChange: (col: string, dir: "asc" | "desc") => void;
+}
+
 interface DataTableProps<T> {
   tableName: string;
   columns: Column<T>[];
@@ -29,6 +43,8 @@ interface DataTableProps<T> {
   getItemKey?: (item: T) => string | number;
   enableSelection?: boolean;
   bulkActions?: BulkAction<T>[];
+  /** در صورت وجود، فیلتر/مرتب‌سازی/صفحه‌بندی سمت سرور انجام می‌شود */
+  server?: ServerPagination;
 }
 
 export default function DataTable<T extends Record<string, any>>({
@@ -41,35 +57,43 @@ export default function DataTable<T extends Record<string, any>>({
   getItemKey,
   enableSelection = false,
   bulkActions = [],
+  server,
 }: DataTableProps<T>) {
+  const isServerMode = server !== undefined;
+
   const [search, setSearch] = useState("");
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [hiddenCols, setHiddenCols] = useState<string[]>(initialHiddenColumns);
+  const [pageSize, setPageSize] = useState(20);
+  const [hiddenCols, setHiddenCols] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(`dt.hidden.${tableName}`);
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch {}
+      }
+    }
+    return initialHiddenColumns;
+  });
   const [showConfig, setShowConfig] = useState(false);
+
+  // وضعیت‌های فعال بستگی به حالت کلاینت یا سرور دارند
+  const activeSearch = isServerMode ? server.search : search;
+  const activeSortCol = isServerMode ? server.sortCol : sortCol;
+  const activeSortDir = isServerMode ? server.sortDir : sortDir;
+  const activePage = isServerMode ? server.page : currentPage;
+  const activePageSize = isServerMode ? server.pageSize : pageSize;
 
   // وضعیت انتخاب ردیف‌ها برای کارهای گروهی
   const [selectedKeys, setSelectedKeys] = useState<Set<string | number>>(new Set());
   const [isProcessingBulk, setIsProcessingBulk] = useState(false);
 
-  const getKey = (item: T): string | number => {
+  const getKey = React.useCallback((item: T): string | number => {
     if (getItemKey) return getItemKey(item);
     return item.id ?? item.code ?? JSON.stringify(item);
-  };
-
-  // لود ستون‌های مخفی از لوکال استوریج یا تنظیمات برای لود سریع‌تر (به عنوان fallback)
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(`dt.hidden.${tableName}`);
-      if (saved) {
-        try {
-          setHiddenCols(JSON.parse(saved));
-        } catch {}
-      }
-    }
-  }, [tableName]);
+  }, [getItemKey]);
 
   const handleToggleCol = async (colKey: string) => {
     const isHidden = hiddenCols.includes(colKey);
@@ -86,51 +110,68 @@ export default function DataTable<T extends Record<string, any>>({
   };
 
   const handleSort = (colKey: string) => {
-    if (sortCol === colKey) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    if (isServerMode) {
+      const nextDir = activeSortCol === colKey && activeSortDir === "asc" ? "desc" : "asc";
+      server.onSortChange(colKey, nextDir);
     } else {
-      setSortCol(colKey);
-      setSortDir("asc");
+      if (sortCol === colKey) {
+        setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      } else {
+        setSortCol(colKey);
+        setSortDir("asc");
+      }
     }
   };
 
   // فیلتر داده‌ها
-  const filtered = data.filter((item) => {
-    if (!search || searchFields.length === 0) return true;
-    const term = search.toLowerCase();
-    return searchFields.some((field) => {
-      const val = item[field];
-      if (val === undefined || val === null) return false;
-      return String(val).toLowerCase().includes(term);
-    });
-  });
+  const filtered = isServerMode
+    ? data
+    : data.filter((item) => {
+        if (!search || searchFields.length === 0) return true;
+        const term = search.toLowerCase();
+        return searchFields.some((field) => {
+          const val = item[field];
+          if (val === undefined || val === null) return false;
+          return String(val).toLowerCase().includes(term);
+        });
+      });
 
   // مرتب‌سازی
-  const sorted = [...filtered].sort((a, b) => {
-    if (!sortCol) return 0;
-    let valA = a[sortCol];
-    let valB = b[sortCol];
+  const sorted = isServerMode
+    ? data
+    : [...filtered].sort((a, b) => {
+        if (!sortCol) return 0;
+        let valA = a[sortCol];
+        let valB = b[sortCol];
 
-    if (valA === undefined || valA === null) return 1;
-    if (valB === undefined || valB === null) return -1;
+        if (valA === undefined || valA === null) return 1;
+        if (valB === undefined || valB === null) return -1;
 
-    if (typeof valA === "string") {
-      return sortDir === "asc"
-        ? valA.localeCompare(valB)
-        : valB.localeCompare(valA);
-    }
-    return sortDir === "asc"
-      ? (valA > valB ? 1 : -1)
-      : (valA < valB ? 1 : -1);
-  });
+        if (typeof valA === "string") {
+          return sortDir === "asc"
+            ? valA.localeCompare(valB)
+            : valB.localeCompare(valA);
+        }
+        return sortDir === "asc"
+          ? (valA > valB ? 1 : -1)
+          : (valA < valB ? 1 : -1);
+      });
 
   // صفحه‌بندی
-  const totalPages = Math.ceil(sorted.length / pageSize);
-  const paginated = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const totalRows = isServerMode ? server.totalRows : sorted.length;
+  const totalPages = isServerMode
+    ? Math.max(1, Math.ceil(server.totalRows / server.pageSize))
+    : Math.max(1, Math.ceil(sorted.length / pageSize));
+
+  const paginated = isServerMode
+    ? data
+    : sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [search, sortCol, sortDir, pageSize]);
+    if (!isServerMode) {
+      setCurrentPage(1);
+    }
+  }, [search, sortCol, sortDir, pageSize, isServerMode]);
 
   const hasSelection = enableSelection || bulkActions.length > 0;
 
@@ -169,13 +210,19 @@ export default function DataTable<T extends Record<string, any>>({
     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
       {/* هدر کنترل جدول */}
       <div className="toolbar" style={{ justifyContent: "space-between" }}>
-        {searchFields.length > 0 ? (
+        {searchFields.length > 0 || isServerMode ? (
           <input
             type="text"
             placeholder={searchPlaceholder}
             className="input search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={activeSearch}
+            onChange={(e) => {
+              if (isServerMode) {
+                server.onSearchChange(e.target.value);
+              } else {
+                setSearch(e.target.value);
+              }
+            }}
             style={{ maxWidth: "300px" }}
           />
         ) : (
@@ -186,14 +233,22 @@ export default function DataTable<T extends Record<string, any>>({
           {/* انتخابگر تعداد صفحات */}
           <select
             className="input"
-            value={pageSize}
-            onChange={(e) => setPageSize(Number(e.target.value))}
-            style={{ width: "90px", padding: "6px 8px", fontSize: "12px" }}
+            value={activePageSize}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              if (isServerMode) {
+                server.onPageSizeChange(val);
+              } else {
+                setPageSize(val);
+              }
+            }}
+            style={{ width: "95px", padding: "6px 8px", fontSize: "12px" }}
           >
-            <option value="5">۵ ردیف</option>
-            <option value="10">۱۰ ردیف</option>
-            <option value="20">۲۰ ردیف</option>
-            <option value="50">۵۰ ردیف</option>
+            {PAGE_SIZE_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt} ردیف
+              </option>
+            ))}
           </select>
 
           {/* شخصی‌سازی ستون‌ها */}
@@ -209,41 +264,33 @@ export default function DataTable<T extends Record<string, any>>({
             </button>
             {showConfig && (
               <div
+                className="card"
                 style={{
                   position: "absolute",
-                  top: "38px",
                   left: 0,
-                  backgroundColor: "var(--panel)",
-                  border: "1px solid var(--line)",
-                  borderRadius: "8px",
+                  top: "100%",
+                  marginTop: "6px",
+                  zIndex: 50,
+                  width: "220px",
                   padding: "10px",
-                  zIndex: 10,
-                  width: "180px",
-                  boxShadow: "var(--sh-2)",
+                  boxShadow: "var(--shadow-lg)",
                 }}
               >
-                <div style={{ fontSize: "12px", fontWeight: "bold", marginBottom: "8px", borderBottom: "1px solid var(--line)", paddingBottom: "4px" }}>
-                  انتخاب ستون‌های نمایشی
+                <div style={{ fontSize: "12px", fontWeight: "bold", marginBottom: "8px" }}>
+                  نمایش / مخفی‌سازی ستون‌ها
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "200px", overflowY: "auto" }}>
                   {columns.map((col) => (
                     <label
                       key={col.key}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        fontSize: "12px",
-                        cursor: "pointer",
-                      }}
+                      style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", cursor: "pointer" }}
                     >
                       <input
                         type="checkbox"
                         checked={!hiddenCols.includes(col.key)}
                         onChange={() => handleToggleCol(col.key)}
-                        style={{ accentColor: "var(--accent)" }}
                       />
-                      {col.label}
+                      <span>{col.label}</span>
                     </label>
                   ))}
                 </div>
@@ -253,20 +300,19 @@ export default function DataTable<T extends Record<string, any>>({
         </div>
       </div>
 
-      {/* نوار اقدامات دسته‌جمعی و کارهای گروهی */}
+      {/* بار کارهای گروهی (Bulk Actions) */}
       {hasSelection && selectedKeys.size > 0 && (
         <div
+          className="card"
           style={{
+            padding: "8px 12px",
             display: "flex",
-            alignItems: "center",
             justifyContent: "space-between",
-            padding: "10px 16px",
-            backgroundColor: "rgba(59, 130, 246, 0.12)",
-            border: "1px solid rgba(59, 130, 246, 0.3)",
-            borderRadius: "8px",
-            backdropFilter: "blur(8px)",
-            gap: "12px",
-            flexWrap: "wrap",
+            alignItems: "center",
+            backgroundColor: "var(--bg-card)",
+            borderColor: "var(--accent)",
+            borderWidth: "1px",
+            borderStyle: "solid",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -277,7 +323,7 @@ export default function DataTable<T extends Record<string, any>>({
               ⚡ {selectedKeys.size} مورد انتخاب گردید
             </span>
 
-            {selectedKeys.size < sorted.length && (
+            {!isServerMode && selectedKeys.size < sorted.length && (
               <button
                 type="button"
                 className="btn sm"
@@ -357,8 +403,8 @@ export default function DataTable<T extends Record<string, any>>({
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                     {col.label}
-                    {col.sortable && sortCol === col.key && (
-                      <span style={{ fontSize: "10px" }}>{sortDir === "asc" ? "▲" : "▼"}</span>
+                    {col.sortable && activeSortCol === col.key && (
+                      <span style={{ fontSize: "10px" }}>{activeSortDir === "asc" ? "▲" : "▼"}</span>
                     )}
                   </div>
                 </th>
@@ -407,26 +453,38 @@ export default function DataTable<T extends Record<string, any>>({
       </div>
 
       {/* بخش صفحه‌بندی */}
-      {totalPages > 1 && (
+      {(totalPages > 1 || (isServerMode && totalRows > 0)) && (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
           <div className="muted" style={{ fontSize: "12px" }}>
-            نمایش {(currentPage - 1) * pageSize + 1} تا {Math.min(currentPage * pageSize, sorted.length)} از {sorted.length} ردیف
+            نمایش {(activePage - 1) * activePageSize + (totalRows > 0 ? 1 : 0)} تا {Math.min(activePage * activePageSize, totalRows)} از {totalRows} ردیف
           </div>
           <div style={{ display: "flex", gap: "6px" }}>
             <button
               className="btn sm"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((p) => p - 1)}
+              disabled={activePage <= 1}
+              onClick={() => {
+                if (isServerMode) {
+                  server.onPageChange(activePage - 1);
+                } else {
+                  setCurrentPage((p) => p - 1);
+                }
+              }}
             >
               قبلی
             </button>
             <span style={{ alignSelf: "center", fontSize: "13px", padding: "0 10px" }} className="num">
-              صفحه {currentPage} از {totalPages}
+              صفحه {activePage} از {totalPages}
             </span>
             <button
               className="btn sm"
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage((p) => p + 1)}
+              disabled={activePage >= totalPages}
+              onClick={() => {
+                if (isServerMode) {
+                  server.onPageChange(activePage + 1);
+                } else {
+                  setCurrentPage((p) => p + 1);
+                }
+              }}
             >
               بعدی
             </button>

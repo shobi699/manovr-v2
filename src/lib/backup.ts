@@ -79,8 +79,8 @@ export async function performSourceCodeBackup() {
   if (fs.existsSync(publicDir)) zip.addLocalFolder(publicDir, "public");
   if (fs.existsSync(prismaSchema)) zip.addLocalFile(prismaSchema, "prisma");
 
-  // فایل‌های پیکربندی کلیدی پروژه
-  const configFiles = ["package.json", "package-lock.json", "tsconfig.json", "next.config.ts", ".env"];
+  // فایل‌های پیکربندی کلیدی پروژه (بدون .env — کلید امضای نشست نباید در پشتیبان قرار گیرد)
+  const configFiles = ["package.json", "package-lock.json", "tsconfig.json", "next.config.ts"];
   configFiles.forEach(file => {
     const filePath = path.join(process.cwd(), file);
     if (fs.existsSync(filePath)) {

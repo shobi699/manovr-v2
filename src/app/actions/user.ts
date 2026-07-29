@@ -6,6 +6,16 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { hasPerm, isRoleAllowedToManage, invalidatePermsCache } from "@/lib/perms";
 import bcrypt from "bcryptjs";
+import { audit } from "@/lib/audit";
+import {
+  personnelCreatedSummary,
+  personnelUpdatedSummary,
+  personnelDeletedSummary,
+  passwordResetSummary,
+  bulkPersonnelSummary,
+  importSummary,
+} from "@/lib/audit-summaries";
+import { findUnmanageableIds } from "@/lib/bulk-guards";
 
 export async function createUser(
   _prev: { error?: string } | null,
@@ -50,7 +60,6 @@ export async function createUser(
   }
 
   if (isShiftSupervisor && currentUser) {
-    // سرپرست شیفت فقط می‌تواند در شیفت و نوع پرسنلی خودش کاربر ثبت کند
     shift = currentUser.shift;
     personnelType = currentUser.personnelType;
     if (orgPosition === 2 || orgPosition === 3) {
@@ -76,13 +85,13 @@ export async function createUser(
     ? await bcrypt.hash(password, 10)
     : null;
 
-  await prisma.personnel.create({
+  const created = await prisma.personnel.create({
     data: {
       firstName,
       lastName,
       userName: hasAccount ? userName : null,
       passwordHash,
-      role: isShiftSupervisor ? 0 : role, // سرپرست شیفت دسترسی سیستمی ادمین/مسئول نمی‌تواند بدهد
+      role: isShiftSupervisor ? 0 : role,
       shift,
       orgPosition,
       personnelType,
@@ -96,6 +105,16 @@ export async function createUser(
       avatarColor,
     },
   });
+
+  await audit(
+    session,
+    "personnel",
+    created.id,
+    "CREATE",
+    null,
+    created,
+    personnelCreatedSummary(created)
+  );
 
   invalidatePermsCache();
   revalidatePath("/users");
@@ -144,7 +163,6 @@ export async function updateUser(
   if (!firstName) return { error: "نام الزامی است." };
   if (!lastName) return { error: "نام خانوادگی الزامی است." };
 
-  // بررسی سلسله‌مراتب نقش‌ها: مدیر نمی‌تواند هم‌تراز یا لول بالاتر از خود را تغییر دهد
   if (!isRoleAllowedToManage(session.role, targetUser.role)) {
     return { error: "شما مجاز به ویرایش این کاربر نیستید (هم‌سطح یا بالاتر از شما)." };
   }
@@ -159,7 +177,6 @@ export async function updateUser(
     if (targetUser.shift !== currentUser.shift || targetUser.personnelType !== currentUser.personnelType) {
       return { error: "شما فقط مجاز به ویرایش پرسنل شیفت خود هستید." };
     }
-    // حفظ شیفت و نوع پرسنلی فعلی
     shift = currentUser.shift;
     personnelType = currentUser.personnelType;
     if (orgPosition === 2 || orgPosition === 3) {
@@ -186,7 +203,7 @@ export async function updateUser(
     if (dupCode) return { error: "این کد پرسنلی قبلاً برای کاربر دیگری ثبت شده است." };
   }
 
-  await prisma.personnel.update({
+  const updated = await prisma.personnel.update({
     where: { id },
     data: {
       firstName,
@@ -206,6 +223,16 @@ export async function updateUser(
       avatarColor,
     },
   });
+
+  await audit(
+    session,
+    "personnel",
+    id,
+    "UPDATE",
+    targetUser,
+    updated,
+    personnelUpdatedSummary(updated)
+  );
 
   invalidatePermsCache();
   revalidatePath("/users");
@@ -255,6 +282,16 @@ export async function resetPassword(
     data: { passwordHash: hash },
   });
 
+  await audit(
+    session,
+    "personnel",
+    id,
+    "UPDATE",
+    null,
+    null,
+    passwordResetSummary(targetUser)
+  );
+
   return { ok: true };
 }
 
@@ -295,13 +332,23 @@ export async function deleteUser(id: number) {
     return { error: "این کاربر در مانورها ثبت شده و قابل حذف نیست. حساب را غیرفعال کنید." };
 
   await prisma.personnel.delete({ where: { id } });
+
+  await audit(
+    session,
+    "personnel",
+    id,
+    "DELETE",
+    targetUser,
+    null,
+    personnelDeletedSummary(targetUser)
+  );
+
   invalidatePermsCache();
   revalidatePath("/users");
   revalidatePath("/phonebook");
   return {};
 }
 
-// ویرایش مخاطب در صفحه دفترچه تلفن
 export async function updatePersonnelPhoneInfo(
   _prev: { error?: string; ok?: boolean } | null,
   fd: FormData
@@ -317,17 +364,28 @@ export async function updatePersonnelPhoneInfo(
   const address = String(fd.get("address") ?? "").trim() || null;
   const avatarColor = String(fd.get("avatarColor") ?? "").trim() || null;
 
-  await prisma.personnel.update({
+  const before = await prisma.personnel.findUnique({ where: { id } });
+
+  const updated = await prisma.personnel.update({
     where: { id },
     data: { phone1, phone2, internalTel, address, avatarColor },
   });
+
+  await audit(
+    session,
+    "personnel",
+    id,
+    "UPDATE",
+    before,
+    updated,
+    personnelUpdatedSummary(updated)
+  );
 
   revalidatePath("/phonebook");
   revalidatePath("/users");
   return { ok: true };
 }
 
-// ایمپورت گروهی پرسنل از فایل اکسل
 export async function importPersonnelFromExcel(list: {
   firstName: string;
   lastName: string;
@@ -355,23 +413,22 @@ export async function importPersonnelFromExcel(list: {
   for (const row of list) {
     if (!row.firstName || !row.lastName) continue;
 
-    // بررسی سلسله‌مراتب نقش در ایمپورت گروهی
     const rowRole = row.orgPosition === 3 ? 1 : row.orgPosition === 2 ? 2 : 3;
     if (!isRoleAllowedToManage(session.role, rowRole)) {
-      row.orgPosition = 4; // سقوط به نقش و سمت بدون دسترسی سیستمی (سایر)
+      row.orgPosition = 4;
     }
 
     const userName = row.userName ? String(row.userName).trim() : null;
 
     if (userName) {
       const dup = await prisma.personnel.findFirst({ where: { userName } });
-      if (dup) continue; // از کاربران تکراری گذر کن
+      if (dup) continue;
     }
 
     const personnelCode = row.personnelCode ? String(row.personnelCode).trim() : null;
     if (personnelCode) {
       const dupCode = await prisma.personnel.findFirst({ where: { personnelCode } });
-      if (dupCode) continue; // از کدهای تکراری گذر کن
+      if (dupCode) continue;
     }
 
     await prisma.personnel.create({
@@ -393,6 +450,10 @@ export async function importPersonnelFromExcel(list: {
     count++;
   }
 
+  if (count > 0) {
+    await audit(session, "personnel", 0, "CREATE", null, null, importSummary("پرسنل", count));
+  }
+
   revalidatePath("/users");
   revalidatePath("/phonebook");
   return { count };
@@ -405,10 +466,32 @@ export async function bulkUpdateUserShift(ids: number[], shift: number) {
   }
 
   try {
+    const targets = await prisma.personnel.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, role: true },
+    });
+
+    const blocked = findUnmanageableIds(session.role, targets);
+    if (blocked.length > 0) {
+      return {
+        error: `شما مجاز به تغییر ${blocked.length} کاربر از موارد انتخاب‌شده نیستید (هم‌سطح یا بالاتر از شما). هیچ تغییری اعمال نشد.`,
+      };
+    }
+
     await prisma.personnel.updateMany({
       where: { id: { in: ids } },
       data: { shift },
     });
+
+    await audit(
+      session,
+      "personnel",
+      0,
+      "UPDATE",
+      null,
+      null,
+      bulkPersonnelSummary("تغییر شیفت", ids.length, ids)
+    );
 
     revalidatePath("/users");
     revalidatePath("/phonebook");
@@ -425,10 +508,32 @@ export async function bulkUpdateUserOrgPosition(ids: number[], orgPosition: numb
   }
 
   try {
+    const targets = await prisma.personnel.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, role: true },
+    });
+
+    const blocked = findUnmanageableIds(session.role, targets);
+    if (blocked.length > 0) {
+      return {
+        error: `شما مجاز به تغییر ${blocked.length} کاربر از موارد انتخاب‌شده نیستید (هم‌سطح یا بالاتر از شما). هیچ تغییری اعمال نشد.`,
+      };
+    }
+
     await prisma.personnel.updateMany({
       where: { id: { in: ids } },
       data: { orgPosition },
     });
+
+    await audit(
+      session,
+      "personnel",
+      0,
+      "UPDATE",
+      null,
+      null,
+      bulkPersonnelSummary("تغییر سمت", ids.length, ids)
+    );
 
     revalidatePath("/users");
     revalidatePath("/phonebook");
@@ -445,15 +550,59 @@ export async function bulkDeleteUsers(ids: number[]) {
   }
 
   try {
-    // جلوگیری از حذف اکانت جاری ادمین
     const filteredIds = ids.filter((id) => id !== session.id);
     if (filteredIds.length === 0) {
       return { error: "امکان حذف حساب کاربری خودتان وجود ندارد." };
     }
 
+    const targets = await prisma.personnel.findMany({
+      where: { id: { in: filteredIds } },
+      select: { id: true, role: true },
+    });
+
+    const blocked = findUnmanageableIds(session.role, targets);
+    if (blocked.length > 0) {
+      return {
+        error: `شما مجاز به حذف ${blocked.length} کاربر از موارد انتخاب‌شده نیستید (هم‌سطح یا بالاتر از شما). هیچ کاربری حذف نشد.`,
+      };
+    }
+
+    const referenced = await prisma.manovr.findMany({
+      where: {
+        OR: [
+          { rahbar1Id: { in: filteredIds } },
+          { rahbar2Id: { in: filteredIds } },
+          { creatorId: { in: filteredIds } },
+        ],
+      },
+      select: { rahbar1Id: true, rahbar2Id: true, creatorId: true },
+    });
+
+    if (referenced.length > 0) {
+      const referencedIds = new Set<number>();
+      for (const m of referenced) {
+        for (const v of [m.rahbar1Id, m.rahbar2Id, m.creatorId]) {
+          if (v !== null && filteredIds.includes(v)) referencedIds.add(v);
+        }
+      }
+      return {
+        error: `${referencedIds.size} کاربر از موارد انتخاب‌شده در مانورها ثبت شده‌اند و قابل حذف نیستند. حساب آنها را غیرفعال کنید. هیچ کاربری حذف نشد.`,
+      };
+    }
+
     await prisma.personnel.deleteMany({
       where: { id: { in: filteredIds } },
     });
+
+    await audit(
+      session,
+      "personnel",
+      0,
+      "DELETE",
+      null,
+      null,
+      bulkPersonnelSummary("حذف", filteredIds.length, filteredIds)
+    );
 
     revalidatePath("/users");
     revalidatePath("/phonebook");

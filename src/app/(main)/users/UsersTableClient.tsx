@@ -5,7 +5,8 @@ import DataTable, { BulkAction } from "@/components/DataTable";
 import UserRowActions from "./UserRowActions";
 import { Role, OrgPosition, Shift, PersonnelType, ManovrType, ManovrStatus, ConfirmationStatus } from "@/lib/enums";
 import { importPersonnelFromExcel, bulkUpdateUserShift, bulkUpdateUserOrgPosition, bulkDeleteUsers } from "@/app/actions/user";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import type { ListParams } from "@/lib/list-query";
 
 interface LookupValue {
   code: number;
@@ -16,6 +17,8 @@ interface LookupValue {
 interface UsersTableClientProps {
   accounts: any[];
   nonAccounts: any[];
+  totalRows?: number;
+  params?: ListParams;
   canManage: boolean;
   currentUserId: number;
   isShiftSupervisor?: boolean;
@@ -28,6 +31,8 @@ interface UsersTableClientProps {
 export default function UsersTableClient({
   accounts,
   nonAccounts,
+  totalRows = 0,
+  params,
   canManage,
   currentUserId,
   isShiftSupervisor = false,
@@ -37,6 +42,19 @@ export default function UsersTableClient({
   roles = [],
 }: UsersTableClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const updateUrl = (updates: Record<string, string | number | undefined>) => {
+    const current = new URLSearchParams(Array.from(searchParams?.entries() || []));
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === undefined || value === "") {
+        current.delete(key);
+      } else {
+        current.set(key, String(value));
+      }
+    }
+    router.push(`/users?${current.toString()}`);
+  };
   const getOrgPosLabel = (code: number) => orgPositions.find((v) => v.code === code)?.label || OrgPosition[code] || `پست ${code}`;
   const getShiftLabel = (code: number) => shifts.find((v) => v.code === code)?.label || Shift[code] || `شیفت ${code}`;
   const getRoleLabel = (code: number) => roles.find((v) => v.code === code)?.label || Role[code] || `نقش ${code}`;
@@ -461,18 +479,20 @@ export default function UsersTableClient({
       {activeTab === "personnel" ? (
         <>
           {canManage && (
-            <div className="card" style={{ padding: "16px", marginBottom: "20px", display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center" }}>
-              <span style={{ fontWeight: 600, fontSize: "14px", color: "var(--ink)" }}>عملیات اکسل پرسنل:</span>
-              
-              <button onClick={handleExportExcel} className="btn primary sm" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ fontSize: "16px" }}>📥</span> خروجی اکسل پرسنل
+            <div style={{ display: "flex", gap: "10px", marginBottom: "16px", flexWrap: "wrap", alignItems: "center" }}>
+              <button onClick={handleExportExcel} className="btn secondary sm">
+                📥 خروجی اکسل
               </button>
-              <span className="spacer" />
-              <button onClick={() => router.push("/users/new")} className="btn accent sm">
-                ➕ افزودن پرسنل جدید
+              <button onClick={handleDownloadSample} className="btn secondary sm">
+                📄 نمونه اکسل ورود پرسنل
               </button>
+              <label className="btn secondary sm" style={{ cursor: "pointer", margin: 0 }}>
+                📤 ورود پرسنل از اکسل
+                <input type="file" accept=".xlsx,.xls" onChange={handleExcelImport} style={{ display: "none" }} />
+              </label>
             </div>
           )}
+
           {/* نوار فیلتر پیشرفته */}
           <div className="card" style={{ padding: "16px", marginBottom: "20px", background: "rgba(30, 41, 59, 0.02)", border: "1px solid var(--line-soft)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
@@ -486,7 +506,10 @@ export default function UsersTableClient({
                 <label style={{ fontSize: "12px", color: "var(--ink-soft)", fontWeight: 600 }}>شیفت کاری:</label>
                 <select
                   value={filterShift}
-                  onChange={(e) => setFilterShift(e.target.value)}
+                  onChange={(e) => {
+                    setFilterShift(e.target.value);
+                    if (params) updateUrl({ shiftFilter: e.target.value, page: 1 });
+                  }}
                   style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--line)", background: "var(--panel)", fontSize: "13px" }}
                 >
                   <option value="all">همه شیفت‌ها</option>
@@ -503,10 +526,13 @@ export default function UsersTableClient({
 
               {/* فیلتر سمت سازمانی */}
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                <label style={{ fontSize: "12px", color: "var(--ink-soft)", fontWeight: 600 }}>پست و سمت سازمانی:</label>
+                <label style={{ fontSize: "12px", color: "var(--ink-soft)", fontWeight: 600 }}>سمت سازمانی:</label>
                 <select
                   value={filterOrgPosition}
-                  onChange={(e) => setFilterOrgPosition(e.target.value)}
+                  onChange={(e) => {
+                    setFilterOrgPosition(e.target.value);
+                    if (params) updateUrl({ posFilter: e.target.value, page: 1 });
+                  }}
                   style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--line)", background: "var(--panel)", fontSize: "13px" }}
                 >
                   <option value="all">همه سمت‌ها</option>
@@ -541,7 +567,10 @@ export default function UsersTableClient({
                 <label style={{ fontSize: "12px", color: "var(--ink-soft)", fontWeight: 600 }}>نقش دسترسی سامانه:</label>
                 <select
                   value={filterRole}
-                  onChange={(e) => setFilterRole(e.target.value)}
+                  onChange={(e) => {
+                    setFilterRole(e.target.value);
+                    if (params) updateUrl({ roleFilter: e.target.value, page: 1 });
+                  }}
                   style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--line)", background: "var(--panel)", fontSize: "13px" }}
                 >
                   <option value="all">همه نقش‌ها</option>
@@ -560,6 +589,7 @@ export default function UsersTableClient({
                       setFilterOrgPosition("all");
                       setFilterPersonnelType("all");
                       setFilterRole("all");
+                      router.push("/users");
                     }}
                     className="btn"
                     style={{
@@ -587,7 +617,7 @@ export default function UsersTableClient({
             <div className="card-head" style={{ padding: "0 0 12px 0", borderBottom: "1px solid var(--line)" }}>
               <h2>حساب‌های کاربری فعال</h2>
               <span className="spacer" />
-              <span className="pill p-mut">{filteredAccounts.length} حساب</span>
+              <span className="pill p-mut">{params ? totalRows : filteredAccounts.length} پرسنل</span>
             </div>
             <div style={{ marginTop: "14px" }}>
               <DataTable
@@ -597,6 +627,18 @@ export default function UsersTableClient({
                 searchPlaceholder="جستجو بر اساس نام کاربری، نام یا نام خانوادگی..."
                 searchFields={["userName", "firstName", "lastName"]}
                 bulkActions={userBulkActions}
+                server={params ? {
+                  page: params.page,
+                  pageSize: params.pageSize,
+                  totalRows,
+                  onPageChange: (p) => updateUrl({ page: p }),
+                  onPageSizeChange: (ps) => updateUrl({ pageSize: ps, page: 1 }),
+                  search: params.search,
+                  onSearchChange: (s) => updateUrl({ search: s, page: 1 }),
+                  sortCol: params.sortField,
+                  sortDir: params.sortDir,
+                  onSortChange: (col, dir) => updateUrl({ sort: col, dir }),
+                } : undefined}
               />
             </div>
           </div>

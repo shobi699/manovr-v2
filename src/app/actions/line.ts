@@ -5,6 +5,13 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { hasPerm } from "@/lib/perms";
+import { audit } from "@/lib/audit";
+import {
+  lineCreatedSummary,
+  lineUpdatedSummary,
+  lineDeletedSummary,
+  importSummary,
+} from "@/lib/audit-summaries";
 
 export async function createLine(
   _prev: { error?: string } | null,
@@ -36,9 +43,19 @@ export async function createLine(
   if (!termVal) return { error: "ترمینال انتخاب شده نامعتبر است." };
   if (capacity < 1) return { error: "ظرفیت باید حداقل ۱ باشد." };
 
-  await prisma.line.create({
+  const created = await prisma.line.create({
     data: { name, tag, capacity, terminal, isDynamic, posX, posY, rotation, length },
   });
+
+  await audit(
+    session,
+    "line",
+    created.id,
+    "CREATE",
+    null,
+    created,
+    lineCreatedSummary(created.name)
+  );
 
   revalidatePath("/lines");
   revalidatePath("/dashboard");
@@ -77,10 +94,22 @@ export async function updateLine(
   if (!termVal) return { error: "ترمینال انتخاب شده نامعتبر است." };
   if (capacity < 1) return { error: "ظرفیت باید حداقل ۱ باشد." };
 
-  await prisma.line.update({
+  const before = await prisma.line.findUnique({ where: { id } });
+
+  const updated = await prisma.line.update({
     where: { id },
     data: { name, tag, capacity, terminal, isDynamic, posX, posY, rotation, length },
   });
+
+  await audit(
+    session,
+    "line",
+    id,
+    "UPDATE",
+    before,
+    updated,
+    lineUpdatedSummary(updated.name)
+  );
 
   revalidatePath("/lines");
   revalidatePath("/dashboard");
@@ -100,7 +129,20 @@ export async function deleteLine(id: number) {
   });
   if (manovrCount > 0) return { error: "این خط در مانورها استفاده شده و قابل حذف نیست." };
 
+  const before = await prisma.line.findUnique({ where: { id } });
+
   await prisma.line.delete({ where: { id } });
+
+  await audit(
+    session,
+    "line",
+    id,
+    "DELETE",
+    before,
+    null,
+    lineDeletedSummary(before?.name || "")
+  );
+
   revalidatePath("/lines");
   revalidatePath("/dashboard");
   revalidatePath("/depot");
@@ -118,6 +160,17 @@ export async function saveLinePositions(positions: { id: number; posX: number; p
       data: { posX: pos.posX, posY: pos.posY, rotation: pos.rotation },
     });
   }
+
+  await audit(
+    session,
+    "line",
+    0,
+    "UPDATE",
+    null,
+    null,
+    `چیدمان ${positions.length} خط در نقشه پایانه بروزرسانی شد.`
+  );
+
   revalidatePath("/depot");
   revalidatePath("/dashboard");
   return { ok: true };
@@ -128,10 +181,23 @@ export async function toggleLineActive(id: number, active: boolean) {
   if (!session || !(await hasPerm(session, "line.manage"))) {
     return { error: "دسترسی ندارید. فقط مدیر یا ادمین اجازه فعال/غیرفعال کردن خط را دارد." };
   }
-  await (prisma.line as any).update({
+  const before = await prisma.line.findUnique({ where: { id } });
+
+  const updated = await (prisma.line as any).update({
     where: { id },
     data: { isActive: active },
   });
+
+  await audit(
+    session,
+    "line",
+    id,
+    "UPDATE",
+    before,
+    updated,
+    lineUpdatedSummary(updated?.name || "")
+  );
+
   revalidatePath("/depot");
   revalidatePath("/lines");
   revalidatePath("/dashboard");
@@ -177,6 +243,10 @@ export async function importLinesFromExcel(list: {
       },
     });
     count++;
+  }
+
+  if (count > 0) {
+    await audit(session, "line", 0, "CREATE", null, null, importSummary("خط", count));
   }
 
   revalidatePath("/lines");

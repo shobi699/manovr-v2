@@ -2,6 +2,7 @@
 
 import React, { useState, useTransition } from "react";
 import { updatePersonnelPhoneInfo, importPersonnelFromExcel } from "@/app/actions/user";
+import type { ListParams } from "@/lib/list-query";
 
 interface PersonnelItem {
   id: number;
@@ -19,11 +20,15 @@ interface PersonnelItem {
 
 export default function PhonebookClient({
   initialPersonnel,
+  totalRows,
+  params,
   canEdit,
   shifts,
   positions,
 }: {
   initialPersonnel: PersonnelItem[];
+  totalRows?: number;
+  params?: ListParams;
   canEdit: boolean;
   shifts: Record<number, string>;
   positions: Record<number, string>;

@@ -1,9 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import DataTable from "@/components/DataTable";
 import ManovrRowActions from "./ManovrRowActions";
 import { ManovrType, ManovrStatus, ConfirmationStatus } from "@/lib/enums";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import type { ListParams } from "@/lib/list-query";
 
 interface LookupValue {
   code: number;
@@ -13,6 +16,8 @@ interface LookupValue {
 
 interface ManovrsTableClientProps {
   manovrs: any[];
+  totalRows: number;
+  params: ListParams;
   canEdit: boolean;
   canConfirm: boolean;
   canDelete: boolean;
@@ -31,10 +36,10 @@ function fmt(d: string | Date) {
   }).format(dateObj);
 }
 
-import { useLiveRefresh } from "@/hooks/useLiveRefresh";
-
 export default function ManovrsTableClient({
   manovrs,
+  totalRows,
+  params,
   canEdit,
   canConfirm,
   canDelete,
@@ -43,61 +48,78 @@ export default function ManovrsTableClient({
   confirmationStatuses,
 }: ManovrsTableClientProps) {
   useLiveRefresh(["manovr_changed"]);
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [showFilters, setShowFilters] = React.useState(false);
-  const [filterTrainCode, setFilterTrainCode] = React.useState("");
-  const [filterType, setFilterType] = React.useState("");
-  const [filterSourceLine, setFilterSourceLine] = React.useState("");
-  const [filterDestLine, setFilterDestLine] = React.useState("");
-  const [filterStatus, setFilterStatus] = React.useState("");
-  const [filterConfirmation, setFilterConfirmation] = React.useState("");
-  const [filterRahbar, setFilterRahbar] = React.useState("");
-  const [filterCreator, setFilterCreator] = React.useState("");
+  const [showFilters, setShowFilters] = useState(false);
 
-  const filteredManovrs = React.useMemo(() => {
-    return manovrs.filter((m) => {
-      if (filterTrainCode.trim()) {
-        const tCode = m.train?.code || "";
-        if (!tCode.toLowerCase().includes(filterTrainCode.trim().toLowerCase())) return false;
+  // وضعیت فیلترها از URL مقداردهی می‌شوند
+  const [filterTrainCode, setFilterTrainCode] = useState(searchParams.get("trainCode") || "");
+  const [filterType, setFilterType] = useState(searchParams.get("typeFilter") || "");
+  const [filterSourceLine, setFilterSourceLine] = useState(searchParams.get("srcLine") || "");
+  const [filterDestLine, setFilterDestLine] = useState(searchParams.get("destLine") || "");
+  const [filterStatus, setFilterStatus] = useState(searchParams.get("statusFilter") || "");
+  const [filterConfirmation, setFilterConfirmation] = useState(searchParams.get("confFilter") || "");
+  const [filterRahbar, setFilterRahbar] = useState(searchParams.get("rahbarFilter") || "");
+  const [filterCreator, setFilterCreator] = useState(searchParams.get("creatorFilter") || "");
+
+  const updateUrl = (newParams: Record<string, string | number | null | undefined>) => {
+    const sp = new URLSearchParams(searchParams.toString());
+    Object.entries(newParams).forEach(([k, v]) => {
+      if (v === null || v === undefined || v === "") {
+        sp.delete(k);
+      } else {
+        sp.set(k, String(v));
       }
-      if (filterType !== "") {
-        if (Number(m.type) !== Number(filterType)) return false;
-      }
-      if (filterSourceLine.trim()) {
-        const sName = m.sourceLine?.name || "";
-        if (!sName.toLowerCase().includes(filterSourceLine.trim().toLowerCase())) return false;
-      }
-      if (filterDestLine.trim()) {
-        const dName = m.destinationLine?.name || "";
-        if (!dName.toLowerCase().includes(filterDestLine.trim().toLowerCase())) return false;
-      }
-      if (filterStatus !== "") {
-        if (Number(m.status) !== Number(filterStatus)) return false;
-      }
-      if (filterConfirmation !== "") {
-        if (Number(m.confirmationStatus) !== Number(filterConfirmation)) return false;
-      }
-      if (filterRahbar.trim()) {
-        const rName = m.rahbar1 ? `${m.rahbar1.firstName} ${m.rahbar1.lastName}` : "";
-        if (!rName.toLowerCase().includes(filterRahbar.trim().toLowerCase())) return false;
-      }
-      if (filterCreator.trim()) {
-        const cName = m.creator ? `${m.creator.firstName} ${m.creator.lastName}` : "سیستم";
-        if (!cName.toLowerCase().includes(filterCreator.trim().toLowerCase())) return false;
-      }
-      return true;
     });
-  }, [
-    manovrs,
-    filterTrainCode,
-    filterType,
-    filterSourceLine,
-    filterDestLine,
-    filterStatus,
-    filterConfirmation,
-    filterRahbar,
-    filterCreator,
-  ]);
+    router.push(`/manovrs?${sp.toString()}`);
+  };
+
+  // اعمال فیلترهای متنی به صورت Debounced
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (filterTrainCode !== (searchParams.get("trainCode") || "")) {
+        updateUrl({ trainCode: filterTrainCode, page: 1 });
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filterTrainCode]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (filterSourceLine !== (searchParams.get("srcLine") || "")) {
+        updateUrl({ srcLine: filterSourceLine, page: 1 });
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filterSourceLine]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (filterDestLine !== (searchParams.get("destLine") || "")) {
+        updateUrl({ destLine: filterDestLine, page: 1 });
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filterDestLine]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (filterRahbar !== (searchParams.get("rahbarFilter") || "")) {
+        updateUrl({ rahbarFilter: filterRahbar, page: 1 });
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filterRahbar]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (filterCreator !== (searchParams.get("creatorFilter") || "")) {
+        updateUrl({ creatorFilter: filterCreator, page: 1 });
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filterCreator]);
 
   const handleClearFilters = () => {
     setFilterTrainCode("");
@@ -108,6 +130,7 @@ export default function ManovrsTableClient({
     setFilterConfirmation("");
     setFilterRahbar("");
     setFilterCreator("");
+    router.push("/manovrs");
   };
 
   const statusPill = (s: number) =>
@@ -141,17 +164,17 @@ export default function ManovrsTableClient({
         </span>
       ),
     },
-    { key: "train", label: "قطار", sortable: true, render: (m: any) => <span className="num">{m.train?.code ?? "—"}</span> },
+    { key: "train", label: "قطار", sortable: false, render: (m: any) => <span className="num">{m.train?.code ?? "—"}</span> },
     {
       key: "rahbar",
       label: "راهبر ۱",
-      sortable: true,
+      sortable: false,
       render: (m: any) => (m.rahbar1 ? `${m.rahbar1.firstName} ${m.rahbar1.lastName}` : "—"),
     },
     {
       key: "creator",
       label: "کاربر ثبت‌کننده",
-      sortable: true,
+      sortable: false,
       render: (m: any) => (m.creator ? `${m.creator.firstName} ${m.creator.lastName}` : "سیستم"),
     },
     { key: "executionTime", label: "زمان اجرا", sortable: true, render: (m: any) => <span className="num" style={{ fontWeight: "bold" }}>{fmt(m.executionTime || m.createdAt)}</span> },
@@ -204,7 +227,8 @@ export default function ManovrsTableClient({
     filterStatus ||
     filterConfirmation ||
     filterRahbar ||
-    filterCreator;
+    filterCreator ||
+    params.search;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -223,7 +247,7 @@ export default function ManovrsTableClient({
                 <span className="pill p-warn" style={{ padding: "1px 6px", fontSize: "10px" }}>فعال</span>
               )}
             </button>
-            <span className="pill p-mut">{manovrs.length} رکورد</span>
+            <span className="pill p-mut">{totalRows} رکورد</span>
           </div>
         </div>
 
@@ -265,7 +289,11 @@ export default function ManovrsTableClient({
                   className="input sm"
                   style={{ height: "30px", fontSize: "11px", padding: "4px 8px" }}
                   value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterType(val);
+                    updateUrl({ typeFilter: val, page: 1 });
+                  }}
                 >
                   <option value="">همه انواع</option>
                   {manovrTypes?.map((t) => (
@@ -307,7 +335,11 @@ export default function ManovrsTableClient({
                   className="input sm"
                   style={{ height: "30px", fontSize: "11px", padding: "4px 8px" }}
                   value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterStatus(val);
+                    updateUrl({ statusFilter: val, page: 1 });
+                  }}
                 >
                   <option value="">همه وضعیت‌ها</option>
                   {manovrStatuses?.map((s) => (
@@ -323,7 +355,11 @@ export default function ManovrsTableClient({
                   className="input sm"
                   style={{ height: "30px", fontSize: "11px", padding: "4px 8px" }}
                   value={filterConfirmation}
-                  onChange={(e) => setFilterConfirmation(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterConfirmation(val);
+                    updateUrl({ confFilter: val, page: 1 });
+                  }}
                 >
                   <option value="">همه تأییدیه‌ها</option>
                   {confirmationStatuses?.map((c) => (
@@ -361,7 +397,7 @@ export default function ManovrsTableClient({
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
               <span style={{ fontSize: "11px", color: "var(--ink-soft)" }}>
-                تعداد نتایج فیلتر شده: <b>{filteredManovrs.length}</b> از {manovrs.length} رکورد
+                تعداد نتایج یافت‌شده: <b>{totalRows}</b> رکورد
               </span>
               {hasAnyFilter && (
                 <button
@@ -380,9 +416,21 @@ export default function ManovrsTableClient({
           <DataTable
             tableName="manovrs"
             columns={columns}
-            data={filteredManovrs}
-            searchPlaceholder="جستجو بر اساس قطار، نوع یا خط..."
+            data={manovrs}
+            searchPlaceholder="جستجو بر اساس قطار یا توضیحات..."
             searchFields={["id"]}
+            server={{
+              page: params.page,
+              pageSize: params.pageSize,
+              totalRows,
+              onPageChange: (p) => updateUrl({ page: p }),
+              onPageSizeChange: (ps) => updateUrl({ pageSize: ps, page: 1 }),
+              search: params.search,
+              onSearchChange: (s) => updateUrl({ search: s, page: 1 }),
+              sortCol: params.sortField,
+              sortDir: params.sortDir,
+              onSortChange: (col, dir) => updateUrl({ sort: col, dir }),
+            }}
           />
         </div>
       </div>

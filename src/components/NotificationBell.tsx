@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "@/app/actions/notification";
+import { showDesktopNotification } from "@/lib/electron-notify";
 
 interface Notification {
   id: number;
@@ -21,17 +22,14 @@ export default function NotificationBell({ userId }: { userId: number }) {
   const [activeFilter, setActiveFilter] = useState<"all" | "unread">("all");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // واکشی اعلان‌ها در لود اولیه
-  const fetchNotifs = async () => {
-    const res = await getNotifications();
-    if (res.ok && res.data) {
-      setNotifications(res.data as any[]);
-      setUnreadCount(res.unreadCount || 0);
-    }
-  };
-
   useEffect(() => {
-    fetchNotifs();
+    let isMounted = true;
+    getNotifications().then((res) => {
+      if (isMounted && res.ok && res.data) {
+        setNotifications(res.data as any[]);
+        setUnreadCount(res.unreadCount || 0);
+      }
+    });
 
     // ثبت‌نام در رویدادهای زنده SSE
     const eventSource = new EventSource("/api/events");
@@ -48,6 +46,10 @@ export default function NotificationBell({ userId }: { userId: number }) {
             const audio = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==\n");
             audio.play();
           } catch {}
+
+          if (newNotif) {
+            showDesktopNotification(newNotif.title || "اعلان جدید", newNotif.body || "");
+          }
         }
       } catch {}
     };

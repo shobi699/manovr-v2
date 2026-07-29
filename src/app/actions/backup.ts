@@ -76,9 +76,10 @@ export async function triggerManualBackup() {
     const backup = await performBackup("manual");
     revalidatePath("/admin/backup");
     return { ok: true, id: backup.id };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error(err);
-    return { error: err.message || "خطا در ایجاد نسخه پشتیبان دیتابیس" };
+    const message = err instanceof Error ? err.message : "خطا در ایجاد نسخه پشتیبان دیتابیس";
+    return { error: message };
   }
 }
 
@@ -94,9 +95,10 @@ export async function triggerSourceCodeBackup() {
     const backup = await performSourceCodeBackup();
     revalidatePath("/admin/backup");
     return { ok: true, id: backup.id };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error(err);
-    return { error: err.message || "خطا در ایجاد نسخه پشتیبان سورس‌کد" };
+    const message = err instanceof Error ? err.message : "خطا در ایجاد نسخه پشتیبان سورس‌کد";
+    return { error: message };
   }
 }
 

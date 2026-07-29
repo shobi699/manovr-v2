@@ -44,20 +44,39 @@ describe("computeDiff", () => {
     expect(Object.keys(diff)).toHaveLength(0);
   });
 
-  // رفتار فعلی (باگ‌دار) — عمداً ثبت شده تا تغییرات آینده قابل تشخیص باشد.
-  // typeof null === "object" است، بنابراین گارد فیلدهای رابطه‌ای در
-  // src/lib/audit.ts:16 هر تغییری را که یک طرف آن null باشد حذف می‌کند.
-  // این یعنی مقداردهی اولیه یا پاک‌کردن هر فیلد nullable در لاگ وقایع ثبت نمی‌شود.
-  // پس از اصلاح این باگ، این تست باید شکست بخورد — آنگاه it.todo زیر را فعال کنید.
-  it("CHARACTERIZATION (known bug): drops changes where either side is null", () => {
-    expect(computeDiff({ phone1: null }, { phone1: "0912" })).toEqual({});
-    expect(computeDiff({ phone1: "0912" }, { phone1: null })).toEqual({});
+  it("records a null -> value transition", () => {
+    expect(computeDiff({ phone1: null }, { phone1: "0912" })).toEqual({
+      phone1: { old: null, new: "0912" },
+    });
   });
 
-  it.todo(
-    "should record null -> value and value -> null transitions " +
-      "(blocked on fixing the typeof-null guard in src/lib/audit.ts:16)"
-  );
+  it("records a value -> null transition", () => {
+    expect(computeDiff({ phone1: "0912" }, { phone1: null })).toEqual({
+      phone1: { old: "0912", new: null },
+    });
+  });
+
+  it("records granting and revoking an access role", () => {
+    expect(computeDiff({ accessRoleId: null }, { accessRoleId: 5 })).toEqual({
+      accessRoleId: { old: null, new: 5 },
+    });
+    expect(computeDiff({ accessRoleId: 5 }, { accessRoleId: null })).toEqual({
+      accessRoleId: { old: 5, new: null },
+    });
+  });
+
+  it("still skips relation objects and arrays", () => {
+    const before = { name: "a", train: { id: 1, code: "AC-1" }, tags: ["x"] };
+    const after = { name: "b", train: { id: 2, code: "AC-2" }, tags: ["y"] };
+    const diff = computeDiff(before, after);
+    expect(diff).toEqual({ name: { old: "a", new: "b" } });
+    expect(diff).not.toHaveProperty("train");
+    expect(diff).not.toHaveProperty("tags");
+  });
+
+  it("does not record a null -> null non-change", () => {
+    expect(computeDiff({ phone1: null }, { phone1: null })).toEqual({});
+  });
 
   it("records all fields when before is null (CREATE path)", () => {
     const diff = computeDiff(null, { phone1: "0912", role: 2 });

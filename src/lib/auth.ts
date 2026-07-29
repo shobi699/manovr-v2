@@ -1,9 +1,18 @@
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 
-const secret = new TextEncoder().encode(
-  process.env.AUTH_SECRET || "dev-secret"
-);
+const AUTH_SECRET = process.env.AUTH_SECRET;
+
+if (!AUTH_SECRET || AUTH_SECRET.length < 32) {
+  throw new Error(
+    "AUTH_SECRET is not set, or is shorter than 32 characters. " +
+      "Session tokens cannot be signed safely without it. " +
+      "Set AUTH_SECRET to a random 32+ character value before starting the server. " +
+      "See README.md and .env.example."
+  );
+}
+
+const secret = new TextEncoder().encode(AUTH_SECRET);
 const COOKIE = "manovr_session";
 
 export interface Session {

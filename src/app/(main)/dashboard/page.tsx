@@ -103,9 +103,21 @@ export default async function DashboardPage() {
   });
 
   // ۵. روند اجرای مانورها در ۱۰ روز گذشته
+  const rangeStart = new Date();
+  rangeStart.setDate(rangeStart.getDate() - 9);
+  rangeStart.setHours(0, 0, 0, 0);
+
+  const trendRows = await prisma.manovr.findMany({
+    where: {
+      createdAt: { gte: rangeStart },
+      status: { not: 3 },
+    },
+    select: { createdAt: true },
+  });
+
   const trendData: { date: string; count: number }[] = [];
   const now = new Date();
-  
+
   for (let i = 9; i >= 0; i--) {
     const d = new Date();
     d.setDate(now.getDate() - i);
@@ -113,12 +125,9 @@ export default async function DashboardPage() {
     const end = new Date(d);
     end.setHours(23, 59, 59, 999);
 
-    const count = await prisma.manovr.count({
-      where: {
-        createdAt: { gte: d, lte: end },
-        status: { not: 3 },
-      },
-    });
+    const count = trendRows.filter(
+      (r) => r.createdAt >= d && r.createdAt <= end
+    ).length;
 
     const jalaliStr = d.toLocaleDateString("fa-IR", {
       calendar: "persian",

@@ -5,7 +5,9 @@ import { getSession } from "@/lib/auth";
 import { hasPerm } from "@/lib/perms";
 import { invalidateLookupCache } from "@/lib/lookups";
 import { audit } from "@/lib/audit";
+import { lookupSummary } from "@/lib/audit-summaries";
 import { emitSSEEvent } from "@/lib/events";
+import { safeAccentColor, safeLogoImage, safeText } from "@/lib/branding";
 
 // دریافت لیست تمام دسته‌بندی‌های لوکاپ
 export async function getLookupTypes() {
@@ -91,6 +93,17 @@ export async function saveLookupValue(data: {
     });
 
     invalidateLookupCache(type.key);
+
+    await audit(
+      session,
+      "lookup_value",
+      upserted.code,
+      existingVal ? "UPDATE" : "CREATE",
+      existingVal,
+      upserted,
+      lookupSummary(existingVal ? "ویرایش" : "ثبت", upserted.label)
+    );
+
     return { ok: true, data: upserted };
   } catch (error: any) {
     return { ok: false, error: error.message || "خطا در ثبت تغییرات" };
@@ -119,6 +132,15 @@ export async function deleteLookupValue(typeId: number, code: number) {
       }
     }
 
+    const before = await prisma.lookupValue.findUnique({
+      where: {
+        typeId_code: {
+          typeId,
+          code,
+        },
+      },
+    });
+
     await prisma.lookupValue.delete({
       where: {
         typeId_code: {
@@ -129,6 +151,16 @@ export async function deleteLookupValue(typeId: number, code: number) {
     });
 
     invalidateLookupCache(type.key);
+
+    await audit(
+      session,
+      "lookup_value",
+      code,
+      "DELETE",
+      before,
+      null,
+      lookupSummary("حذف", before?.label || String(code))
+    );
     return { ok: true };
   } catch (error: any) {
     return { ok: false, error: error.message || "خطا در حذف مقدار" };
@@ -155,6 +187,23 @@ export async function saveBrandingSettings(settings: {
   try {
     const beforeSettings = await getBrandingSettings();
 
+    // مقادیر ورودی از سمت کلاینت می‌آیند و نوع TypeScript تضمینی ایجاد نمی‌کند
+    const safeSettings = {
+      title: safeText(settings.title, 120),
+      footer: safeText(settings.footer, 200),
+      logoIcon: safeText(settings.logoIcon, 8),
+      logoType: settings.logoType === "image" ? "image" : "icon",
+      logoImage: safeLogoImage(settings.logoImage),
+      accentColor: safeAccentColor(settings.accentColor),
+      announcementText: safeText(settings.announcementText, 500),
+      announcementKind: (["info", "success", "warning", "alert"] as const).includes(
+        settings.announcementKind
+      )
+        ? settings.announcementKind
+        : "info",
+      announcementActive: settings.announcementActive === true,
+    };
+
     await prisma.appSetting.upsert({
       where: {
         scope_userId_key: {
@@ -164,13 +213,13 @@ export async function saveBrandingSettings(settings: {
         },
       },
       update: {
-        value: JSON.stringify(settings),
+        value: JSON.stringify(safeSettings),
       },
       create: {
         scope: "global",
         userId: 0,
         key: "branding",
-        value: JSON.stringify(settings),
+        value: JSON.stringify(safeSettings),
       },
     });
 
@@ -181,12 +230,12 @@ export async function saveBrandingSettings(settings: {
       0,
       "UPDATE",
       beforeSettings,
-      settings,
-      `بروزرسانی برندینگ سامانه: عنوان: ${settings.title}، رنگ تم: ${settings.accentColor}`
+      safeSettings,
+      `بروزرسانی برندینگ سامانه: عنوان: ${safeSettings.title}، رنگ تم: ${safeSettings.accentColor}`
     );
 
     // ارسال لایو اعلان تغییرات برندینگ از طریق SSE
-    emitSSEEvent("branding_changed", settings);
+    emitSSEEvent("branding_changed", safeSettings);
 
     return { ok: true };
   } catch (error: any) {
@@ -209,15 +258,19 @@ export async function getBrandingSettings() {
     if (setting) {
       const data = JSON.parse(setting.value);
       return {
-        title: data.title ?? "سامانه مدیریت مانور",
-        footer: data.footer ?? "پایانه فتح‌آباد · v3",
-        logoIcon: data.logoIcon ?? "🚇",
-        logoType: data.logoType ?? "icon",
-        logoImage: data.logoImage ?? "",
-        accentColor: data.accentColor ?? "#d8842a",
-        announcementText: data.announcementText ?? "",
-        announcementKind: data.announcementKind ?? "info",
-        announcementActive: data.announcementActive ?? false,
+        title: safeText(data.title, 120) || "سامانه مدیریت مانور",
+        footer: safeText(data.footer, 200) || "پایانه فتح‌آباد · v3",
+        logoIcon: safeText(data.logoIcon, 8) || "🚇",
+        logoType: (data.logoType === "image" ? "image" : "icon") as "image" | "icon",
+        logoImage: safeLogoImage(data.logoImage),
+        accentColor: safeAccentColor(data.accentColor),
+        announcementText: safeText(data.announcementText, 500),
+        announcementKind: (["info", "success", "warning", "alert"] as const).includes(
+          data.announcementKind
+        )
+          ? data.announcementKind
+          : "info",
+        announcementActive: data.announcementActive === true,
       };
     }
   } catch {}
@@ -227,11 +280,11 @@ export async function getBrandingSettings() {
     title: "سامانه مدیریت مانور",
     footer: "پایانه فتح‌آباد · v3",
     logoIcon: "🚇",
-    logoType: "icon",
+    logoType: "icon" as "image" | "icon",
     logoImage: "",
     accentColor: "#d8842a",
     announcementText: "",
-    announcementKind: "info",
+    announcementKind: "info" as "info" | "success" | "warning" | "alert",
     announcementActive: false,
   };
 }

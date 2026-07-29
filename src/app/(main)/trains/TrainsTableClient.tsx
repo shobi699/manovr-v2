@@ -6,8 +6,9 @@ import TrainRowActions from "./TrainRowActions";
 import { TrainType } from "@/lib/enums";
 
 import { updateTrainStatus, importTrainsFromExcel, updateTrainFlags, bulkUpdateTrainStatus, bulkUpdateTrainFlags, bulkToggleTrainDisposed } from "@/app/actions/train";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
+import type { ListParams } from "@/lib/list-query";
 
 interface LookupValue {
   code: number;
@@ -17,26 +18,52 @@ interface LookupValue {
 
 interface TrainsTableClientProps {
   trains: any[];
+  totalRows: number;
+  params: ListParams;
+  allLines?: { id: number; name: string }[];
   trainTypes?: LookupValue[];
   canManage: boolean;
 }
 
-export default function TrainsTableClient({ trains, trainTypes = [], canManage }: TrainsTableClientProps) {
+export default function TrainsTableClient({
+  trains,
+  totalRows,
+  params,
+  allLines = [],
+  trainTypes = [],
+  canManage,
+}: TrainsTableClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
   const getTrainTypeLabel = (code: number) => {
     return trainTypes.find((v) => v.code === code)?.label || TrainType[code] || `نوع ${code}`;
   };
 
-  const [filterType, setFilterType] = React.useState<string>("all");
-  const [filterOpStatus, setFilterOpStatus] = React.useState<string>("all");
-  const [filterLine, setFilterLine] = React.useState<string>("all");
-  const [filterSystemStatus, setFilterSystemStatus] = React.useState<string>("all");
-  const [filterTechnical, setFilterTechnical] = React.useState<string>("all");
+  const [filterType, setFilterType] = React.useState<string>(searchParams.get("type") || "all");
+  const [filterOpStatus, setFilterOpStatus] = React.useState<string>(searchParams.get("opStatus") || "all");
+  const [filterLine, setFilterLine] = React.useState<string>(searchParams.get("line") || "all");
+  const [filterSystemStatus, setFilterSystemStatus] = React.useState<string>(searchParams.get("sysStatus") || "all");
+  const [filterTechnical, setFilterTechnical] = React.useState<string>(searchParams.get("tech") || "all");
+
+  const updateUrl = (newParams: Record<string, string | number | null | undefined>) => {
+    const sp = new URLSearchParams(searchParams.toString());
+    Object.entries(newParams).forEach(([k, v]) => {
+      if (v === null || v === undefined || v === "" || v === "all") {
+        sp.delete(k);
+      } else {
+        sp.set(k, String(v));
+      }
+    });
+    router.push(`/trains?${sp.toString()}`);
+  };
 
   // استخراج تمام خطوط متمایز قطارها برای نمایش در دراپ‌داون فیلتر
   const uniqueLines = React.useMemo(() => {
+    if (allLines.length > 0) {
+      return allLines.map((l) => ({ value: String(l.id), label: l.name }));
+    }
     const linesMap = new Map<string, string>();
     trains.forEach((t) => {
       if (t.line) {
@@ -44,7 +71,7 @@ export default function TrainsTableClient({ trains, trainTypes = [], canManage }
       }
     });
     return Array.from(linesMap.entries()).map(([value, label]) => ({ value, label }));
-  }, [trains]);
+  }, [allLines, trains]);
 
   const filteredTrains = React.useMemo(() => {
     return trains.filter((t) => {
@@ -564,7 +591,11 @@ export default function TrainsTableClient({ trains, trainTypes = [], canManage }
             <label style={{ fontSize: "12px", color: "var(--ink-soft)", fontWeight: 600 }}>نوع قطار:</label>
             <select
               value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setFilterType(val);
+                updateUrl({ type: val, page: 1 });
+              }}
               style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--line)", background: "var(--panel)", fontSize: "13px" }}
             >
               <option value="all">همه نوع‌ها</option>
@@ -584,7 +615,11 @@ export default function TrainsTableClient({ trains, trainTypes = [], canManage }
             <label style={{ fontSize: "12px", color: "var(--ink-soft)", fontWeight: 600 }}>وضعیت عملیاتی:</label>
             <select
               value={filterOpStatus}
-              onChange={(e) => setFilterOpStatus(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setFilterOpStatus(val);
+                updateUrl({ opStatus: val, page: 1 });
+              }}
               style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--line)", background: "var(--panel)", fontSize: "13px" }}
             >
               <option value="all">همه وضعیت‌ها</option>
@@ -600,7 +635,11 @@ export default function TrainsTableClient({ trains, trainTypes = [], canManage }
             <label style={{ fontSize: "12px", color: "var(--ink-soft)", fontWeight: 600 }}>خط پارک ریل:</label>
             <select
               value={filterLine}
-              onChange={(e) => setFilterLine(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setFilterLine(val);
+                updateUrl({ line: val, page: 1 });
+              }}
               style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--line)", background: "var(--panel)", fontSize: "13px" }}
             >
               <option value="all">همه خطوط</option>
@@ -615,7 +654,11 @@ export default function TrainsTableClient({ trains, trainTypes = [], canManage }
             <label style={{ fontSize: "12px", color: "var(--ink-soft)", fontWeight: 600 }}>وضعیت در سیستم:</label>
             <select
               value={filterSystemStatus}
-              onChange={(e) => setFilterSystemStatus(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setFilterSystemStatus(val);
+                updateUrl({ sysStatus: val, page: 1 });
+              }}
               style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--line)", background: "var(--panel)", fontSize: "13px" }}
             >
               <option value="all">همه</option>
@@ -629,7 +672,11 @@ export default function TrainsTableClient({ trains, trainTypes = [], canManage }
             <label style={{ fontSize: "12px", color: "var(--ink-soft)", fontWeight: 600 }}>وضعیت فنی و ویژگی‌ها:</label>
             <select
               value={filterTechnical}
-              onChange={(e) => setFilterTechnical(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setFilterTechnical(val);
+                updateUrl({ tech: val, page: 1 });
+              }}
               style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--line)", background: "var(--panel)", fontSize: "13px" }}
             >
               <option value="all">همه وضعیت‌های فنی</option>
@@ -653,6 +700,7 @@ export default function TrainsTableClient({ trains, trainTypes = [], canManage }
                   setFilterLine("all");
                   setFilterSystemStatus("all");
                   setFilterTechnical("all");
+                  router.push("/trains");
                 }}
                 className="btn"
                 style={{
@@ -679,16 +727,28 @@ export default function TrainsTableClient({ trains, trainTypes = [], canManage }
         <div className="card-head" style={{ padding: "0 0 12px 0", borderBottom: "1px solid var(--line)" }}>
           <h2>فهرست قطارها</h2>
           <span className="spacer" />
-          <span className="pill p-mut">{filteredTrains.length}</span>
+          <span className="pill p-mut">{totalRows} رکورد</span>
         </div>
         <div style={{ marginTop: "14px" }}>
           <DataTable
             tableName="trains"
             columns={columns}
-            data={filteredTrains}
+            data={trains}
             searchPlaceholder="جستجو بر اساس کد قطار..."
             searchFields={["code"]}
             bulkActions={trainBulkActions}
+            server={{
+              page: params.page,
+              pageSize: params.pageSize,
+              totalRows,
+              onPageChange: (p) => updateUrl({ page: p }),
+              onPageSizeChange: (ps) => updateUrl({ pageSize: ps, page: 1 }),
+              search: params.search,
+              onSearchChange: (s) => updateUrl({ search: s, page: 1 }),
+              sortCol: params.sortField,
+              sortDir: params.sortDir,
+              onSortChange: (col, dir) => updateUrl({ sort: col, dir }),
+            }}
           />
         </div>
       </div>

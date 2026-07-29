@@ -4,6 +4,14 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { hasPerm } from "@/lib/perms";
+import { audit } from "@/lib/audit";
+import {
+  LAYOUT_SCOPES,
+  type LayoutScope,
+  isValidLayoutScope,
+  isSharedLayoutScope,
+} from "@/lib/dashboard-layout";
 
 export async function getDashboardLayout() {
   const session = await getSession();
@@ -36,9 +44,22 @@ export async function getDashboardLayout() {
   }
 }
 
-export async function saveDashboardLayoutAction(layoutData: any, scope: "user" | "role" | "default" = "user") {
+export async function saveDashboardLayoutAction(
+  layoutData: any,
+  scope: LayoutScope = "user"
+) {
   const session = await getSession();
   if (!session) return { error: "ابتدا وارد شوید." };
+
+  // scope از سمت کلاینت می‌آید و تایپ TypeScript تضمینی ایجاد نمی‌کند
+  if (!isValidLayoutScope(scope)) {
+    return { error: "دامنه چیدمان نامعتبر است." };
+  }
+
+  // چیدمان نقش و چیدمان پیش‌فرض روی کاربران دیگر اثر می‌گذارند
+  if (isSharedLayoutScope(scope) && !(await hasPerm(session, "settings.global"))) {
+    return { error: "دسترسی ندارید. تغییر چیدمان مشترک نیازمند مجوز تنظیمات سراسری است." };
+  }
 
   const userId = scope === "user" ? session.id : null;
   const roleId = scope === "role" ? session.role : null;
@@ -68,6 +89,20 @@ export async function saveDashboardLayoutAction(layoutData: any, scope: "user" |
           layout: layoutJson,
         },
       });
+    }
+
+    if (isSharedLayoutScope(scope)) {
+      await audit(
+        session,
+        "dashboardLayout",
+        existing?.id ?? 0,
+        existing ? "UPDATE" : "CREATE",
+        null,
+        { scope, roleId },
+        scope === "default"
+          ? "چیدمان پیش‌فرض داشبورد سامانه بازنویسی شد."
+          : `چیدمان داشبورد نقش ${session.role} بازنویسی شد.`
+      );
     }
 
     revalidatePath("/dashboard");

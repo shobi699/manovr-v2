@@ -46,7 +46,7 @@ export default function NewUserForm({
 
   // تولید رنگ رندوم آواتار به عنوان مقدار اولیه
   const [avatarCol, setAvatarCol] = useState(
-    "hsla(" + Math.floor(Math.random() * 360) + ", 70%, 45%, 0.85)"
+    () => "hsla(" + Math.floor(Math.random() * 360) + ", 70%, 45%, 0.85)"
   );
 
   const isShiftSupervisor = currentUser?.orgPosition === 2;

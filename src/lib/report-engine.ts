@@ -17,6 +17,42 @@ export interface ReportConfig {
   sortDirection?: "asc" | "desc";
 }
 
+// ستون‌های مجاز پرسنل برای ارسال به کلاینت و خروجی گزارش‌ها.
+// passwordHash عمداً حذف شده است و هرگز نباید اضافه شود.
+export const PERSONNEL_SAFE_FIELDS = [
+  "id",
+  "firstName",
+  "lastName",
+  "userName",
+  "role",
+  "shift",
+  "orgPosition",
+  "workPlace",
+  "personnelType",
+  "personnelCode",
+  "hasAccount",
+  "createdAt",
+  "phone1",
+  "phone2",
+  "internalTel",
+  "address",
+  "avatarColor",
+  "accessRoleId",
+] as const;
+
+export type PersonnelSafeField = (typeof PERSONNEL_SAFE_FIELDS)[number];
+
+// شکل select برای Prisma بر اساس لیست مجاز بالا
+export const PERSONNEL_SAFE_SELECT = Object.fromEntries(
+  PERSONNEL_SAFE_FIELDS.map((f) => [f, true])
+) as Record<PersonnelSafeField, true>;
+
+// فیلدهای درخواستی کلاینت را برای موجودیت پرسنل به لیست مجاز محدود می‌کند
+export function sanitizeReportFields(entity: string, fields: string[]): string[] {
+  if (entity !== "personnel") return fields;
+  return fields.filter((f) => (PERSONNEL_SAFE_FIELDS as readonly string[]).includes(f));
+}
+
 function buildRelationalFieldOperator(op: string, val: any, val2?: any) {
   if (op === "equals") return val;
   if (op === "notEquals") return { not: val };
@@ -194,7 +230,10 @@ export async function executeReportQuery(config: ReportConfig) {
     records = await prisma.personnel.findMany({
       where,
       orderBy,
-      include: { accessRole: true },
+      select: {
+        ...PERSONNEL_SAFE_SELECT,
+        accessRole: true,
+      },
     });
   }
 

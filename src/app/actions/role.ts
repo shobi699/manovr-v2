@@ -5,6 +5,12 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { hasPerm, invalidatePermsCache } from "@/lib/perms";
+import { audit } from "@/lib/audit";
+import {
+  roleCreatedSummary,
+  roleUpdatedSummary,
+  roleDeletedSummary,
+} from "@/lib/audit-summaries";
 
 export async function createRole(
   _prev: { error?: string } | null,
@@ -23,13 +29,23 @@ export async function createRole(
   const exists = await prisma.accessRole.findUnique({ where: { name } });
   if (exists) return { error: "نقشی با این نام وجود دارد." };
 
-  await prisma.accessRole.create({
+  const created = await prisma.accessRole.create({
     data: {
       name,
       permissions: JSON.stringify(permsRaw),
       isSystem: false,
     },
   });
+
+  await audit(
+    session,
+    "accessRole",
+    created.id,
+    "CREATE",
+    null,
+    created,
+    roleCreatedSummary(created.name, permsRaw.length)
+  );
 
   invalidatePermsCache();
   revalidatePath("/roles");
@@ -66,10 +82,20 @@ export async function updateRole(
     updateData.name = name;
   }
 
-  await prisma.accessRole.update({
+  const updated = await prisma.accessRole.update({
     where: { id },
     data: updateData,
   });
+
+  await audit(
+    session,
+    "accessRole",
+    id,
+    "UPDATE",
+    role,
+    updated,
+    roleUpdatedSummary(updated.name, permsRaw.length)
+  );
 
   invalidatePermsCache();
   revalidatePath("/roles");
@@ -93,6 +119,17 @@ export async function deleteRole(id: number) {
   }
 
   await prisma.accessRole.delete({ where: { id } });
+
+  await audit(
+    session,
+    "accessRole",
+    id,
+    "DELETE",
+    role,
+    null,
+    roleDeletedSummary(role.name)
+  );
+
   invalidatePermsCache();
   revalidatePath("/roles");
   revalidatePath("/users");

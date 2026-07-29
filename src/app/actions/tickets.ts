@@ -5,6 +5,8 @@ import { getSession } from "@/lib/auth";
 import { hasPerm } from "@/lib/perms";
 import { emitSSEEvent } from "@/lib/events";
 import { revalidatePath } from "next/cache";
+import { audit } from "@/lib/audit";
+import { ticketSummary } from "@/lib/audit-summaries";
 
 /**
  * دریافت لیست پرسنل فعال سیستم برای ارجاع/انتساب تیکت‌ها
@@ -147,6 +149,17 @@ export async function createTicket(title: string, body: string, assigneeId?: num
     }
 
     emitSSEEvent("ticket_changed", { ticketId: ticket.id });
+
+    await audit(
+      session,
+      "ticket",
+      ticket.id,
+      "CREATE",
+      null,
+      ticket,
+      ticketSummary("ایجاد", ticket.title)
+    );
+
     return { ok: true, data: ticket };
   } catch (error: any) {
     return { ok: false, error: error.message || "خطا در ثبت تیکت" };

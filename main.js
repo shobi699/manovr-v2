@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { fork } = require('child_process');
@@ -6,6 +6,20 @@ const http = require('http');
 
 let mainWindow = null;
 let serverProcess = null;
+
+// ثبت handler اعلانات نیتیو سیستم‌عامل در الکترون
+ipcMain.handle('show-notification', (event, { title, body }) => {
+  if (Notification.isSupported()) {
+    const notif = new Notification({
+      title: title || 'سامانه مدیریت مانور',
+      body: body || '',
+      silent: false,
+    });
+    notif.show();
+    return { ok: true };
+  }
+  return { ok: false, error: 'Notifications not supported' };
+});
 
 // آدرس لوکال دیتابیس در پوشه AppData کاربر
 const userDataPath = app.getPath('userData');
@@ -26,6 +40,26 @@ function writeLog(message) {
 }
 
 writeLog('Starting application...');
+
+const crypto = require('crypto');
+
+let authSecret = null;
+
+function setupAuthSecret() {
+  const configFolder = path.join(userDataPath, 'config');
+  if (!fs.existsSync(configFolder)) {
+    fs.mkdirSync(configFolder, { recursive: true });
+  }
+  const keyPath = path.join(configFolder, 'auth.key');
+  if (!fs.existsSync(keyPath)) {
+    const secret = crypto.randomBytes(48).toString('base64');
+    fs.writeFileSync(keyPath, secret, 'utf8');
+    writeLog(`Auth secret created successfully at: ${keyPath}`);
+  } else {
+    writeLog(`Auth secret loaded from: ${keyPath}`);
+  }
+  return fs.readFileSync(keyPath, 'utf8').trim();
+}
 
 function setupDatabase() {
   if (!fs.existsSync(dbFolder)) {
@@ -88,6 +122,7 @@ function startNextServer(port) {
       ...process.env,
       PORT: String(port),
       DATABASE_URL: `file:${dbPath}`,
+      AUTH_SECRET: authSecret,
       NODE_ENV: 'production'
     },
     cwd: app.isPackaged
@@ -154,6 +189,7 @@ let selectedPort = 3000;
 
 app.on('ready', () => {
   setupDatabase();
+  authSecret = setupAuthSecret();
   
   findFreePort(3000, (port) => {
     selectedPort = port;

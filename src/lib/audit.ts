@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Session } from "@/lib/auth";
-import { emitSSEEvent } from "@/lib/events";
+import { emitSSEEvent, emitEntityChanged } from "@/lib/events";
 
 // محاسبه تفاوت‌های دو شیء
 export function computeDiff(before: any, after: any) {
@@ -9,11 +9,14 @@ export function computeDiff(before: any, after: any) {
   const allKeys = Array.from(new Set([...Object.keys(before || {}), ...Object.keys(after || {})]));
   
   const ignoreKeys = ["createdAt", "updatedAt", "passwordHash", "id"];
+  const isRelation = (v: unknown) => v !== null && typeof v === "object";
 
   for (const key of allKeys) {
     if (ignoreKeys.includes(key)) continue;
-    // بررسی فیلدهای رابطه‌ای (آبجکت‌ها یا آرایه‌ها)
-    if (typeof before?.[key] === "object" || typeof after?.[key] === "object") continue;
+    // فیلدهای رابطه‌ای (آبجکت یا آرایه) نادیده گرفته می‌شوند، اما null یک مقدار
+    // اسکالر معتبر است و باید ثبت شود — typeof null برابر "object" است و این
+    // تله‌ای بود که باعث حذف خاموش تغییرات null می‌شد.
+    if (isRelation(before?.[key]) || isRelation(after?.[key])) continue;
 
     const oldVal = before?.[key];
     const newVal = after?.[key];
@@ -73,8 +76,8 @@ export async function audit(
     // ۲. تولید اعلان‌های خودکار
     await handleAutoNotifications(session, entity, entityId, action, before, after, summary);
 
-    // ۳. انتشار رویداد به استریم SSE
-    emitSSEEvent(`${entity}_changed`, { id: entityId, action, summary, log });
+    // ۳. انتشار رویداد به استریم SSE (فقط سیگنال ابطال — خلاصه و دیف لاگ محرمانه است و نباید همگانی منتشر شود)
+    emitEntityChanged(entity, { id: entityId, action });
 
     return log;
   } catch (error) {

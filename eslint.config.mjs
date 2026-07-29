@@ -37,12 +37,16 @@ const eslintConfig = defineConfig([
   },
   globalIgnores([
     ".next/**",
+    "**/.next/**",
+    "node_modules/**",
+    "**/node_modules/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
     "coverage/**",
     "scripts/**",
     "prisma/*.mjs",
+    "plans/**",
   ]),
 ]);
 

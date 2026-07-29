@@ -64,12 +64,12 @@ export default function JalaliDateTimePicker({
   useEffect(() => {
     if (value) {
       const parsed = new Date(value);
-      if (!isNaN(parsed.getTime())) {
+      if (!isNaN(parsed.getTime()) && parsed.getTime() !== selectedDate.getTime()) {
         setSelectedDate(parsed);
         setViewDate(parsed);
       }
     }
-  }, [value]);
+  }, [value, selectedDate]);
 
   // Click away listener
   useEffect(() => {

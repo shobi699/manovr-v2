@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildPrismaWhere, type ReportFilter } from "@/lib/report-engine";
+import { buildPrismaWhere, PERSONNEL_SAFE_FIELDS, PERSONNEL_SAFE_SELECT, sanitizeReportFields, type ReportFilter } from "@/lib/report-engine";
 
 describe("buildPrismaWhere", () => {
   it("coerces a numeric field to a number, not a string", () => {
@@ -69,5 +69,24 @@ describe("buildPrismaWhere", () => {
     ];
     const where = buildPrismaWhere("train", filters);
     expect(where.capacity).toEqual({ gte: 10, lte: 20 });
+  });
+});
+
+describe("PERSONNEL_SAFE_FIELDS and sanitizeReportFields", () => {
+  it("does not include passwordHash in PERSONNEL_SAFE_FIELDS", () => {
+    expect(PERSONNEL_SAFE_FIELDS).not.toContain("passwordHash");
+  });
+
+  it("does not include passwordHash in PERSONNEL_SAFE_SELECT", () => {
+    expect(PERSONNEL_SAFE_SELECT).not.toHaveProperty("passwordHash");
+  });
+
+  it("removes passwordHash from personnel report fields", () => {
+    expect(sanitizeReportFields("personnel", ["firstName", "passwordHash"])).toEqual(["firstName"]);
+    expect(sanitizeReportFields("personnel", ["passwordHash"])).toEqual([]);
+  });
+
+  it("leaves non-personnel report fields untouched", () => {
+    expect(sanitizeReportFields("manovr", ["type", "anything"])).toEqual(["type", "anything"]);
   });
 });

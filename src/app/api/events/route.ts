@@ -12,36 +12,47 @@ export async function GET(req: NextRequest) {
 
   const responseStream = new ReadableStream({
     start(controller) {
-      // ارسال سیگنال اولیه اتصال
-      controller.enqueue(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
+      let closed = false;
 
-      const onMessage = (event: { channel: string; data: any }) => {
-        // مدیریت ارسال اعلان‌های شخصی یا عمومی
-        if (event.channel.startsWith("notification:")) {
+      const send = (chunk: string) => {
+        if (closed) return;
+        try {
+          controller.enqueue(chunk);
+        } catch {
+          // کلاینت قطع شده است — منابع را آزاد کن
+          cleanup();
+        }
+      };
+
+      const cleanup = () => {
+        if (closed) return;
+        closed = true;
+        clearInterval(heartbeat);
+        sseEmitter.off("message", onMessage);
+      };
+
+      // کانال‌های عمومی مجاز — فقط سیگنال ابطال کش، بدون داده‌ی محرمانه
+      const isPersonalChannel = (channel: string) => channel.startsWith("notification:");
+
+      const onMessage = (event: { channel: string; data: unknown }) => {
+        if (isPersonalChannel(event.channel)) {
           const targetUserId = parseInt(event.channel.split(":")[1]) || 0;
           if (targetUserId !== session.id) return;
         }
-        
-        controller.enqueue(`data: ${JSON.stringify(event)}\n\n`);
+        send(`data: ${JSON.stringify(event)}\n\n`);
       };
 
-      sseEmitter.on("message", onMessage);
-
-      // ارسال سیگنال heartbeat برای باز نگه داشتن ارتباط
       const heartbeat = setInterval(() => {
-        try {
-          controller.enqueue(`: heartbeat\n\n`);
-        } catch {
-          // اتصال از سمت کلاینت بسته شده است
-          clearInterval(heartbeat);
-          sseEmitter.off("message", onMessage);
-        }
+        send(`: heartbeat\n\n`);
       }, 25000);
 
-      req.signal.addEventListener("abort", () => {
-        clearInterval(heartbeat);
-        sseEmitter.off("message", onMessage);
-      });
+      sseEmitter.on("message", onMessage);
+      send(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
+
+      req.signal.addEventListener("abort", cleanup);
+    },
+    cancel() {
+      // ReadableStream توسط مصرف‌کننده لغو شد
     },
   });
 

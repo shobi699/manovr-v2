@@ -52,8 +52,6 @@ export default function SearchableSelect({
       setTimeout(() => {
         searchInputRef.current?.focus();
       }, 50);
-    } else {
-      setSearch("");
     }
   }, [isOpen]);
 
@@ -70,6 +68,7 @@ export default function SearchableSelect({
   const handleSelect = (val: string | number, optDisabled?: boolean) => {
     if (optDisabled) return;
     onChange(val);
+    setSearch("");
     setIsOpen(false);
   };
 
