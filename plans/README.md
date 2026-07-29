@@ -89,6 +89,61 @@ its structure, `src/app/(main)/depot/scene3d/*`, `src/app/globals.css`, the seed
 scripts under `prisma/` and `seed/`, and `scripts/build.js` beyond its
 interaction with the packaging problem in plan 012.
 
+## Review of plans 017–022 (2026-07-29)
+
+Plans 017–022 were written outside the original audit session. Reviewed against
+the same standard as 001–016, with every factual claim checked against the code.
+**Three rest on premises that are false.**
+
+| Plan | Verdict | Why |
+|---|---|---|
+| 017 | **REJECT — do not execute** | Premise inverted; 6 of 9 named functions do not exist |
+| 018 | **REWRITE** | Warning count off by 2.4×; named functions do not exist; premise already resolved |
+| 019 | **REWRITE** | Right concern, wrong file — cited routes contain zero Prisma calls |
+| 020 | Implemented, **tests are weak** | 7 assertions total; at least one passes for the wrong reason |
+| 021 | Implemented, **but non-functional** | No preload script, so the IPC path is dead code |
+| 022 | Implemented | Plausible as written |
+
+**017** claims `train.ts`, `manovr.ts`, `lookups.ts`, and `tickets.ts` "mutate
+records without emitting audit logs". Measured: they contain **10, 4, 3, and 1**
+`await audit(` calls respectively. The plan also names `bulkDeleteTrains`,
+`toggleTrainActive`, `updateManovrStatus`, `updateConfirmStatus`,
+`toggleLookupActive`, and `replyTicket` — **none of which exist**. The real
+names are `bulkToggleTrainDisposed`, `updateTrainStatus`, `finishManovr`,
+`confirmManovr`, and `replyToTicket`. There *is* a residual gap worth planning
+(`saveLookupValue` and `deleteLookupValue` lack audit calls; `tickets.ts` has
+only one), but it needs a plan written from measurement.
+
+**018** claims "over 600 `no-explicit-any` warnings" — actual count is **255**.
+It names `exportManeuversToExcel` and `exportManeuversToPdf`; the real exports
+are `generateExcelBuffer` and `generatePDFBuffer`. Its core deliverable —
+removing `@ts-ignore` from `src/lib/export-helpers.ts` — is **already done**;
+`grep` finds none, and `src/types/third-party.d.ts` now supplies the
+declarations.
+
+**019** claims both export routes "execute unbounded
+`prisma.manovr.findMany({ where, include })`". Both routes contain **zero**
+occurrences of `prisma`; they delegate to `runDynamicReport`. The underlying
+concern is real — `executeReportQuery` in `src/lib/report-engine.ts` is genuinely
+unbounded — but every step targets the wrong file, so the plan cannot be executed
+as written.
+
+**021** is implemented but does not work. `main.js:11` registers
+`ipcMain.handle('show-notification', …)` and `src/lib/electron-notify.ts` calls
+`window.electronAPI.showNotification(…)`, but `webPreferences` sets
+`contextIsolation: true` with **no `preload` script**, and no `contextBridge`
+call exists anywhere in the repo. `window.electronAPI` is therefore permanently
+`undefined`: the Electron branch is unreachable and every notification silently
+falls through to the Web Notification API. The `ipcMain` handler is dead code.
+
+**020**'s three files hold 7 tests and 7 assertions between them. The
+hierarchy test in `user-actions.test.ts` asserts only
+`expect(result.error).toBeDefined()`, and `prisma.personnel.findMany` is mocked
+with no return value — so `findUnmanageableIds` receives `undefined`, throws a
+`TypeError`, and the action's `catch` returns an error object. The test passes
+because of a mocking gap, not because the guard works. It would pass equally if
+the guard were deleted.
+
 ## Findings considered and rejected
 
 Recorded so nobody re-audits them.
