@@ -218,6 +218,10 @@ export default function DepotScene({
   const [manovrType, setManovrType] = useState<number>(2);
   const [manovrDesc, setManovrDesc] = useState<string>("");
 
+  const [quickType, setQuickType] = useState<string>("2");
+  const [quickRahbar1, setQuickRahbar1] = useState<string>("");
+  const [quickRahbar2, setQuickRahbar2] = useState<string>("");
+
   const [successMsg, setSuccessMsg] = useState<string>("");
 
   // فیلدهای جابجایی سریع ادمین
@@ -3937,29 +3941,29 @@ export default function DepotScene({
                 </div>
 
                 <div className="field">
-                  <label htmlFor="trainId">قطار انتخابی جهت مانور</label>
-                  <select
-                    id="trainId"
+                  <label htmlFor="trainId">قطار انتخابی جهت مانور *</label>
+                  <SearchableSelect
                     name="trainId"
-                    className="input"
-                    value={preSelectedTrainId || undefined}
-                    onChange={(e) => setPreSelectedTrainId(Number(e.target.value))}
-                    required
-                  >
-                    {trains
+                    value={preSelectedTrainId || ""}
+                    onChange={(val) => setPreSelectedTrainId(Number(val))}
+                    options={trains
                       .filter((t) => t.lineId === sourceLineId)
-                      .map((t) => (
-                        <option key={t.id} value={t.id}>
-                          قطار {t.code} ({TrainType[t.type]})
-                        </option>
-                      ))}
-                  </select>
+                      .map((t) => ({
+                        value: String(t.id),
+                        label: `قطار ${t.code} (${TrainType[t.type] || "نامشخص"})`,
+                      }))}
+                    placeholder="جستجو و انتخاب قطار..."
+                    required
+                  />
                 </div>
 
                 <div className="field">
                   <label htmlFor="type">نوع مانور *</label>
-                  <select id="type" name="type" className="input" defaultValue="2" required>
-                    {(() => {
+                  <SearchableSelect
+                    name="type"
+                    value={quickType}
+                    onChange={(val) => setQuickType(String(val))}
+                    options={(() => {
                       const list = manovrTypes ? manovrTypes.filter((v) => v.isActive !== false).map((v) => ({ code: v.code, label: v.label })) : [];
                       const existing = new Set(list.map((v) => v.code));
                       for (const [k, v] of Object.entries(ManovrType)) {
@@ -3968,37 +3972,46 @@ export default function DepotScene({
                           list.push({ code, label: v });
                         }
                       }
-                      return list.sort((a, b) => a.code - b.code).map((v) => (
-                        <option key={v.code} value={v.code}>
-                          {v.label}
-                        </option>
-                      ));
+                      return list.sort((a, b) => a.code - b.code).map((v) => ({
+                        value: String(v.code),
+                        label: v.label,
+                      }));
                     })()}
-                  </select>
+                    placeholder="جستجوی نوع مانور..."
+                    required
+                  />
                 </div>
 
                 <div className="grid2">
                   <div className="field">
                     <label htmlFor="rahbar1Id">راهبر مسئول ۱ *</label>
-                    <select id="rahbar1Id" name="rahbar1Id" className="input" required>
-                      <option value="">-- انتخاب کنید --</option>
-                      {rahbaran.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.name}
-                        </option>
-                      ))}
-                    </select>
+                    <SearchableSelect
+                      name="rahbar1Id"
+                      value={quickRahbar1}
+                      onChange={(val) => setQuickRahbar1(String(val))}
+                      options={rahbaran.map((r) => ({
+                        value: String(r.id),
+                        label: r.name,
+                      }))}
+                      placeholder="جستجوی راهبر ۱..."
+                      required
+                    />
                   </div>
                   <div className="field">
                     <label htmlFor="rahbar2Id">راهبر مسئول ۲ (اختیاری)</label>
-                    <select id="rahbar2Id" name="rahbar2Id" className="input">
-                      <option value="">-- انتخاب کنید --</option>
-                      {rahbaran.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.name}
-                        </option>
-                      ))}
-                    </select>
+                    <SearchableSelect
+                      name="rahbar2Id"
+                      value={quickRahbar2}
+                      onChange={(val) => setQuickRahbar2(String(val))}
+                      options={[
+                        { value: "", label: "-- بدون راهبر کمکی --" },
+                        ...rahbaran.map((r) => ({
+                          value: String(r.id),
+                          label: r.name,
+                        })),
+                      ]}
+                      placeholder="جستجوی راهبر کمکی..."
+                    />
                   </div>
                 </div>
 

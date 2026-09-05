@@ -5,7 +5,33 @@ const { fork } = require('child_process');
 const http = require('http');
 
 let mainWindow = null;
+let splashWindow = null;
 let serverProcess = null;
+
+function createSplashWindow() {
+  splashWindow = new BrowserWindow({
+    width: 480,
+    height: 520,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: false,
+    center: true,
+    show: true,
+    backgroundColor: '#0f172a',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+    icon: path.join(__dirname, 'public', 'logo.png'),
+  });
+
+  splashWindow.loadFile(path.join(__dirname, 'splash.html'));
+
+  splashWindow.on('closed', () => {
+    splashWindow = null;
+  });
+}
 
 // ثبت handler اعلانات نیتیو سیستم‌عامل در الکترون.
 // ورودی از سمت رندرر می‌آید و نباید مورد اعتماد فرض شود؛ payload ممکن است
@@ -75,22 +101,32 @@ function setupDatabase() {
     fs.mkdirSync(dbFolder, { recursive: true });
   }
 
-  // اگر دیتابیس در AppData وجود نداشت، دیتابیس اولیه را از داخل پکیج کپی می‌کنیم
+  const templateDbPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'dev.db')
+    : path.join(__dirname, 'prisma', 'dev.db');
+
+  writeLog(`Looking for template database at: ${templateDbPath}`);
+
   if (!fs.existsSync(dbPath)) {
-    const templateDbPath = app.isPackaged
-      ? path.join(process.resourcesPath, 'dev.db')
-      : path.join(__dirname, 'prisma', 'dev.db');
-
-    writeLog(`Looking for template database at: ${templateDbPath}`);
-
     if (fs.existsSync(templateDbPath)) {
       fs.copyFileSync(templateDbPath, dbPath);
       writeLog(`Database initialized successfully at: ${dbPath}`);
     } else {
       writeLog(`ERROR: Template database not found at: ${templateDbPath}`);
     }
-  } else {
-    writeLog(`Database already exists at: ${dbPath}`);
+  } else if (fs.existsSync(templateDbPath)) {
+    try {
+      const templateStat = fs.statSync(templateDbPath);
+      const currentStat = fs.statSync(dbPath);
+      if (templateStat.mtimeMs > currentStat.mtimeMs) {
+        fs.copyFileSync(templateDbPath, dbPath);
+        writeLog(`Database updated from newer template at: ${dbPath}`);
+      } else {
+        writeLog(`Database already exists at: ${dbPath}`);
+      }
+    } catch (e) {
+      writeLog(`Database status check error: ${e.message}`);
+    }
   }
 }
 
@@ -178,21 +214,34 @@ function createWindow(port) {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
+    show: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      // بدون این preload، پل contextBridge ساخته نمی‌شود و window.electronAPI
-      // هرگز در رندرر وجود نخواهد داشت — یعنی مسیر اعلان نیتیو به‌صورت خاموش
-      // از کار می‌افتد. اگر این خط حذف شود، preload.js نیز باید از
-      // package.json > build.files حذف گردد.
       preload: path.join(__dirname, 'preload.js'),
     },
     title: 'سامانه مدیریت مانور دپو',
-    autoHideMenuBar: true, // پنهان کردن منوهای بالای صفحه
+    autoHideMenuBar: true,
+    icon: path.join(__dirname, 'public', 'logo.png'),
   });
 
   const url = `http://localhost:${port}`;
   mainWindow.loadURL(url);
+
+  const showMainWindow = () => {
+    if (mainWindow && !mainWindow.isVisible()) {
+      mainWindow.show();
+      mainWindow.maximize();
+      mainWindow.focus();
+    }
+    if (splashWindow && !splashWindow.isDestroyed()) {
+      splashWindow.close();
+      splashWindow = null;
+    }
+  };
+
+  mainWindow.once('ready-to-show', showMainWindow);
+  mainWindow.webContents.once('did-finish-load', showMainWindow);
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -202,6 +251,7 @@ function createWindow(port) {
 let selectedPort = 3000;
 
 app.on('ready', () => {
+  createSplashWindow();
   setupDatabase();
   authSecret = setupAuthSecret();
   

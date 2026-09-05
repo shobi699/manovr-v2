@@ -4,10 +4,17 @@ const prisma = new PrismaClient();
 
 export const ALL_PERMS = [
   "manovr.view", "manovr.create", "manovr.edit", "manovr.confirm", "manovr.delete",
-  "train.manage", "line.manage", "terminal.manage", "user.manage", "role.manage",
-  "phonebook.view", "phonebook.edit", "report.build", "report.export", "report.import",
-  "ticket.create", "ticket.manage", "lookups.manage", "branding.manage", "audit.view",
-  "backup.manage", "settings.global", "depot.layout", "depot.view", "dashboard.view"
+  "train.view", "train.create", "train.edit", "train.delete",
+  "train.status.kafshak", "train.status.atp", "train.status.rotary", "train.status.license",
+  "line.view", "line.create", "line.edit", "line.delete",
+  "terminal.view", "terminal.create", "terminal.edit", "terminal.delete",
+  "user.view", "user.create", "user.edit", "user.delete",
+  "role.view", "role.create", "role.edit", "role.delete",
+  "phonebook.view", "phonebook.edit",
+  "report.build", "report.export", "report.import",
+  "ticket.create", "ticket.manage",
+  "lookups.manage", "branding.manage", "audit.view", "backup.manage", "settings.global",
+  "depot.layout", "depot.view", "dashboard.view"
 ];
 
 const SYSTEM_ROLES = [
@@ -16,7 +23,10 @@ const SYSTEM_ROLES = [
     name: "مسئول",
     permissions: [
       "manovr.view", "manovr.create", "manovr.edit", "manovr.confirm", "manovr.delete",
-      "train.manage", "line.manage", "terminal.manage", "user.manage",
+      "train.view", "train.create", "train.edit", "train.delete",
+      "line.view", "line.create", "line.edit", "line.delete",
+      "terminal.view", "terminal.create", "terminal.edit", "terminal.delete",
+      "user.view", "user.create", "user.edit", "user.delete",
       "phonebook.view", "report.build", "report.export", "ticket.create", "ticket.manage",
       "depot.view", "dashboard.view", "settings.global"
     ],

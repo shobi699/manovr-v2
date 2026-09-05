@@ -1,11 +1,12 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createManovr } from "@/app/actions/manovr";
 import { ManovrType } from "@/lib/enums";
 import { isPermanentTransfer } from "@/lib/manovr-rules";
 import JalaliDateTimePicker from "@/components/JalaliDateTimePicker";
+import SearchableSelect from "@/components/SearchableSelect";
 
 type LineOpt = { id: number; name?: string };
 type TrainOpt = {
@@ -35,6 +36,8 @@ export default function NewManovrForm({
   const [selectedType, setSelectedType] = useState<string>("");
   const [sourceLineId, setSourceLineId] = useState<string>("");
   const [destinationLineId, setDestinationLineId] = useState<string>("");
+  const [rahbar1Id, setRahbar1Id] = useState<string>("");
+  const [rahbar2Id, setRahbar2Id] = useState<string>("");
   const [isStaticMode, setIsStaticMode] = useState<boolean>(false);
 
   const isPermType = isPermanentTransfer(Number(selectedType));
@@ -84,35 +87,82 @@ export default function NewManovrForm({
 
   const selectedTrain = trains.find((t) => t.id === Number(selectedTrainId));
 
+  const typeOptions = useMemo(() => {
+    const list = manovrTypes ? manovrTypes.filter((v) => v.isActive !== false) : [];
+    const existingCodes = new Set(list.map((v) => v.code));
+    for (const [k, v] of Object.entries(ManovrType)) {
+      const code = Number(k);
+      if (!existingCodes.has(code)) {
+        list.push({ code, label: v, isActive: true });
+      }
+    }
+    return list.sort((a, b) => a.code - b.code).map((v) => ({
+      value: String(v.code),
+      label: v.label,
+    }));
+  }, [manovrTypes]);
+
+  const trainOptions = useMemo(() => {
+    return trains.map((t) => ({
+      value: String(t.id),
+      label: `قطار ${t.code} ${t.lineName ? `(فعلی: ${t.lineName})` : ""}`,
+    }));
+  }, [trains]);
+
+  const sourceLineOptions = useMemo(() => {
+    return [
+      { value: "", label: "— انتخاب مبدأ —" },
+      ...lines.map((l) => ({ value: String(l.id), label: l.name || `خط ${l.id}` })),
+    ];
+  }, [lines]);
+
+  const destLineOptions = useMemo(() => {
+    if (isPermType) {
+      return [{ value: "", label: "— خروج دائم از پایانه —" }];
+    }
+    return [
+      { value: "", label: "انتخاب مقصد…" },
+      ...lines.map((l) => {
+        const isSame = sourceLineId && String(l.id) === sourceLineId;
+        return {
+          value: String(l.id),
+          label: `${l.name || `خط ${l.id}`}${isSame ? " (همین خط)" : ""}`,
+        };
+      }),
+    ];
+  }, [lines, sourceLineId, isPermType]);
+
+  const rahbar1Options = useMemo(() => {
+    return rahbaran.map((p) => ({
+      value: String(p.id),
+      label: p.name || `کاربر ${p.id}`,
+    }));
+  }, [rahbaran]);
+
+  const rahbar2Options = useMemo(() => {
+    return [
+      { value: "", label: "— بدون راهبر کمکی —" },
+      ...rahbaran.map((p) => ({
+        value: String(p.id),
+        label: p.name || `کاربر ${p.id}`,
+      })),
+    ];
+  }, [rahbaran]);
+
   return (
     <form action={action}>
       {state?.error && <div className="err" style={{ marginBottom: 12 }}>{state.error}</div>}
 
       <div className="field">
         <label htmlFor="type">نوع مانور *</label>
-        <select
-          id="type"
+        <SearchableSelect
           name="type"
-          className="input"
           value={selectedType}
-          onChange={(e) => handleTypeChange(e.target.value)}
+          onChange={(val) => handleTypeChange(String(val))}
+          options={typeOptions}
+          placeholder="نوع مانور را جستجو و انتخاب کنید..."
           required
-        >
-          <option value="" disabled>انتخاب کنید…</option>
-          {(() => {
-            const list = manovrTypes ? manovrTypes.filter((v) => v.isActive !== false) : [];
-            const existingCodes = new Set(list.map((v) => v.code));
-            for (const [k, v] of Object.entries(ManovrType)) {
-              const code = Number(k);
-              if (!existingCodes.has(code)) {
-                list.push({ code, label: v, isActive: true });
-              }
-            }
-            return list.sort((a, b) => a.code - b.code).map((v) => (
-              <option key={v.code} value={v.code}>{v.label}</option>
-            ));
-          })()}
-        </select>
+        />
       </div>
 
       {isPermType && (
@@ -135,21 +185,14 @@ export default function NewManovrForm({
 
       <div className="field">
         <label htmlFor="trainId">قطار *</label>
-        <select
-          id="trainId"
+        <SearchableSelect
           name="trainId"
-          className="input"
           value={selectedTrainId}
-          onChange={(e) => handleTrainChange(e.target.value)}
+          onChange={(val) => handleTrainChange(String(val))}
+          options={trainOptions}
+          placeholder="قطار مورد نظر را جستجو کنید..."
           required
-        >
-          <option value="" disabled>انتخاب کنید…</option>
-          {trains.map((t) => (
-            <option key={t.id} value={t.id}>
-              قطار {t.code} {t.lineName ? `(فعلی: ${t.lineName})` : ""}
-            </option>
-          ))}
-        </select>
+        />
       </div>
 
       {/* چک‌باکس و توضیحات مانور در محل (ثابت) */}
@@ -184,44 +227,29 @@ export default function NewManovrForm({
       <div className="grid2">
         <div className="field">
           <label htmlFor="sourceLineId">مبدأ</label>
-          <select
-            id="sourceLineId"
+          <SearchableSelect
             name="sourceLineId"
-            className="input"
             value={sourceLineId}
-            onChange={(e) => {
-              const val = e.target.value;
-              setSourceLineId(val);
-              if (isStaticMode || isPermType) setDestinationLineId(val);
+            onChange={(val) => {
+              const vStr = String(val);
+              setSourceLineId(vStr);
+              if (isStaticMode || isPermType) setDestinationLineId(vStr);
             }}
-          >
-            <option value="">— انتخاب مبدأ —</option>
-            {lines.map((l) => (
-              <option key={l.id} value={l.id}>{l.name}</option>
-            ))}
-          </select>
+            options={sourceLineOptions}
+            placeholder="جستجوی خط مبدأ..."
+          />
         </div>
 
         <div className="field">
           <label htmlFor="destinationLineId">مقصد {isPermType ? "(خروج دائم)" : "*"}</label>
-          <select
-            id="destinationLineId"
+          <SearchableSelect
             name="destinationLineId"
-            className="input"
             value={destinationLineId}
-            onChange={(e) => setDestinationLineId(e.target.value)}
+            onChange={(val) => setDestinationLineId(String(val))}
+            options={destLineOptions}
+            placeholder={isPermType ? "— خروج دائم از پایانه —" : "جستجوی خط مقصد..."}
             required={!isPermType}
-          >
-            <option value="" disabled={!isPermType}>{isPermType ? "— خروج دائم از پایانه —" : "انتخاب مقصد…"}</option>
-            {lines.map((l) => {
-              const isSame = sourceLineId && String(l.id) === sourceLineId;
-              return (
-                <option key={l.id} value={l.id}>
-                  {l.name} {isSame ? " (همین خط)" : ""}
-                </option>
-              );
-            })}
-          </select>
+          />
         </div>
       </div>
 
@@ -232,21 +260,24 @@ export default function NewManovrForm({
       <div className="grid2">
         <div className="field">
           <label htmlFor="rahbar1Id">راهبر ۱ *</label>
-          <select id="rahbar1Id" name="rahbar1Id" className="input" defaultValue="" required>
-            <option value="" disabled>انتخاب کنید…</option>
-            {rahbaran.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
+          <SearchableSelect
+            name="rahbar1Id"
+            value={rahbar1Id}
+            onChange={(val) => setRahbar1Id(String(val))}
+            options={rahbar1Options}
+            placeholder="جستجوی راهبر ۱..."
+            required
+          />
         </div>
         <div className="field">
           <label htmlFor="rahbar2Id">راهبر ۲ (کمکی)</label>
-          <select id="rahbar2Id" name="rahbar2Id" className="input" defaultValue="">
-            <option value="">—</option>
-            {rahbaran.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
+          <SearchableSelect
+            name="rahbar2Id"
+            value={rahbar2Id}
+            onChange={(val) => setRahbar2Id(String(val))}
+            options={rahbar2Options}
+            placeholder="جستجوی راهبر کمکی..."
+          />
         </div>
       </div>
 

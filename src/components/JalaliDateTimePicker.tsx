@@ -204,37 +204,62 @@ export default function JalaliDateTimePicker({
 
       {isOpen && (
         <div
-          className="absolute right-0 mt-1 p-3 rounded-lg shadow-xl border border-line z-50 text-white"
           style={{
-            backgroundColor: "rgba(15,23,42,0.95)",
-            backdropFilter: "blur(12px)",
+            position: "absolute",
+            right: 0,
+            top: "calc(100% + 4px)",
+            backgroundColor: "#0f172a",
+            backdropFilter: "blur(16px)",
             width: "300px",
-            borderColor: "var(--line)",
-            boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.5)",
-            zIndex: 1000
+            padding: "12px",
+            borderRadius: "12px",
+            border: "1px solid rgba(255, 255, 255, 0.2)",
+            boxShadow: "0 20px 40px -10px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0, 0, 0, 0.4)",
+            zIndex: 99999,
+            color: "#f8fafc",
           }}
         >
           {/* Calendar Header: Year & Month Selectors */}
           <div className="flex gap-2 mb-3" style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
             <select
               className="input sm"
-              style={{ flex: 1, padding: "4px 8px", fontSize: "12px", backgroundColor: "var(--panel-2)", color: "#fff", border: "1px solid var(--line)", borderRadius: "4px" }}
+              style={{
+                flex: 1,
+                padding: "6px 8px",
+                fontSize: "12px",
+                backgroundColor: "#1e293b",
+                color: "#ffffff",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                borderRadius: "6px",
+                outline: "none",
+                cursor: "pointer",
+              }}
               value={viewMonth}
               onChange={(e) => handleMonthChange(Number(e.target.value))}
             >
               {JALALI_MONTH_NAMES.map((name, idx) => (
-                <option key={idx} value={idx}>{name}</option>
+                <option key={idx} value={idx} style={{ backgroundColor: "#1e293b", color: "#ffffff", padding: "6px" }}>{name}</option>
               ))}
             </select>
 
             <select
               className="input sm"
-              style={{ flex: 1, padding: "4px 8px", fontSize: "12px", backgroundColor: "var(--panel-2)", color: "#fff", border: "1px solid var(--line)", borderRadius: "4px" }}
+              style={{
+                flex: 1,
+                padding: "6px 8px",
+                fontSize: "12px",
+                backgroundColor: "#1e293b",
+                color: "#ffffff",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                borderRadius: "6px",
+                outline: "none",
+                cursor: "pointer",
+              }}
               value={viewYear}
               onChange={(e) => handleYearChange(Number(e.target.value))}
             >
               {yearOptions.map((y) => (
-                <option key={y} value={y}>{y}</option>
+                <option key={y} value={y} style={{ backgroundColor: "#1e293b", color: "#ffffff", padding: "6px" }}>{y}</option>
               ))}
             </select>
           </div>
@@ -249,11 +274,11 @@ export default function JalaliDateTimePicker({
               fontSize: "11px",
               fontWeight: "600",
               marginBottom: "8px",
-              opacity: 0.6
+              color: "#94a3b8"
             }}
           >
             {WEEK_DAYS.map((day, idx) => (
-              <div key={idx} className={idx === 6 ? "text-red-400" : ""}>{day}</div>
+              <div key={idx} style={{ color: idx === 6 ? "#f87171" : "#94a3b8" }}>{day}</div>
             ))}
           </div>
 
@@ -283,19 +308,21 @@ export default function JalaliDateTimePicker({
                   key={idx}
                   type="button"
                   onClick={() => handleDaySelect(day)}
-                  className={`py-1 rounded text-center transition-all ${
-                    isSelected
-                      ? "bg-amber-500 text-slate-900 font-bold"
-                      : "hover:bg-slate-700 hover:text-white"
-                  }`}
                   style={{
-                    padding: "4px 0",
-                    borderRadius: "4px",
+                    padding: "6px 0",
+                    borderRadius: "6px",
                     border: "none",
                     cursor: "pointer",
-                    backgroundColor: isSelected ? "var(--accent)" : "transparent",
-                    color: isSelected ? "var(--bg)" : "#fff",
-                    fontWeight: isSelected ? "bold" : "normal"
+                    backgroundColor: isSelected ? "#3b82f6" : "transparent",
+                    color: isSelected ? "#ffffff" : "#f8fafc",
+                    fontWeight: isSelected ? "bold" : "normal",
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSelected) e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSelected) e.currentTarget.style.backgroundColor = "transparent";
                   }}
                 >
                   {day}
@@ -305,45 +332,45 @@ export default function JalaliDateTimePicker({
           </div>
 
           {/* Separator */}
-          <div className="my-3 border-t border-line" style={{ margin: "12px 0", borderTop: "1px solid var(--line)" }} />
+          <div style={{ margin: "12px 0", borderTop: "1px solid rgba(255, 255, 255, 0.12)" }} />
 
           {/* Time Picker */}
-          <div className="flex items-center justify-between gap-2" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-            <span style={{ fontSize: "12px", opacity: 0.8 }}>ساعت اجرای مانور:</span>
-            <div className="flex items-center gap-1" style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+            <span style={{ fontSize: "12px", color: "#cbd5e1" }}>ساعت اجرای مانور:</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
               {/* Minutes Select */}
               <select
                 className="input sm text-center"
-                style={{ width: "60px", padding: "2px 4px", fontSize: "12px", backgroundColor: "var(--panel-2)", color: "#fff", border: "1px solid var(--line)", borderRadius: "4px" }}
+                style={{ width: "60px", padding: "4px", fontSize: "12px", backgroundColor: "#1e293b", color: "#ffffff", border: "1px solid rgba(255, 255, 255, 0.2)", borderRadius: "6px" }}
                 value={minutes}
                 onChange={(e) => handleMinuteChange(Number(e.target.value))}
               >
                 {Array.from({ length: 60 }, (_, i) => i).map((m) => (
-                  <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
+                  <option key={m} value={m} style={{ backgroundColor: "#1e293b", color: "#ffffff" }}>{String(m).padStart(2, "0")}</option>
                 ))}
               </select>
-              <span>:</span>
+              <span style={{ color: "#94a3b8", fontWeight: "bold" }}>:</span>
               {/* Hours Select */}
               <select
                 className="input sm text-center"
-                style={{ width: "60px", padding: "2px 4px", fontSize: "12px", backgroundColor: "var(--panel-2)", color: "#fff", border: "1px solid var(--line)", borderRadius: "4px" }}
+                style={{ width: "60px", padding: "4px", fontSize: "12px", backgroundColor: "#1e293b", color: "#ffffff", border: "1px solid rgba(255, 255, 255, 0.2)", borderRadius: "6px" }}
                 value={hours}
                 onChange={(e) => handleHourChange(Number(e.target.value))}
               >
                 {Array.from({ length: 24 }, (_, i) => i).map((h) => (
-                  <option key={h} value={h}>{String(h).padStart(2, "0")}</option>
+                  <option key={h} value={h} style={{ backgroundColor: "#1e293b", color: "#ffffff" }}>{String(h).padStart(2, "0")}</option>
                 ))}
               </select>
             </div>
           </div>
 
           {/* Footer Buttons */}
-          <div className="flex justify-between mt-3 gap-2" style={{ display: "flex", justifyContent: "space-between", marginTop: "12px", gap: "8px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "12px", gap: "8px" }}>
             <button
               type="button"
               onClick={handleTodayClick}
               className="btn sm"
-              style={{ flex: 1, padding: "4px 8px", fontSize: "11px", justifyContent: "center" }}
+              style={{ flex: 1, padding: "6px 8px", fontSize: "11.5px", justifyContent: "center", backgroundColor: "rgba(255, 255, 255, 0.08)", color: "#f8fafc", border: "1px solid rgba(255, 255, 255, 0.15)" }}
             >
               امروز
             </button>
@@ -351,9 +378,9 @@ export default function JalaliDateTimePicker({
               type="button"
               onClick={() => setIsOpen(false)}
               className="btn sm primary"
-              style={{ flex: 1, padding: "4px 8px", fontSize: "11px", justifyContent: "center" }}
+              style={{ flex: 1, padding: "6px 8px", fontSize: "11.5px", justifyContent: "center" }}
             >
-              تایید و بستن
+              تأیید و بستن
             </button>
           </div>
         </div>

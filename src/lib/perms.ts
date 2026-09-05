@@ -146,10 +146,12 @@ import { unstable_cache, revalidateTag } from "next/cache";
 // مجوزهای مؤثر کاربر را از DB می‌خواند (با استفاده از کش سراسری Next.js برای سرعت بالا)
 export const getUserPerms = unstable_cache(
   async (userId: number, legacyRole: number): Promise<string[]> => {
+    if (legacyRole === 4) return [...ALL_PERMS];
     const p = await prisma.personnel.findUnique({
       where: { id: userId },
       include: { accessRole: true },
     });
+    if (p?.role === 4) return [...ALL_PERMS];
     if (p?.accessRole) {
       try { return JSON.parse(p.accessRole.permissions); } catch { /* fallthrough */ }
     }
@@ -171,6 +173,7 @@ export function permsInclude(perms: string[], perm: Perm) {
 // چک مجوز برای server action ها
 export async function hasPerm(session: Session | null, perm: Perm): Promise<boolean> {
   if (!session) return false;
+  if (session.role === 4) return true; // سوپرادمین همواره به تمامی بخش‌ها دسترسی کامل دارد
   const perms = await getUserPerms(session.id, session.role);
   return perms.includes(perm);
 }

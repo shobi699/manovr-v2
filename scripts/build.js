@@ -102,6 +102,7 @@ function build() {
     console.log('7. Copying final packages to root directory...');
     // Stop any running processes to prevent file locks
     try {
+      execSync('taskkill /f /fi "IMAGENAME eq Manovr*"', { stdio: 'ignore' });
       execSync('taskkill /f /im ManovrSystem.exe', { stdio: 'ignore' });
     } catch (e) {}
 
@@ -109,6 +110,11 @@ function build() {
       if (file.endsWith('.exe')) {
         const src = path.join(distDir, file);
         const dest = path.join(rootDir, file);
+        if (fs.existsSync(dest)) {
+          try {
+            fs.unlinkSync(dest);
+          } catch (e) {}
+        }
         fs.copyFileSync(src, dest);
         console.log(`Copied package to root: ${file}`);
       }

@@ -89,6 +89,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "splash.html",
       ".next/standalone/**/*",
       "!.next/standalone/**/.env*",
       "public/**/*",
