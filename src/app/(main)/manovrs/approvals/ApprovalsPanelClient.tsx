@@ -3,6 +3,8 @@
 import React, { useState, useTransition } from "react";
 import { confirmManovr, finishManovr, deleteManovr } from "@/app/actions/manovr";
 import { ManovrType, ManovrStatus, ConfirmationStatus } from "@/lib/enums";
+import { useToast } from "@/components/ui/Toast";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 
 interface LookupValue {
   code: number;
@@ -72,61 +74,109 @@ export default function ApprovalsPanelClient({
     return true;
   });
 
+  const [confirmAction, setConfirmAction] = useState<{
+    type: "approve" | "reject" | "finish" | "delete";
+    id: number;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant?: "danger" | "primary" | "default";
+  } | null>(null);
+  const { toast } = useToast();
+
   // انجام عملیات تأیید
-  const handleApprove = async (id: number) => {
-    if (!confirm("آیا از تأیید نهایی این مانور مطمئن هستید؟")) return;
-    startTransition(async () => {
-      const res = await confirmManovr(id, 1);
-      if (res.ok) {
-        setManovrs((prev) =>
-          prev.map((m) => (m.id === id ? { ...m, confirmationStatus: 1 } : m))
-        );
-      } else {
-        alert(res.error || "خطا در تایید مانور");
-      }
+  const handleApprove = (id: number) => {
+    setConfirmAction({
+      type: "approve",
+      id,
+      title: "تأیید نهایی مانور",
+      message: "آیا از تأیید نهایی این مانور مطمئن هستید؟",
+      confirmText: "تأیید مانور",
+      variant: "primary",
     });
   };
 
   // انجام عملیات رد
-  const handleReject = async (id: number) => {
-    if (!confirm("آیا از رد کردن این مانور مطمئن هستید؟")) return;
-    startTransition(async () => {
-      const res = await confirmManovr(id, 2);
-      if (res.ok) {
-        setManovrs((prev) =>
-          prev.map((m) => (m.id === id ? { ...m, confirmationStatus: 2 } : m))
-        );
-      } else {
-        alert(res.error || "خطا در رد مانور");
-      }
+  const handleReject = (id: number) => {
+    setConfirmAction({
+      type: "reject",
+      id,
+      title: "رد کردن مانور",
+      message: "آیا از رد کردن این مانور مطمئن هستید؟",
+      confirmText: "رد مانور",
+      variant: "danger",
     });
   };
 
   // انجام عملیات اتمام و بستن مانور
-  const handleFinish = async (id: number) => {
-    if (!confirm("آیا از اتمام و بستن این مانور مطمئن هستید؟")) return;
-    startTransition(async () => {
-      const res = await finishManovr(id);
-      if (res.ok) {
-        setManovrs((prev) =>
-          prev.map((m) => (m.id === id ? { ...m, status: 2, finishedAt: new Date().toISOString() } : m))
-        );
-      } else {
-        alert(res.error || "خطا در بستن مانور");
-      }
+  const handleFinish = (id: number) => {
+    setConfirmAction({
+      type: "finish",
+      id,
+      title: "اتمام و بستن مانور",
+      message: "آیا از اتمام و بستن این مانور مطمئن هستید؟",
+      confirmText: "بستن مانور",
+      variant: "primary",
     });
   };
 
   // انجام عملیات حذف مانور
-  const handleDelete = async (id: number) => {
-    if (!confirm("آیا از حذف این مانور مطمئن هستید؟ (حذف نرم)")) return;
+  const handleDelete = (id: number) => {
+    setConfirmAction({
+      type: "delete",
+      id,
+      title: "حذف مانور",
+      message: "آیا از حذف این مانور مطمئن هستید؟ (حذف نرم)",
+      confirmText: "حذف مانور",
+      variant: "danger",
+    });
+  };
+
+  const handleExecuteConfirm = async () => {
+    if (!confirmAction) return;
+    const { type, id } = confirmAction;
+
     startTransition(async () => {
-      const res = await deleteManovr(id);
-      if (res.ok) {
-        setManovrs((prev) => prev.filter((m) => m.id !== id));
-      } else {
-        alert(res.error || "خطا در حذف مانور");
+      if (type === "approve") {
+        const res = await confirmManovr(id, 1);
+        if (res.ok) {
+          toast.success("مانور با موفقیت تأیید شد.");
+          setManovrs((prev) =>
+            prev.map((m) => (m.id === id ? { ...m, confirmationStatus: 1 } : m))
+          );
+        } else {
+          toast.error(res.error || "خطا در تایید مانور");
+        }
+      } else if (type === "reject") {
+        const res = await confirmManovr(id, 2);
+        if (res.ok) {
+          toast.success("مانور با موفقیت رد شد.");
+          setManovrs((prev) =>
+            prev.map((m) => (m.id === id ? { ...m, confirmationStatus: 2 } : m))
+          );
+        } else {
+          toast.error(res.error || "خطا در رد مانور");
+        }
+      } else if (type === "finish") {
+        const res = await finishManovr(id);
+        if (res.ok) {
+          toast.success("مانور با موفقیت بسته شد.");
+          setManovrs((prev) =>
+            prev.map((m) => (m.id === id ? { ...m, status: 2, finishedAt: new Date().toISOString() } : m))
+          );
+        } else {
+          toast.error(res.error || "خطا در بستن مانور");
+        }
+      } else if (type === "delete") {
+        const res = await deleteManovr(id);
+        if (res.ok) {
+          toast.success("مانور با موفقیت حذف شد.");
+          setManovrs((prev) => prev.filter((m) => m.id !== id));
+        } else {
+          toast.error(res.error || "خطا در حذف مانور");
+        }
       }
+      setConfirmAction(null);
     });
   };
 
@@ -375,6 +425,18 @@ export default function ApprovalsPanelClient({
           })}
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(confirmAction)}
+        title={confirmAction?.title ?? "تأیید عملیات"}
+        message={confirmAction?.message ?? ""}
+        confirmText={confirmAction?.confirmText ?? "تأیید"}
+        cancelText="انصراف"
+        variant={confirmAction?.variant ?? "primary"}
+        isLoading={isPending}
+        onConfirm={handleExecuteConfirm}
+        onCancel={() => setConfirmAction(null)}
+      />
     </div>
   );
 }

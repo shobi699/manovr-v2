@@ -27,6 +27,7 @@ describe("list-query helpers", () => {
     });
 
     it("clamps page sizes exceeding MAX_PAGE_SIZE or invalid options", () => {
+      expect(MAX_PAGE_SIZE).toBe(100);
       expect(parseListParams({ pageSize: "999" }, allowedSort).pageSize).toBe(DEFAULT_PAGE_SIZE);
       expect(parseListParams({ pageSize: "7" }, allowedSort).pageSize).toBe(DEFAULT_PAGE_SIZE);
       expect(parseListParams({ pageSize: "50" }, allowedSort).pageSize).toBe(50);

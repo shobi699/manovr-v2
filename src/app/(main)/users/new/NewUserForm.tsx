@@ -225,8 +225,8 @@ export default function NewUserForm({
               <input id="userName" name="userName" className="input" dir="ltr" required />
             </div>
             <div className="field">
-              <label htmlFor="password">رمز عبور *</label>
-              <input id="password" name="password" type="password" className="input" dir="ltr" required />
+              <label htmlFor="password">رمز عبور (پیش‌فرض: ۱۲۳۴۵۶)</label>
+              <input id="password" name="password" type="password" className="input" dir="ltr" defaultValue="123456" />
             </div>
           </div>
           <div className="grid2">

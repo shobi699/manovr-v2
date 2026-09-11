@@ -17,6 +17,12 @@ import {
   importSummary,
 } from "@/lib/audit-summaries";
 import { findUnmanageableIds } from "@/lib/bulk-guards";
+import {
+  createUserSchema,
+  updateUserSchema,
+  resetPasswordSchema,
+  formatZodError,
+} from "@/lib/validations";
 
 export async function createUser(
   _prev: { error?: string } | null,
@@ -35,26 +41,34 @@ export async function createUser(
     return { error: "دسترسی ندارید. شما مجاز به افزودن کاربر نیستید." };
   }
 
-  const firstName = String(fd.get("firstName") ?? "").trim();
-  const lastName = String(fd.get("lastName") ?? "").trim();
-  const userName = String(fd.get("userName") ?? "").trim() || null;
-  const password = String(fd.get("password") ?? "").trim();
-  const role = Number(fd.get("role") ?? 0);
-  let shift = Number(fd.get("shift") ?? 1);
-  let orgPosition = Number(fd.get("orgPosition") ?? 4);
-  let personnelType = Number(fd.get("personnelType") ?? 1);
-  const personnelCode = String(fd.get("personnelCode") ?? "").trim() || null;
-  const hasAccount = fd.get("hasAccount") === "1";
-  const accessRoleId = fd.get("accessRoleId") ? Number(fd.get("accessRoleId")) : null;
+  const rawInput = Object.fromEntries(fd.entries());
+  const parsed = createUserSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { error: formatZodError(parsed.error) };
+  }
 
-  const phone1 = fd.get("phone1") ? String(fd.get("phone1")).trim() : null;
-  const phone2 = fd.get("phone2") ? String(fd.get("phone2")).trim() : null;
-  const internalTel = fd.get("internalTel") ? String(fd.get("internalTel")).trim() : null;
-  const address = fd.get("address") ? String(fd.get("address")).trim() : null;
-  const avatarColor = fd.get("avatarColor") ? String(fd.get("avatarColor")).trim() : null;
+  const {
+    firstName,
+    lastName,
+    userName,
+    password,
+    role,
+    shift: defaultShift,
+    orgPosition: defaultOrgPosition,
+    personnelType: defaultPersonnelType,
+    personnelCode,
+    hasAccount,
+    accessRoleId,
+    phone1,
+    phone2,
+    internalTel,
+    address,
+    avatarColor,
+  } = parsed.data;
 
-  if (!firstName) return { error: "نام الزامی است." };
-  if (!lastName) return { error: "نام خانوادگی الزامی است." };
+  let shift = defaultShift;
+  let orgPosition = defaultOrgPosition;
+  let personnelType = defaultPersonnelType;
 
   if (!isRoleAllowedToManage(session.role, role)) {
     return { error: "شما مجاز به تعیین این نقش برای کاربر جدید نیستید (هم‌سطح یا بالاتر از شما)." };
@@ -68,11 +82,7 @@ export async function createUser(
     }
   }
 
-  if (hasAccount) {
-    if (!userName) return { error: "نام کاربری برای حساب فعال الزامی است." };
-    if (!password || password.length < 4)
-      return { error: "رمز عبور حداقل ۴ کاراکتر باشد." };
-
+  if (hasAccount && userName) {
     const dup = await prisma.personnel.findFirst({ where: { userName } });
     if (dup) return { error: "این نام کاربری قبلاً ثبت شده." };
   }
@@ -82,8 +92,9 @@ export async function createUser(
     if (dupCode) return { error: "این کد پرسنلی قبلاً ثبت شده است." };
   }
 
-  const passwordHash = hasAccount && password
-    ? await bcrypt.hash(password, 10)
+  const pwdToHash = password && password.trim().length >= 4 ? password.trim() : "123456";
+  const passwordHash = hasAccount
+    ? await bcrypt.hash(pwdToHash, 10)
     : null;
 
   const created = await prisma.personnel.create({
@@ -140,29 +151,39 @@ export async function updateUser(
     return { error: "دسترسی ندارید." };
   }
 
-  const id = Number(fd.get("id"));
+  const rawInput = Object.fromEntries(fd.entries());
+  const parsed = updateUserSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { error: formatZodError(parsed.error) };
+  }
+
+  const {
+    id,
+    firstName,
+    lastName,
+    userName,
+    role: initialRole,
+    shift: initialShift,
+    orgPosition: initialOrgPosition,
+    personnelType: initialPersonnelType,
+    personnelCode,
+    hasAccount,
+    accessRoleId: initialAccessRoleId,
+    phone1,
+    phone2,
+    internalTel,
+    address,
+    avatarColor,
+  } = parsed.data;
+
+  let role = initialRole;
+  let shift = initialShift;
+  let orgPosition = initialOrgPosition;
+  let personnelType = initialPersonnelType;
+  let accessRoleId = initialAccessRoleId;
+
   const targetUser = await prisma.personnel.findUnique({ where: { id } });
   if (!targetUser) return { error: "کاربر مورد نظر یافت نشد." };
-
-  const firstName = String(fd.get("firstName") ?? "").trim();
-  const lastName = String(fd.get("lastName") ?? "").trim();
-  const userName = String(fd.get("userName") ?? "").trim() || null;
-  let role = Number(fd.get("role") ?? 0);
-  let shift = Number(fd.get("shift") ?? 1);
-  let orgPosition = Number(fd.get("orgPosition") ?? 4);
-  let personnelType = Number(fd.get("personnelType") ?? 1);
-  const personnelCode = String(fd.get("personnelCode") ?? "").trim() || null;
-  const hasAccount = fd.get("hasAccount") === "1";
-  let accessRoleId = fd.get("accessRoleId") ? Number(fd.get("accessRoleId")) : null;
-
-  const phone1 = fd.get("phone1") ? String(fd.get("phone1")).trim() : null;
-  const phone2 = fd.get("phone2") ? String(fd.get("phone2")).trim() : null;
-  const internalTel = fd.get("internalTel") ? String(fd.get("internalTel")).trim() : null;
-  const address = fd.get("address") ? String(fd.get("address")).trim() : null;
-  const avatarColor = fd.get("avatarColor") ? String(fd.get("avatarColor")).trim() : null;
-
-  if (!firstName) return { error: "نام الزامی است." };
-  if (!lastName) return { error: "نام خانوادگی الزامی است." };
 
   if (!isRoleAllowedToManage(session.role, targetUser.role)) {
     return { error: "شما مجاز به ویرایش این کاربر نیستید (هم‌سطح یا بالاتر از شما)." };
@@ -204,12 +225,18 @@ export async function updateUser(
     if (dupCode) return { error: "این کد پرسنلی قبلاً برای کاربر دیگری ثبت شده است." };
   }
 
+  const newPassword =
+    typeof rawInput.password === "string" && rawInput.password.trim().length >= 4
+      ? await bcrypt.hash(rawInput.password.trim(), 10)
+      : (!targetUser.passwordHash && hasAccount ? await bcrypt.hash("123456", 10) : undefined);
+
   const updated = await prisma.personnel.update({
     where: { id },
     data: {
       firstName,
       lastName,
       userName: hasAccount ? userName : null,
+      ...(newPassword ? { passwordHash: newPassword } : {}),
       role,
       shift,
       orgPosition,
@@ -251,18 +278,22 @@ export async function resetPassword(
   const currentUser = await prisma.personnel.findUnique({
     where: { id: session.id },
   });
-  const hasManagePerm = await hasPerm(session, "user.delete");
+  const hasManagePerm = (await hasPerm(session, "user.edit")) || (await hasPerm(session, "user.delete"));
   const isShiftSupervisor = currentUser?.orgPosition === ORG_POSITIONS.RESPONSIBLE;
 
   if (!hasManagePerm && !isShiftSupervisor) {
     return { error: "دسترسی ندارید." };
   }
 
-  const id = Number(fd.get("id"));
-  const password = String(fd.get("password") ?? "").trim();
+  const parsed = resetPasswordSchema.safeParse({
+    userId: fd.get("id"),
+    password: fd.get("password"),
+  });
+  if (!parsed.success) {
+    return { error: formatZodError(parsed.error) };
+  }
 
-  if (!password || password.length < 4)
-    return { error: "رمز عبور حداقل ۴ کاراکتر باشد." };
+  const { userId: id, password } = parsed.data;
 
   const targetUser = await prisma.personnel.findUnique({ where: { id } });
   if (!targetUser) return { error: "کاربر مورد نظر یافت نشد." };
@@ -549,7 +580,8 @@ export async function importPersonnelFromExcel(list: {
       row.orgPosition = 4;
     }
 
-    const userName = row.userName ? String(row.userName).trim() : null;
+    const rawUserName = row.userName ? String(row.userName).trim() : "";
+    const userName = rawUserName.length > 0 ? rawUserName : null;
 
     if (userName) {
       const dup = await prisma.personnel.findFirst({ where: { userName } });
@@ -562,11 +594,18 @@ export async function importPersonnelFromExcel(list: {
       if (dupCode) continue;
     }
 
+    // اگر سطر اکسل دارای نام کاربری باشد، به صورت خودکار حساب کاربری با رمز ۱۲۳۴۵۶ برای او فعال می‌شود
+    const hasAccount = Boolean(userName);
+    const passwordHash = hasAccount ? await bcrypt.hash("123456", 10) : null;
+    const role = hasAccount ? rowRole : 0;
+
     await prisma.personnel.create({
       data: {
         firstName: row.firstName.trim(),
         lastName: row.lastName.trim(),
         userName,
+        passwordHash,
+        role,
         personnelCode,
         phone1: row.phone1 ? String(row.phone1).trim() : null,
         phone2: row.phone2 ? String(row.phone2).trim() : null,
@@ -574,7 +613,7 @@ export async function importPersonnelFromExcel(list: {
         address: row.address ? String(row.address).trim() : null,
         shift: row.shift ?? 1,
         orgPosition: row.orgPosition ?? 4,
-        hasAccount: false,
+        hasAccount,
         avatarColor: "hsla(" + Math.floor(Math.random() * 360) + ", 70%, 45%, 0.85)",
       },
     });
@@ -742,3 +781,93 @@ export async function bulkDeleteUsers(ids: number[]) {
     return { error: err.message };
   }
 }
+
+/**
+ * ایجاد گروهی حساب کاربری برای پرسنل انتخاب‌شده با رمز عبور پیش‌فرض ۱۲۳۴۵۶
+ */
+export async function bulkCreateUserAccounts(ids: number[]): Promise<{
+  ok?: boolean;
+  error?: string;
+  count?: number;
+  message?: string;
+}> {
+  const session = await getSession();
+  if (!session) return { error: "ابتدا وارد سامانه شوید." };
+
+  const hasPermManage =
+    (await hasPerm(session, "user.create")) || (await hasPerm(session, "user.edit"));
+  const currentUser = await prisma.personnel.findUnique({ where: { id: session.id } });
+  const isShiftSupervisor = currentUser?.orgPosition === ORG_POSITIONS.RESPONSIBLE;
+
+  if (!hasPermManage && !isShiftSupervisor) {
+    return { error: "شما دسترسی لازم برای ایجاد حساب کاربری را ندارید." };
+  }
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return { error: "هیچ کاربری انتخاب نشده است." };
+  }
+
+  try {
+    const defaultPasswordHash = await bcrypt.hash("123456", 10);
+    const personnelList = await prisma.personnel.findMany({
+      where: { id: { in: ids } },
+    });
+
+    let createdCount = 0;
+
+    for (const p of personnelList) {
+      // تعیین نام کاربری: اگر پرسنلی کد دارد، از آن استفاده کن، در غیر این صورت نام کاربری فعلی یا user_ID
+      let proposedUserName = (p.userName || p.personnelCode || "").trim();
+      if (!proposedUserName) {
+        proposedUserName = `user_${p.id}`;
+      }
+
+      // اطمینان از یکتا بودن نام کاربری
+      const dup = await prisma.personnel.findFirst({
+        where: {
+          userName: proposedUserName,
+          NOT: { id: p.id },
+        },
+      });
+
+      if (dup) {
+        proposedUserName = `${proposedUserName}_${p.id}`;
+      }
+
+      await prisma.personnel.update({
+        where: { id: p.id },
+        data: {
+          hasAccount: true,
+          userName: proposedUserName,
+          passwordHash: p.passwordHash || defaultPasswordHash,
+          role: p.role === 0 ? 3 : p.role, // اگر نقش ندارد، حداقل دسترسی مشاهده (Viewer = 3)
+        },
+      });
+
+      createdCount++;
+    }
+
+    await audit(
+      session,
+      "personnel",
+      0,
+      "UPDATE",
+      null,
+      { ids, count: createdCount },
+      `ساخت دسته‌جمعی حساب کاربری برای ${createdCount} پرسنل با رمز عبور پیش‌فرض ۱۲۳۴۵۶`
+    );
+
+    invalidatePermsCache();
+    revalidatePath("/users");
+    revalidatePath("/phonebook");
+
+    return {
+      ok: true,
+      count: createdCount,
+      message: `برای ${createdCount} پرسنل با موفقیت حساب کاربری با رمز عبور پیش‌فرض ۱۲۳۴۵۶ فعال شد.`,
+    };
+  } catch (err: any) {
+    return { error: err?.message || "خطا در ایجاد گروهی حساب‌های کاربری" };
+  }
+}
+

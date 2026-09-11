@@ -98,6 +98,27 @@ function copyAssets() {
     cleanUnusedPrismaEngines(standaloneDir);
     console.log('Prisma database engines cleaned successfully.');
 
+    // ۵. پاکسازی فایل‌ها و پوشه‌های اضافی از standalone جهت بهینه‌سازی حداکثری حجم بیلد
+    console.log('Cleaning unneeded directories and files from standalone...');
+    const dirsToRemove = ['export', 'backups', 'data', 'seed', 'plans', '.agents', '.claude', 'graphify-out'];
+    dirsToRemove.forEach(d => {
+      const p = path.join(standaloneDir, d);
+      if (fs.existsSync(p)) {
+        fs.rmSync(p, { recursive: true, force: true });
+        console.log(`Cleaned unneeded directory from standalone: ${d}`);
+      }
+    });
+
+    fs.readdirSync(standaloneDir).forEach(f => {
+      const ext = path.extname(f).toLowerCase();
+      if (['.exe', '.rar', '.zip', '.docx', '.pdf'].includes(ext) || f.startsWith('ManovrSystem')) {
+        try {
+          fs.unlinkSync(path.join(standaloneDir, f));
+          console.log(`Cleaned file from standalone: ${f}`);
+        } catch (e) {}
+      }
+    });
+
   } catch (err) {
     console.error('Error copying assets or replacing junctions:', err);
     process.exit(1);
@@ -115,11 +136,13 @@ function cleanUnusedPrismaEngines(dir) {
       } else {
         const lowerName = element.toLowerCase();
         if (
-          (lowerName.includes('cockroachdb') ||
-           lowerName.includes('postgresql') ||
-           lowerName.includes('mysql') ||
-           lowerName.includes('sqlserver')) &&
-          (lowerName.endsWith('.js') || lowerName.endsWith('.mjs') || lowerName.endsWith('.wasm'))
+          lowerName.includes('query_engine-windows.dll.node.tmp') ||
+          (lowerName.startsWith('query_engine') && lowerName.includes('.tmp')) ||
+          ((lowerName.includes('cockroachdb') ||
+            lowerName.includes('postgresql') ||
+            lowerName.includes('mysql') ||
+            lowerName.includes('sqlserver')) &&
+           (lowerName.endsWith('.js') || lowerName.endsWith('.mjs') || lowerName.endsWith('.wasm')))
         ) {
           fs.unlinkSync(fullPath);
         } else if (lowerName.endsWith('.map')) {

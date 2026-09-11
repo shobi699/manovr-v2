@@ -8,6 +8,8 @@ import {
   importPersonnelFromExcel,
 } from "@/app/actions/user";
 import type { ListParams } from "@/lib/list-query";
+import { useToast } from "@/components/ui/Toast";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 
 interface PersonnelItem {
   id: number;
@@ -42,6 +44,8 @@ export default function PhonebookClient({
   const [search, setSearch] = useState("");
   const [shiftFilter, setShiftFilter] = useState("all");
   const [posFilter, setPosFilter] = useState("all");
+  const [deletePersonTarget, setDeletePersonTarget] = useState<PersonnelItem | null>(null);
+  const { toast } = useToast();
 
   // افزودن مخاطب جدید
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -115,7 +119,7 @@ export default function PhonebookClient({
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error(err);
-      alert("خطا در خروجی گرفتن اکسل.");
+      toast.error("خطا در خروجی گرفتن اکسل.");
     }
   };
 
@@ -162,7 +166,7 @@ export default function PhonebookClient({
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error(err);
-      alert("خطا در تولید فایل نمونه اکسل.");
+      toast.error("خطا در تولید فایل نمونه اکسل.");
     }
   };
 
@@ -212,20 +216,20 @@ export default function PhonebookClient({
         });
 
         if (rows.length === 0) {
-          alert("هیچ داده معتبری در فایل پیدا نشد.");
+          toast.warning("هیچ داده معتبری در فایل پیدا نشد.");
           return;
         }
 
         const res = await importPersonnelFromExcel(rows);
         if (res.error) {
-          alert(res.error);
+          toast.error(res.error);
         } else {
-          alert(`تعداد ${res.count} مخاطب جدید با موفقیت درج شدند.`);
+          toast.success(`تعداد ${res.count} مخاطب جدید با موفقیت درج شدند.`);
           window.location.reload();
         }
       } catch (err) {
         console.error(err);
-        alert("فرمت فایل اکسل معتبر نیست یا خطا در خواندن رخ داد.");
+        toast.error("فرمت فایل اکسل معتبر نیست یا خطا در خواندن رخ داد.");
       }
     };
     reader.readAsArrayBuffer(file);
@@ -252,6 +256,7 @@ export default function PhonebookClient({
       const res = await createPhonebookContact(null, fd);
       if (res.error) {
         setError(res.error);
+        toast.error(res.error);
       } else if (res.contact) {
         const newContact: PersonnelItem = {
           id: res.contact.id,
@@ -268,6 +273,7 @@ export default function PhonebookClient({
         };
         setList((prev) => [newContact, ...prev]);
         setIsAddOpen(false);
+        toast.success("مخاطب جدید با موفقیت افزوده شد.");
         // ریست فرم
         setAddFirstName("");
         setAddLastName("");
@@ -318,6 +324,7 @@ export default function PhonebookClient({
       const res = await updatePersonnelPhoneInfo(null, fd);
       if (res?.error) {
         setError(res.error);
+        toast.error(res.error);
       } else {
         setList((prev) =>
           prev.map((item) =>
@@ -338,21 +345,29 @@ export default function PhonebookClient({
               : item
           )
         );
+        toast.success("اطلاعات مخاطب با موفقیت به‌روزرسانی شد.");
         setEditingPerson(null);
       }
     });
   };
 
   // حذف مخاطب
-  const handleDeleteClick = async (p: PersonnelItem) => {
-    if (!confirm(`آیا از حذف مخاطب «${p.firstName} ${p.lastName}» اطمینان دارید؟`)) return;
+  const handleDeleteClick = (p: PersonnelItem) => {
+    setDeletePersonTarget(p);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletePersonTarget) return;
+    const p = deletePersonTarget;
 
     startTransition(async () => {
       const res = await deletePhonebookContact(p.id);
       if (res.error) {
-        alert(res.error);
+        toast.error(res.error);
       } else {
         setList((prev) => prev.filter((item) => item.id !== p.id));
+        toast.success("مخاطب با موفقیت حذف شد.");
+        setDeletePersonTarget(null);
       }
     });
   };
@@ -360,7 +375,7 @@ export default function PhonebookClient({
   const handleCopy = (text: string, label: string) => {
     if (!text) return;
     navigator.clipboard.writeText(text);
-    alert(`${label} در حافظه کپی شد: ${text}`);
+    toast.success(`${label} در حافظه کپی شد: ${text}`);
   };
 
   const filtered = list.filter((p) => {
@@ -947,6 +962,18 @@ export default function PhonebookClient({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(deletePersonTarget)}
+        title="حذف مخاطب"
+        message={`آیا از حذف مخاطب «${deletePersonTarget?.firstName ?? ""} ${deletePersonTarget?.lastName ?? ""}» اطمینان دارید؟`}
+        confirmText="حذف مخاطب"
+        cancelText="انصراف"
+        variant="danger"
+        isLoading={isPending}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeletePersonTarget(null)}
+      />
     </div>
   );
 }

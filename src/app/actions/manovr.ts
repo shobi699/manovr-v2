@@ -8,6 +8,15 @@ import { hasPerm } from "@/lib/perms";
 import { audit } from "@/lib/audit";
 import { ManovrType } from "@/lib/enums";
 import { hasRoomOnLine, shouldSetKafshak, isPermanentTransfer } from "@/lib/manovr-rules";
+import {
+  createManovrSchema,
+  confirmManovrSchema,
+  finishManovrSchema,
+  formatZodError,
+} from "@/lib/validations";
+import { getOfflinePolicy } from "@/lib/settings";
+import { getNetworkStatus } from "@/lib/network-status";
+import { recordOfflineAction } from "@/lib/offline-sync";
 
 // خطای دامنه‌ای که باید به پیام کاربر تبدیل شود، نه خطای ۵۰۰
 class ManovrError extends Error {}
@@ -21,30 +30,44 @@ export async function createManovr(
   if (!(await hasPerm(session, "manovr.create")))
     return { error: "دسترسی ندارید. شما اجازه ثبت مانور را ندارید." };
 
-  const type = Number(fd.get("type"));
-  const trainId = Number(fd.get("trainId"));
-  const destRaw = fd.get("destinationLineId");
-  const sourceRaw = fd.get("sourceLineId");
-  const rahbar1Id = Number(fd.get("rahbar1Id"));
-  const rahbar2Raw = fd.get("rahbar2Id");
-  const rahbar2Id = rahbar2Raw ? Number(rahbar2Raw) : null;
-  const slotIndex = fd.get("slotIndex") ? Number(fd.get("slotIndex")) : 0;
-  const description = String(fd.get("description") ?? "").trim() || null;
-  const executionTimeRaw = fd.get("executionTime");
-  const executionTime = executionTimeRaw ? new Date(String(executionTimeRaw)) : new Date();
-  const noRedirect = fd.get("noRedirect") === "1";
+  // بررسی سیاست کار در زمان قطعی شبکه
+  const netStatus = await getNetworkStatus();
+  const offlinePolicy = await getOfflinePolicy();
+  if (!netStatus.isShared) {
+    if (offlinePolicy === "read_only") {
+      return {
+        error:
+          "ارتباط با سرور متمرکز دپو برقرار نیست. طبق تنظیمات مدیریت، در زمان قطعی شبکه سیستم در حالت «فقط مشاهده» قرار دارد و امکان ثبت مانور جدید مسدود است.",
+      };
+    }
+  }
 
-  if (!type) return { error: "لطفا نوع مانور را انتخاب کنید." };
-  if (!trainId) return { error: "لطفا قطار را انتخاب نمایید." };
-  if (!rahbar1Id) return { error: "لطفا راهبر ۱ را انتخاب نمایید." };
+  const rawInput = Object.fromEntries(fd.entries());
+  const parsed = createManovrSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { error: formatZodError(parsed.error) };
+  }
+
+  const {
+    type,
+    trainId,
+    rahbar1Id,
+    rahbar2Id,
+    sourceLineId: formSourceLineId,
+    destinationLineId: formDestLineId,
+    slotIndex,
+    description,
+    executionTime,
+    noRedirect,
+  } = parsed.data;
 
   // دریافت اطلاعات قطار برای تعیین خط فعلی
   const train = await prisma.train.findUnique({ where: { id: trainId } });
-  if (!train) return { error: "قطار مورد نظر یافت نمایید." };
+  if (!train) return { error: "قطار مورد نظر یافت نشد." };
 
   const isPerm = isPermanentTransfer(type);
-  let sourceLineId = sourceRaw ? Number(sourceRaw) : train.lineId;
-  let destinationLineId = destRaw ? Number(destRaw) : (sourceLineId || train.lineId);
+  let sourceLineId = formSourceLineId || train.lineId;
+  let destinationLineId = formDestLineId || (sourceLineId || train.lineId);
 
   if (!destinationLineId && !isPerm) return { error: "لطفا مقصد را انتخاب نمایید." };
   if (!sourceLineId) sourceLineId = destinationLineId || 1;
@@ -144,6 +167,33 @@ export async function createManovr(
     auditMessage
   );
 
+  // در صورت قطعی شبکه و ثبت در حالت محلی، عملیات در صف آفلاین ذخیره می‌شود
+  if (!netStatus.isShared) {
+    try {
+      await recordOfflineAction({
+        actionType: "CREATE_MANOVR",
+        data: {
+          type,
+          trainId,
+          sourceLineId,
+          destinationLineId,
+          slotIndex,
+          rahbar1Id,
+          rahbar2Id,
+          creatorId: session.id,
+          description,
+          executionTime: executionTime ? executionTime.toISOString() : undefined,
+          status: 1,
+        },
+        timestamp: new Date().toISOString(),
+        userId: session.id,
+        userFullName: (session as any).name || (session as any).username || "کاربر سیستم",
+      });
+    } catch (offlineErr) {
+      console.error("[createManovr] خطا در ذخیره صف همگام‌سازی آفلاین:", offlineErr);
+    }
+  }
+
   revalidatePath("/manovrs");
   revalidatePath("/dashboard");
   revalidatePath("/depot");
@@ -157,6 +207,9 @@ export async function createManovr(
 export async function finishManovr(id: number) {
   const session = await getSession();
   if (!session || !(await hasPerm(session, "manovr.edit"))) return { error: "دسترسی ندارید." };
+
+  const parsed = finishManovrSchema.safeParse({ id });
+  if (!parsed.success) return { error: formatZodError(parsed.error) };
 
   const before = await prisma.manovr.findUnique({ where: { id } });
   const after = await prisma.manovr.update({
@@ -183,6 +236,9 @@ export async function finishManovr(id: number) {
 export async function confirmManovr(id: number, value: number) {
   const session = await getSession();
   if (!session || !(await hasPerm(session, "manovr.confirm"))) return { error: "دسترسی ندارید." };
+
+  const parsed = confirmManovrSchema.safeParse({ id, status: value });
+  if (!parsed.success) return { error: formatZodError(parsed.error) };
 
   const before = await prisma.manovr.findUnique({ where: { id } });
   const after = await prisma.manovr.update({

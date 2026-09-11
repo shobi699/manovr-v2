@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { saveLookupValue, deleteLookupValue } from "@/app/actions/lookups";
 import DataTable, { Column } from "@/components/DataTable";
 
+import { useToast } from "@/components/ui/Toast";
+import ConfirmModal from "@/components/ui/ConfirmModal";
+
 interface LookupValue {
   id: number;
   code: number;
@@ -30,12 +33,14 @@ interface LookupsClientProps {
 
 export default function LookupsClient({ initialTypes }: LookupsClientProps) {
   const router = useRouter();
+  const { toast } = useToast();
   const [types, setTypes] = useState<LookupType[]>(initialTypes);
   const [selectedTypeId, setSelectedTypeId] = useState<number>(initialTypes[0]?.id || 0);
   const [isPending, startTransition] = useTransition();
 
   const [editValue, setEditValue] = useState<Partial<LookupValue> | null>(null);
   const [isNew, setIsNew] = useState(false);
+  const [valToDelete, setValToDelete] = useState<LookupValue | null>(null);
 
   const selectedType = types.find((t) => t.id === selectedTypeId);
 
@@ -63,9 +68,15 @@ export default function LookupsClient({ initialTypes }: LookupsClientProps) {
     setIsNew(true);
   };
 
-  const handleDeleteClick = async (val: LookupValue) => {
+  const handleDeleteClick = (val: LookupValue) => {
     if (!selectedType) return;
-    if (!confirm(`آیا از حذف مقدار "${val.label}" اطمینان دارید؟`)) return;
+    setValToDelete(val);
+  };
+
+  const confirmDeleteAction = async () => {
+    if (!selectedType || !valToDelete) return;
+    const val = valToDelete;
+    setValToDelete(null);
 
     startTransition(async () => {
       const res = await deleteLookupValue(selectedType.id, val.code);
@@ -83,9 +94,9 @@ export default function LookupsClient({ initialTypes }: LookupsClientProps) {
           setEditValue(null);
         }
         router.refresh();
-        alert("مقدار با موفقیت حذف شد.");
+        toast.success("مقدار با موفقیت حذف شد.");
       } else {
-        alert(res.error || "خطا در حذف مقدار");
+        toast.error(res.error || "خطا در حذف مقدار");
       }
     });
   };
@@ -123,9 +134,9 @@ export default function LookupsClient({ initialTypes }: LookupsClientProps) {
         );
         setEditValue(null);
         router.refresh();
-        alert("تغییرات با موفقیت ذخیره شد.");
+        toast.success("تغییرات با موفقیت ذخیره شد.");
       } else {
-        alert(res.error || "خطا در ذخیره‌سازی");
+        toast.error(res.error || "خطا در ذخیره‌سازی");
       }
     });
   };
@@ -490,6 +501,19 @@ export default function LookupsClient({ initialTypes }: LookupsClientProps) {
           </div>
         )}
       </div>
+
+      {/* مدال تایید حذف */}
+      <ConfirmModal
+        isOpen={!!valToDelete}
+        title="حذف مقدار لوکاپ"
+        message={`آیا از حذف مقدار "${valToDelete?.label}" اطمینان دارید؟`}
+        confirmText="حذف مقدار"
+        cancelText="انصراف"
+        variant="danger"
+        isLoading={isPending}
+        onConfirm={confirmDeleteAction}
+        onCancel={() => setValToDelete(null)}
+      />
     </div>
   );
 }

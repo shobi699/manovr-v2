@@ -2,6 +2,8 @@
 
 import React, { useState, useTransition } from "react";
 import { saveBrandingSettings } from "@/app/actions/lookups";
+import { saveOfflinePolicyAction } from "@/app/actions/settings";
+import { useToast } from "@/components/ui/Toast";
 
 interface BrandingSettings {
   title: string;
@@ -17,26 +19,34 @@ interface BrandingSettings {
 
 interface BrandingClientProps {
   initialSettings: BrandingSettings;
+  initialOfflinePolicy?: "auto_sync" | "read_only";
 }
 
 // لیست رنگ‌های پیش‌فرض جهت دسترسی سریع
 const ACCENT_PRESETS = [
   { name: "نارنجی (پیش‌فرض)", value: "#d8842a" },
   { name: "آبی کلاسیک", value: "#2563eb" },
-  { name: "سبز زمردی", value: "#059669" },
-  { name: "بنفش سلطنتی", value: "#7c3aed" },
-  { name: "سرخ آلبالویی", value: "#dc2626" },
-  { name: "طلایی خورشیدی", value: "#d97706" },
-  { name: "خاکستری تیره", value: "#4b5563" },
+  { name: "سبز متالیک", value: "#10b981" },
+  { name: "قرمز شرکتی", value: "#ef4444" },
+  { name: "بنفش مات", value: "#8b5cf6" },
+  { name: "فیروزه‌ای خطی", value: "#06b6d4" },
+  { name: "طلایی فاخر", value: "#f59e0b" },
+  { name: "نوک‌مدادی لوکس", value: "#475569" },
 ];
 
 const LOGO_PRESETS = ["🚇", "🚉", "⚙️", "🛠️", "📊", "🚃", "🏢", "⚡"];
 
-export default function BrandingClient({ initialSettings }: BrandingClientProps) {
+export default function BrandingClient({
+  initialSettings,
+  initialOfflinePolicy = "auto_sync",
+}: BrandingClientProps) {
+  const [offlinePolicy, setOfflinePolicyState] = useState<"auto_sync" | "read_only">(
+    initialOfflinePolicy
+  );
   const [settings, setSettings] = useState<BrandingSettings>({
-    title: initialSettings.title ?? "سامانه مدیریت مانور",
-    footer: initialSettings.footer ?? "پایانه فتح‌آباد · v3",
-    logoIcon: initialSettings.logoIcon ?? "🚇",
+    title: initialSettings.title ?? "سامانه هوشمند مانور و دپو قطارها",
+    footer: initialSettings.footer ?? "تمامی حقوق متعلق به عملیات خط یک شرکت بهره‌برداری راه‌آهن شهری تهران و حومه می‌باشد.",
+    logoIcon: initialSettings.logoIcon ?? "🚈",
     logoType: initialSettings.logoType ?? "icon",
     logoImage: initialSettings.logoImage ?? "",
     accentColor: initialSettings.accentColor ?? "#d8842a",
@@ -46,13 +56,14 @@ export default function BrandingClient({ initialSettings }: BrandingClientProps)
   });
 
   const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > 500 * 1024) {
-      alert("حجم تصویر لوگو نباید بیشتر از ۵۰۰ کیلوبایت باشد.");
+      toast.warning("حجم تصویر لوگو نباید بیشتر از ۵۰۰ کیلوبایت باشد.");
       return;
     }
 
@@ -68,17 +79,20 @@ export default function BrandingClient({ initialSettings }: BrandingClientProps)
     e.preventDefault();
     startTransition(async () => {
       const res = await saveBrandingSettings(settings);
-      if (res.ok) {
-        alert("تغییرات برندینگ با موفقیت ذخیره شد و به صورت زنده در کل سیستم اعمال گردید! 🎉");
+      const policyRes = await saveOfflinePolicyAction(offlinePolicy);
+      if (res.ok && policyRes.ok) {
+        toast.success("تغییرات برندینگ و سیاست‌های شبکه با موفقیت ذخیره شد و به صورت زنده اعمال گردید! 🎉");
+      } else if (!res.ok) {
+        toast.error(res.error || "خطا در ذخیره‌سازی برندینگ");
       } else {
-        alert(res.error || "خطا در ذخیره‌سازی");
+        toast.error(policyRes.error || "خطا در ذخیره‌سازی سیاست شبکه");
       }
     });
   };
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: "24px", alignItems: "start" }} className="branding-grid">
-      
+
       {/* فرم تنظیمات */}
       <form onSubmit={handleSave} className="card" style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "24px" }}>
         <div style={{ borderBottom: "1px solid var(--line)", paddingBottom: "12px" }}>
@@ -115,7 +129,7 @@ export default function BrandingClient({ initialSettings }: BrandingClientProps)
         {/* بخش لوگو و آیکون سامانه */}
         <div style={{ display: "flex", flexDirection: "column", gap: "10px", background: "rgba(30,41,59,0.01)", padding: "16px", borderRadius: "8px", border: "1px solid var(--line-soft)" }}>
           <label className="label" style={{ fontWeight: 650, fontSize: "14px" }}>🚇 لوگو و آیکون بالای سامانه</label>
-          
+
           <div style={{ display: "flex", gap: "16px", alignItems: "center", marginBottom: "8px" }}>
             <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "13px" }}>
               <input
@@ -284,6 +298,83 @@ export default function BrandingClient({ initialSettings }: BrandingClientProps)
               </div>
             </div>
           )}
+        </div>
+
+        {/* بخش سیاست قطعی شبکه و سرور دپو */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px", borderTop: "1px solid var(--line)", paddingTop: "16px" }}>
+          <div>
+            <label className="label" style={{ fontWeight: 650, fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <span>🌐</span>
+              <span>سیاست سامانه در زمان قطعی ارتباط با سرور دپو (Offline Policy)</span>
+            </label>
+            <p style={{ margin: "4px 0 0 0", fontSize: "11.5px", color: "var(--ink-soft)" }}>
+              تعیین نحوه عملکرد سامانه و دسترسی کاربران هنگام قطعی شبکه یا عدم دسترسی به سرور متمرکز دپو
+            </p>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "4px" }}>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "10px",
+                padding: "12px",
+                borderRadius: "8px",
+                border: `1px solid ${offlinePolicy === "auto_sync" ? "var(--accent)" : "var(--line)"}`,
+                backgroundColor: offlinePolicy === "auto_sync" ? "rgba(216, 132, 42, 0.08)" : "var(--panel)",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+            >
+              <input
+                type="radio"
+                name="offlinePolicy"
+                value="auto_sync"
+                checked={offlinePolicy === "auto_sync"}
+                onChange={() => setOfflinePolicyState("auto_sync")}
+                style={{ marginTop: "3px" }}
+              />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: "13px", color: "var(--ink)" }}>
+                  ⚡ همگام‌سازی هوشمند آفلاین (پیش‌فرض و توصیه‌شده)
+                </div>
+                <div style={{ fontSize: "11.5px", color: "var(--ink-soft)", marginTop: "3px", lineHeight: "1.6" }}>
+                  در زمان قطعی شبکه به کاربران اجازه ثبت مانورها داده شده و عملیات در پایگاه داده محلی ذخیره می‌شود. به محض اتصال مجدد به سرور دپو، کلیه تغییرات کاربران به صورت کاملاً خودکار و دقیقاً بر اساس ساعت و دقیقه ثبت (Chronological Timestamp) در سرور متمرکز دپو همگام‌سازی می‌شوند.
+                </div>
+              </div>
+            </label>
+
+            <label
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "10px",
+                padding: "12px",
+                borderRadius: "8px",
+                border: `1px solid ${offlinePolicy === "read_only" ? "var(--crit)" : "var(--line)"}`,
+                backgroundColor: offlinePolicy === "read_only" ? "rgba(239, 68, 68, 0.08)" : "var(--panel)",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+            >
+              <input
+                type="radio"
+                name="offlinePolicy"
+                value="read_only"
+                checked={offlinePolicy === "read_only"}
+                onChange={() => setOfflinePolicyState("read_only")}
+                style={{ marginTop: "3px" }}
+              />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: "13px", color: "var(--ink)" }}>
+                  🔒 حالت فقط خواندنی (مشاهده)
+                </div>
+                <div style={{ fontSize: "11.5px", color: "var(--ink-soft)", marginTop: "3px", lineHeight: "1.6" }}>
+                  در زمان قطعی شبکه، پیام هشدار به کاربران نمایش داده شده و از ثبت هرگونه مانور یا تغییرات جدید در سیستم تا زمان برقراری مجدد ارتباط با سرور دپو جلوگیری می‌شود.
+                </div>
+              </div>
+            </label>
+          </div>
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end" }}>

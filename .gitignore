@@ -50,9 +50,16 @@ next-env.d.ts
 prisma/*.db
 prisma/*.db-journal
 backups/
+data/
+export/
 
 # tool output
 graphify-out/
 
 # agent worktrees (disposable, can be multi-GB)
 .claude/worktrees/
+
+# office temporary & binary docs
+~$*
+*.docx
+*.pdf

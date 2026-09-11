@@ -5,10 +5,45 @@ import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 
 /**
+ * مسیر فایل فعال دیتابیس (SQLite)
+ */
+export function getActiveDbPath(): string {
+  if (process.env.DATABASE_URL) {
+    const raw = process.env.DATABASE_URL.replace(/^file:/, "");
+    if (path.isAbsolute(raw) || raw.startsWith("\\\\") || raw.startsWith("//")) return raw;
+    return path.resolve(process.cwd(), raw);
+  }
+  return path.join(process.cwd(), "prisma", "dev.db");
+}
+
+/**
+ * مسیر پوشه ذخیره‌سازی نسخه‌های پشتیبان
+ */
+export function getBackupBaseDir(): string {
+  const dbPath = getActiveDbPath();
+  const dbDir = path.dirname(dbPath);
+  if (path.basename(dbDir).toLowerCase() === "database") {
+    return path.join(path.dirname(dbDir), "backups");
+  }
+  return path.join(process.cwd(), "backups");
+}
+
+/**
+ * بازیابی مسیر فیزیکی فایل پشتیبان با قابلیت Fallback به پوشه جاری در حالت پرتابل
+ */
+export function resolveBackupPath(storedPath: string | null | undefined, fileType: "db" | "app"): string | null {
+  if (!storedPath) return null;
+  if (fs.existsSync(storedPath)) return storedPath;
+  const fallback = path.join(getBackupBaseDir(), fileType, path.basename(storedPath));
+  if (fs.existsSync(fallback)) return fallback;
+  return null;
+}
+
+/**
  * ایجاد فایل پشتیبان فقط از دیتابیس (SQLite)
  */
 export async function performBackup(backupType: "manual" | "scheduled", schedule?: string) {
-  const baseDir = path.join(process.cwd(), "backups");
+  const baseDir = getBackupBaseDir();
   const dbBackupDir = path.join(baseDir, "db");
 
   // ایجاد دایرکتوری‌ها
@@ -18,14 +53,14 @@ export async function performBackup(backupType: "manual" | "scheduled", schedule
     .replace(/[\/\s:]/g, "-");
   
   // ۱. پشتیبان‌گیری از دیتابیس
-  const dbSource = path.join(process.cwd(), "prisma", "dev.db");
+  const dbSource = getActiveDbPath();
   const dbFilename = `db_backup_${timestamp}.db`;
   const dbDestPath = path.join(dbBackupDir, dbFilename);
   
   if (fs.existsSync(dbSource)) {
     fs.copyFileSync(dbSource, dbDestPath);
   } else {
-    throw new Error("فایل دیتابیس (dev.db) در پوشه prisma یافت نشد.");
+    throw new Error(`فایل دیتابیس در مسیر ${dbSource} یافت نشد.`);
   }
 
   const dbSize = fs.statSync(dbDestPath).size;
@@ -59,7 +94,7 @@ export async function performBackup(backupType: "manual" | "scheduled", schedule
  * ایجاد پشتیبان اختصاصی از سورس‌کد پروژه (مخصوص سوپرادمین)
  */
 export async function performSourceCodeBackup() {
-  const baseDir = path.join(process.cwd(), "backups");
+  const baseDir = getBackupBaseDir();
   const appBackupDir = path.join(baseDir, "app");
 
   if (!fs.existsSync(appBackupDir)) fs.mkdirSync(appBackupDir, { recursive: true });
@@ -71,9 +106,10 @@ export async function performSourceCodeBackup() {
   const appDestPath = path.join(appBackupDir, appFilename);
 
   const zip = new AdmZip();
-  const srcDir = path.join(process.cwd(), "src");
-  const publicDir = path.join(process.cwd(), "public");
-  const prismaSchema = path.join(process.cwd(), "prisma", "schema.prisma");
+  const cwd = process.cwd();
+  const srcDir = path.join(/*turbopackIgnore: true*/ cwd, "src");
+  const publicDir = path.join(/*turbopackIgnore: true*/ cwd, "public");
+  const prismaSchema = path.join(/*turbopackIgnore: true*/ cwd, "prisma", "schema.prisma");
 
   if (fs.existsSync(srcDir)) zip.addLocalFolder(srcDir, "src");
   if (fs.existsSync(publicDir)) zip.addLocalFolder(publicDir, "public");
@@ -82,7 +118,7 @@ export async function performSourceCodeBackup() {
   // فایل‌های پیکربندی کلیدی پروژه (بدون .env — کلید امضای نشست نباید در پشتیبان قرار گیرد)
   const configFiles = ["package.json", "package-lock.json", "tsconfig.json", "next.config.ts"];
   configFiles.forEach(file => {
-    const filePath = path.join(process.cwd(), file);
+    const filePath = path.join(/*turbopackIgnore: true*/ cwd, file);
     if (fs.existsSync(filePath)) {
       zip.addLocalFile(filePath);
     }
@@ -138,8 +174,8 @@ export async function checkAndRunScheduledBackup() {
     // زمان اجرای پیش‌فرض ساعت ۰۲:۰۰ صبح
     const [targetHour, targetMinute] = (config.time || "02:00").split(":").map(Number);
     
-    // فقط در ساعت و دقیقه زمان‌بندی‌شده بررسی را انجام بده
-    if (currentHour !== targetHour) return;
+    // فقط در محدوده ساعت و دقیقه زمان‌بندی‌شده بررسی را انجام بده (تا ۵ دقیقه تلورانس)
+    if (currentHour !== targetHour || Math.abs(currentMinute - (targetMinute || 0)) > 5) return;
 
     // دریافت آخرین بکاپ خودکار از همان زمان‌بندی
     const lastBackup = await prisma.backup.findFirst({
@@ -165,6 +201,24 @@ export async function checkAndRunScheduledBackup() {
     }
 
     if (shouldBackup) {
+      // قفل توزیع‌شده در دیتابیس مشترک تا سایر کلاینت‌ها هم‌زمان اقدام به تهیه بکاپ نکنند
+      const lockKey = `scheduled_backup_lock_${config.schedule}`;
+      const lockSetting = await prisma.appSetting.findUnique({
+        where: { scope_userId_key: { scope: "global", userId: 0, key: lockKey } }
+      });
+      if (lockSetting) {
+        const lockTime = Number(lockSetting.value);
+        if (Date.now() - lockTime < 1000 * 60 * 15) {
+          // کلاینت دیگری در شبکه اخیراً بکاپ را آغاز کرده است
+          return;
+        }
+      }
+      await prisma.appSetting.upsert({
+        where: { scope_userId_key: { scope: "global", userId: 0, key: lockKey } },
+        create: { scope: "global", userId: 0, key: lockKey, value: String(Date.now()) },
+        update: { value: String(Date.now()) },
+      });
+
       console.log(`[Scheduler] Automatic scheduled backup started (${config.schedule})...`);
       await performBackup("scheduled", config.schedule);
     }

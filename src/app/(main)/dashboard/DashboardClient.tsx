@@ -12,6 +12,7 @@ import {
   replyToTicket,
   updateTicketStatus,
 } from "@/app/actions/tickets";
+import { useToast } from "@/components/ui/Toast";
 import {
   ResponsiveContainer,
   PieChart,
@@ -44,26 +45,42 @@ interface DashboardClientProps {
     activeManovrs: number;
     totalPersonnel: number;
     totalManovrs: number;
+    maintenanceTrains?: number;
+    manovrsToday?: number;
+    occupancyPct?: number;
+    criticalWaitTime?: boolean;
+    avgOperationMinutes?: number;
+    completedToday?: number;
+    terminalDistribution?: { terminal: number; count: number; name?: string }[];
+    statusDistribution?: { status: number; count: number }[];
+    typeDistribution?: { type: number; count: number }[];
+    hourlyTrend?: { hour: string; count: number }[];
   };
-  terminalGroups: {
-    termName: string;
-    lines: any[];
+  terminalGroups?: any[];
+  recentManovrs?: any[];
+  typeDistribution?: any[];
+  trendData?: any[];
+  currentUser: {
+    id: number;
+    fullName: string;
+    role: number;
+  };
+  personnelList: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    role?: number;
   }[];
-  recentManovrs: any[];
-  typeDistribution: { name: string; value: number }[];
-  trendData: { date: string; count: number }[];
-  personnelList: { id: number; firstName: string; lastName: string }[];
-  currentUser: { id: number; fullName: string; role: number };
 }
 
 const DEFAULT_LAYOUT: Widget[] = [
-  { id: "kpi_tiles", title: "کارت‌های آمار کلیدی (KPI)", visible: true },
-  { id: "tickets_support", title: "تیکت‌ها و درخواست‌های پشتیبانی پرسنل", visible: true },
-  { id: "charts_distribution", title: "نمودار توزیع نوع مانورها", visible: true },
+  { id: "kpi_tiles", title: "شاخص‌های کلیدی عملکرد", visible: true },
+  { id: "depot_grid", title: "نقشه وضعیت خطوط و پایانه‌ها", visible: true },
   { id: "recent_manovrs", title: "آخرین مانورهای پایانه", visible: true },
-  { id: "charts_trend", title: "نمودار روند روزانه مانورها", visible: true },
-  { id: "depot_grid", title: "وضعیت ریل‌های پایانه", visible: true },
-  { id: "admin_messages", title: "اطلاعیه‌ها و پیام‌های مدیریت", visible: true },
+  { id: "charts_distribution", title: "نمودارهای توزیع مانورها", visible: true },
+  { id: "charts_trend", title: "روند اجرای مانورها (۱۰ روز گذشته)", visible: true },
+  { id: "admin_messages", title: "پیام‌ها و اعلانات مدیر", visible: true },
+  { id: "tickets_support", title: "پشتیبانی و تیکتینگ", visible: true },
 ];
 
 const COLORS = ["#1f3a5f", "#d8842a", "#10b981", "#ef4444", "#8b5cf6", "#ec4899"];
@@ -73,25 +90,26 @@ export default function DashboardClient({
   pendingCount,
   isManager,
   kpiData,
-  terminalGroups,
-  recentManovrs,
-  typeDistribution,
-  trendData,
-  personnelList,
+  terminalGroups = [],
+  recentManovrs = [],
+  typeDistribution = [],
+  trendData = [],
   currentUser,
+  personnelList,
 }: DashboardClientProps) {
   const [layout, setLayout] = useState<Widget[]>(() => {
-    const base = initialLayout || DEFAULT_LAYOUT;
-    const merged = [...base];
-    DEFAULT_LAYOUT.forEach((w) => {
-      if (!merged.some((item) => item.id === w.id)) {
-        merged.push(w);
+    if (!initialLayout || initialLayout.length === 0) return DEFAULT_LAYOUT;
+    const merged = [...initialLayout];
+    DEFAULT_LAYOUT.forEach((def) => {
+      if (!merged.some((m) => m.id === def.id)) {
+        merged.push(def);
       }
     });
     return merged;
   });
   const [isEditMode, setIsEditMode] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
 
   // وضعیت‌های مربوط به تیکتینگ و پیام‌ها
   const [tickets, setTickets] = useState<any[]>([]);
@@ -114,9 +132,8 @@ export default function DashboardClient({
     const res = await getTicketsList();
     if (res.ok && res.data) {
       setTickets(res.data);
-      if (activeTicket) {
-        const updated = res.data.find((t: any) => t.id === activeTicket.id);
-        if (updated) setActiveTicket(updated);
+      if (!activeTicket && res.data.length > 0) {
+        setActiveTicket(res.data[0]);
       }
     }
     setLoadingTickets(false);
@@ -126,27 +143,18 @@ export default function DashboardClient({
     fetchTickets();
   }, []);
 
-  const handleMoveUp = (index: number) => {
-    if (index === 0) return;
+  const moveWidget = (index: number, direction: "up" | "down") => {
     const newLayout = [...layout];
-    const temp = newLayout[index];
-    newLayout[index] = newLayout[index - 1];
-    newLayout[index - 1] = temp;
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newLayout.length) return;
+    const [moved] = newLayout.splice(index, 1);
+    newLayout.splice(targetIndex, 0, moved);
     setLayout(newLayout);
   };
 
-  const handleMoveDown = (index: number) => {
-    if (index === layout.length - 1) return;
-    const newLayout = [...layout];
-    const temp = newLayout[index];
-    newLayout[index] = newLayout[index + 1];
-    newLayout[index + 1] = temp;
-    setLayout(newLayout);
-  };
-
-  const handleToggleVisible = (id: string) => {
-    setLayout(
-      layout.map((w) => (w.id === id ? { ...w, visible: !w.visible } : w))
+  const toggleVisibility = (id: string) => {
+    setLayout((prev) =>
+      prev.map((w) => (w.id === id ? { ...w, visible: !w.visible } : w))
     );
   };
 
@@ -155,20 +163,25 @@ export default function DashboardClient({
       const res = await saveDashboardLayoutAction(layout, "user");
       if (res.ok) {
         setIsEditMode(false);
+        toast.success("چیدمان داشبورد با موفقیت ذخیره شد.");
       } else {
-        alert("خطا در ذخیره چیدمان");
+        toast.error("خطا در ذخیره چیدمان");
       }
     });
   };
 
   const handleReset = () => {
     setLayout(DEFAULT_LAYOUT);
+    toast.info("چیدمان به حالت پیش‌فرض بازنشانی شد.");
   };
 
   // ارسال پیام سراسری یا خصوصی توسط مدیر
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!msgTitle.trim() || !msgBody.trim()) return alert("لطفاً عنوان و متن پیام را وارد کنید.");
+    if (!msgTitle.trim() || !msgBody.trim()) {
+      toast.warning("لطفاً عنوان و متن پیام را وارد کنید.");
+      return;
+    }
 
     startTransition(async () => {
       const res = await sendAdminMessage({
@@ -179,9 +192,9 @@ export default function DashboardClient({
       });
 
       if (!res.ok) {
-        alert(res.error || "خطا در ارسال پیام");
+        toast.error(res.error || "خطا در ارسال پیام");
       } else {
-        alert("پیام و اعلان با موفقیت ثبت و ارسال شد.");
+        toast.success("پیام و اعلان با موفقیت ثبت و ارسال شد.");
         setMsgTitle("");
         setMsgBody("");
       }
@@ -191,14 +204,17 @@ export default function DashboardClient({
   // ایجاد تیکت پشتیبانی جدید توسط کاربر
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTicketTitle.trim() || !newTicketBody.trim()) return alert("لطفاً عنوان و متن تیکت را وارد کنید.");
+    if (!newTicketTitle.trim() || !newTicketBody.trim()) {
+      toast.warning("لطفاً عنوان و متن تیکت را وارد کنید.");
+      return;
+    }
 
     startTransition(async () => {
       const res = await createTicket(newTicketTitle, newTicketBody);
       if (!res.ok) {
-        alert(res.error || "خطا در ثبت تیکت");
+        toast.error(res.error || "خطا در ثبت تیکت");
       } else {
-        alert("تیکت شما با موفقیت ثبت شد و به مدیران ابلاغ گردید.");
+        toast.success("تیکت شما با موفقیت ثبت شد و به مدیران ابلاغ گردید.");
         setNewTicketTitle("");
         setNewTicketBody("");
         setShowNewTicketForm(false);
@@ -215,8 +231,9 @@ export default function DashboardClient({
     startTransition(async () => {
       const res = await replyToTicket(activeTicket.id, replyBody);
       if (!res.ok) {
-        alert(res.error || "خطا در ثبت پاسخ");
+        toast.error(res.error || "خطا در ثبت پاسخ");
       } else {
+        toast.success("پاسخ شما با موفقیت ثبت شد.");
         setReplyBody("");
         fetchTickets();
       }
@@ -228,7 +245,7 @@ export default function DashboardClient({
     startTransition(async () => {
       const res = await updateTicketStatus(ticketId, status);
       if (!res.ok) {
-        alert(res.error || "خطا در تغییر وضعیت");
+        toast.error(res.error || "خطا در تغییر وضعیت");
       } else {
         fetchTickets();
       }
@@ -252,14 +269,14 @@ export default function DashboardClient({
       case "depot_grid":
         return (
           <div key="depot_grid" style={{ marginBottom: "24px" }}>
-            {terminalGroups.map((tg, idx) => (
+            {terminalGroups.map((tg: any, idx: number) => (
               <div className="term-group" key={idx} style={{ marginBottom: "16px" }}>
                 <h3>
                   {tg.termName}
                   <span className="cnt">{tg.lines.length} خط</span>
                 </h3>
                 <div className="lines-grid">
-                  {tg.lines.map((l) => (
+                  {tg.lines.map((l: any) => (
                     <div className={`line-cell${l.trains.length > 0 ? " occupied" : ""}`} key={l.id}>
                       <div className="lname">{l.name}</div>
                       {l.trains.length > 0 ? (
@@ -319,7 +336,7 @@ export default function DashboardClient({
                       fill="#8884d8"
                       dataKey="value"
                     >
-                      {typeDistribution.map((entry, index) => (
+                      {typeDistribution.map((entry: any, index: number) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
@@ -682,7 +699,7 @@ export default function DashboardClient({
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <button 
-                      onClick={() => handleToggleVisible(w.id)}
+                      onClick={() => toggleVisibility(w.id)}
                       style={{
                         background: "none",
                         border: "none",
@@ -697,8 +714,8 @@ export default function DashboardClient({
                     </span>
                   </div>
                   <div style={{ display: "flex", gap: "4px" }}>
-                    <button onClick={() => handleMoveUp(idx)} className="btn sm outline" disabled={idx === 0}>▲</button>
-                    <button onClick={() => handleMoveDown(idx)} className="btn sm outline" disabled={idx === layout.length - 1}>▼</button>
+                    <button onClick={() => moveWidget(idx, "up")} className="btn sm outline" disabled={idx === 0}>▲</button>
+                    <button onClick={() => moveWidget(idx, "down")} className="btn sm outline" disabled={idx === layout.length - 1}>▼</button>
                   </div>
                 </div>
               ))}

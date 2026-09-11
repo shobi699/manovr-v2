@@ -56,25 +56,121 @@ ipcMain.handle('show-notification', (event, payload) => {
   return { ok: true };
 });
 
-// آدرس لوکال دیتابیس در پوشه AppData کاربر
-const userDataPath = app.getPath('userData');
+function ensureWritableDir(dirPath) {
+  try {
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+    }
+    const testFile = path.join(dirPath, `.test_write_${Date.now()}`);
+    fs.writeFileSync(testFile, 'ok');
+    fs.unlinkSync(testFile);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+let appConfig = { mode: 'server', serverUrl: 'http://localhost:3000', sharedDataPath: '' };
+
+function loadAppConfig() {
+  const configCandidatePaths = [
+    process.env.PORTABLE_EXECUTABLE_DIR ? path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'manovr-config.json') : null,
+    path.join(path.dirname(process.execPath), 'manovr-config.json'),
+    process.resourcesPath ? path.join(process.resourcesPath, 'manovr-config.json') : null,
+    path.join(__dirname, 'manovr-config.json'),
+    path.join(app.getPath('userData'), 'manovr-config.json')
+  ].filter(Boolean);
+
+  for (const cfgFile of configCandidatePaths) {
+    if (fs.existsSync(cfgFile)) {
+      try {
+        const raw = fs.readFileSync(cfgFile, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          appConfig = { ...appConfig, ...parsed, _source: cfgFile };
+          return;
+        }
+      } catch (e) {}
+    }
+  }
+}
+
+loadAppConfig();
+
+// تعیین هوشمند مسیر ذخیره‌سازی داده‌ها (پوشه محلی، تنظیمات یا AppData)
+function resolveUserDataPath() {
+  // ۱. بررسی فایل تنظیمات manovr-config.json در اولویت اول
+  if (appConfig?.sharedDataPath && typeof appConfig.sharedDataPath === 'string') {
+    const target = appConfig.sharedDataPath.trim();
+    if (target && ensureWritableDir(target)) {
+      return { path: target, source: `manovr-config.json (${appConfig._source || 'config'})` };
+    }
+  }
+
+  // ۲. بررسی مسیر پیش‌فرض DFS سازمانی پایانه فتح‌آباد (\\srvdfs01\Line1\Depo\data)
+  const defaultDfsData = '\\\\srvdfs01\\Line1\\Depo\\data';
+  const defaultDfsRoot = '\\\\srvdfs01\\Line1\\Depo';
+  try {
+    if (fs.existsSync(defaultDfsRoot) && ensureWritableDir(defaultDfsData)) {
+      return { path: defaultDfsData, source: 'Default Corporate DFS Share (\\\\srvdfs01\\Line1\\Depo\\data)' };
+    }
+  } catch (e) {}
+
+  // ۳. بررسی حالت پرتابل در مسیر فایل اجرایی
+  const portableDir = process.env.PORTABLE_EXECUTABLE_DIR;
+  if (portableDir) {
+    const portableDataDir = path.join(portableDir, 'data');
+    if (ensureWritableDir(portableDataDir)) {
+      return { path: portableDataDir, source: `Portable directory (${portableDataDir})` };
+    }
+  }
+
+  // ۴. بررسی وجود پوشه data در کنار پروژه/برنامه
+  const localDataDir = path.join(__dirname, 'data');
+  if (ensureWritableDir(localDataDir)) {
+    return { path: localDataDir, source: 'Local application data directory' };
+  }
+
+  // ۵. فالبک نهایی به AppData سیستم‌عامل
+  return { path: app.getPath('userData'), source: 'OS Local AppData fallback' };
+}
+
+const { path: userDataPath, source: userDataSource } = resolveUserDataPath();
 const dbFolder = path.join(userDataPath, 'database');
 const dbPath = path.join(dbFolder, 'dev.db');
 
-// ایجاد پوشه لاگ و جریان نوشتن لاگ‌ها
+const os = require('os');
+const hostname = os.hostname().replace(/[^a-zA-Z0-9_-]/g, '_');
+
+// ایجاد پوشه لاگ و جریان نوشتن لاگ‌ها به تفکیک نام هر سیستم
 const logFolder = path.join(userDataPath, 'logs');
 if (!fs.existsSync(logFolder)) {
   fs.mkdirSync(logFolder, { recursive: true });
 }
-const logPath = path.join(logFolder, 'server.log');
+const logPath = path.join(logFolder, `server-${hostname}.log`);
 const logStream = fs.createWriteStream(logPath, { flags: 'a' });
 
 function writeLog(message) {
   const timestamp = new Date().toISOString();
-  logStream.write(`[${timestamp}] ${message}\n`);
+  logStream.write(`[${timestamp}] [${hostname}] ${message}\n`);
+}
+
+function getLanAddresses(port) {
+  const interfaces = os.networkInterfaces();
+  const addresses = [];
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name] || []) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        addresses.push(`http://${iface.address}:${port}`);
+      }
+    }
+  }
+  return addresses;
 }
 
 writeLog('Starting application...');
+writeLog(`Active data directory: ${userDataPath} (Source: ${userDataSource})`);
+writeLog(`Database target path: ${dbPath}`);
 
 const crypto = require('crypto');
 
@@ -114,18 +210,23 @@ function setupDatabase() {
     } else {
       writeLog(`ERROR: Template database not found at: ${templateDbPath}`);
     }
-  } else if (fs.existsSync(templateDbPath)) {
-    try {
-      const templateStat = fs.statSync(templateDbPath);
-      const currentStat = fs.statSync(dbPath);
-      if (templateStat.mtimeMs > currentStat.mtimeMs) {
-        fs.copyFileSync(templateDbPath, dbPath);
-        writeLog(`Database updated from newer template at: ${dbPath}`);
-      } else {
-        writeLog(`Database already exists at: ${dbPath}`);
+  } else {
+    // در نسخه پروداکشن/پرتابل هرگز دیتابیس موجود کاربر رونویسی نمی‌شود تا اطلاعات از دست نرود
+    if (!app.isPackaged && fs.existsSync(templateDbPath)) {
+      try {
+        const templateStat = fs.statSync(templateDbPath);
+        const currentStat = fs.statSync(dbPath);
+        if (templateStat.mtimeMs > currentStat.mtimeMs) {
+          fs.copyFileSync(templateDbPath, dbPath);
+          writeLog(`[Dev Mode] Database updated from newer template at: ${dbPath}`);
+        } else {
+          writeLog(`Database already exists at: ${dbPath}`);
+        }
+      } catch (e) {
+        writeLog(`Database status check error: ${e.message}`);
       }
-    } catch (e) {
-      writeLog(`Database status check error: ${e.message}`);
+    } else {
+      writeLog(`Database already exists at: ${dbPath}`);
     }
   }
 }
@@ -161,13 +262,23 @@ function startNextServer(port) {
     return;
   }
 
+  function formatDatabaseUrl(rawPath) {
+    const normalized = rawPath.replace(/\\/g, '/');
+    return `file:${normalized}`;
+  }
+
   // فورک کردن پروسه سرور Next.js با استفاده از انجین Node داخلی الکترون
   serverProcess = fork(serverPath, [], {
     env: {
       ...process.env,
+      ELECTRON_RUN_AS_NODE: '1',
       PORT: String(port),
-      DATABASE_URL: `file:${dbPath}`,
+      DATABASE_URL: formatDatabaseUrl(dbPath),
       AUTH_SECRET: authSecret,
+      IS_MASTER_SERVER: 'true',
+      STORAGE_SOURCE: userDataSource,
+      STORAGE_PATH: userDataPath,
+      SHARED_DATA_TARGET: appConfig.sharedDataPath || '\\\\srvdfs01\\Line1\\Depo\\data',
       NODE_ENV: 'production'
     },
     cwd: app.isPackaged
@@ -202,6 +313,10 @@ function checkServerReady(port, callback, attempts = 0) {
   
   const req = http.get(`http://localhost:${port}`, (res) => {
     writeLog(`Server responded with status: ${res.statusCode}. Server is ready!`);
+    const lanAddrs = getLanAddresses(port);
+    if (lanAddrs.length > 0) {
+      writeLog(`Network access URLs for other PCs: ${lanAddrs.join(' | ')}`);
+    }
     callback();
   });
   
@@ -210,7 +325,16 @@ function checkServerReady(port, callback, attempts = 0) {
   });
 }
 
-function createWindow(port) {
+function createWindow(portOrUrl, customTitle) {
+  const isUrl = typeof portOrUrl === "string" && portOrUrl.startsWith("http");
+  const targetUrl = isUrl ? portOrUrl : `http://localhost:${portOrUrl}`;
+  
+  const windowTitle = customTitle || (
+    userDataSource && (userDataSource.includes('DFS') || userDataSource.includes('config'))
+      ? 'سامانه مدیریت مانور دپو — پایگاه داده متمرکز شبکه'
+      : 'سامانه مدیریت مانور دپو'
+  );
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -220,13 +344,12 @@ function createWindow(port) {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
     },
-    title: 'سامانه مدیریت مانور دپو',
+    title: windowTitle,
     autoHideMenuBar: true,
     icon: path.join(__dirname, 'public', 'logo.png'),
   });
 
-  const url = `http://localhost:${port}`;
-  mainWindow.loadURL(url);
+  mainWindow.loadURL(targetUrl);
 
   const showMainWindow = () => {
     if (mainWindow && !mainWindow.isVisible()) {
@@ -252,6 +375,15 @@ let selectedPort = 3000;
 
 app.on('ready', () => {
   createSplashWindow();
+
+  if (appConfig?.mode === 'client') {
+    const targetUrl = appConfig.serverUrl || 'http://localhost:3000';
+    writeLog(`Starting in CLIENT mode. Connecting directly to master server: ${targetUrl}`);
+    createWindow(targetUrl, 'سامانه مدیریت مانور دپو (کلاینت متصل به سرور مرکزی)');
+    return;
+  }
+
+  // حالت سرور محلی / مستر (Master Server)
   setupDatabase();
   authSecret = setupAuthSecret();
   
@@ -273,8 +405,14 @@ app.on('ready', () => {
 
 function killServer() {
   if (serverProcess) {
-    writeLog('Killing Next.js server process...');
+    writeLog('Killing Next.js server process and tree...');
     try {
+      if (process.platform === 'win32' && serverProcess.pid) {
+        const { execSync } = require('child_process');
+        try {
+          execSync(`taskkill /pid ${serverProcess.pid} /t /f`, { stdio: 'ignore' });
+        } catch (e) {}
+      }
       serverProcess.kill();
     } catch (e) {
       writeLog(`Error killing server process: ${e.message}`);

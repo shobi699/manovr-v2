@@ -3,6 +3,8 @@
 import React, { useState, useTransition } from "react";
 import { triggerManualBackup, triggerSourceCodeBackup, deleteBackup, updateBackupSettings, restoreDatabaseAction } from "@/app/actions/backup";
 import DataTable, { Column } from "@/components/DataTable";
+import { useToast } from "@/components/ui/Toast";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 
 interface BackupRecord {
   id: number;
@@ -43,40 +45,33 @@ export default function BackupClient({
   const [mathAns, setMathAns] = useState("");
   const [mathQuestion, setMathQuestion] = useState({ num1: 0, num2: 0 });
   const [isRestorePending, setIsRestorePending] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+  const [isDeletePending, setIsDeletePending] = useState(false);
+  const { toast } = useToast();
 
   const isSuperAdmin = userRole === 4;
 
   const openRestoreModal = (backupId: number | null) => {
     setSelectedBackupId(backupId);
-    const n1 = Math.floor(Math.random() * 9) + 2;
-    const n2 = Math.floor(Math.random() * 9) + 2;
-    setMathQuestion({ num1: n1, num2: n2 });
     setRestorePassword("");
     setRestoreConfirmText("");
     setMathAns("");
+    const n1 = Math.floor(Math.random() * 10) + 1;
+    const n2 = Math.floor(Math.random() * 10) + 1;
+    setMathQuestion({ num1: n1, num2: n2 });
     setShowRestoreModal(true);
   };
 
   const handleRestoreSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (restoreConfirmText !== "تایید بازگردانی") {
-      alert("لطفاً عبارت تاییدیه را دقیقاً وارد نمایید.");
-      return;
-    }
-    
-    if (Number(mathAns) !== mathQuestion.num1 + mathQuestion.num2) {
-      alert("پاسخ سوال ریاضی نادرست است.");
+
+    if (parseInt(mathAns, 10) !== mathQuestion.num1 + mathQuestion.num2) {
+      toast.error("پاسخ سوال امنیتی ریاضی نادرست است.");
       return;
     }
 
-    if (!restorePassword) {
-      alert("رمز عبور سوپرادمین الزامی است.");
-      return;
-    }
-
-    if (selectedBackupId === null && !uploadedFile) {
-      alert("هیچ فایلی برای بازگردانی مشخص نشده است.");
+    if (restoreConfirmText.trim() !== "تایید بازگردانی") {
+      toast.error("عبارت تاییدیه به درستی وارد نشده است.");
       return;
     }
 
@@ -86,7 +81,7 @@ export default function BackupClient({
     formData.append("mathNum1", String(mathQuestion.num1));
     formData.append("mathNum2", String(mathQuestion.num2));
     formData.append("mathAns", mathAns);
-    
+
     if (selectedBackupId !== null) {
       formData.append("backupId", String(selectedBackupId));
     } else if (uploadedFile) {
@@ -97,15 +92,17 @@ export default function BackupClient({
     try {
       const res = await restoreDatabaseAction(formData);
       if (res.error) {
-        alert(res.error);
+        toast.error(res.error);
       } else {
-        alert("دیتابیس با موفقیت بازگردانی شد! سیستم بارگذاری مجدد می‌شود.");
+        toast.success("دیتابیس با موفقیت بازگردانی شد! سیستم بارگذاری مجدد می‌شود.");
         setShowRestoreModal(false);
         setUploadedFile(null);
-        window.location.reload();
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
       }
     } catch {
-      alert("خطایی در سرور رخ داد.");
+      toast.error("خطایی در سرور رخ داد.");
     } finally {
       setIsRestorePending(false);
     }
@@ -116,7 +113,7 @@ export default function BackupClient({
     if (!file) return;
 
     if (!file.name.endsWith(".db")) {
-      alert("فرمت فایل نامعتبر است. فقط فایل‌های با پسوند db. مجاز هستند.");
+      toast.warning("فرمت فایل نامعتبر است. فقط فایل‌های با پسوند db. مجاز هستند.");
       e.target.value = "";
       return;
     }
@@ -154,9 +151,9 @@ export default function BackupClient({
     startTransition(async () => {
       const res = await updateBackupSettings(settings);
       if (res.error) {
-        alert(res.error);
+        toast.error(res.error);
       } else {
-        alert("تنظیمات زمان‌بندی پشتیبان‌گیری با موفقیت ذخیره شد.");
+        toast.success("تنظیمات زمان‌بندی پشتیبان‌گیری با موفقیت ذخیره شد.");
       }
     });
   };
@@ -167,13 +164,13 @@ export default function BackupClient({
     try {
       const res = await triggerManualBackup();
       if (res.error) {
-        alert(res.error);
+        toast.error(res.error);
       } else {
-        alert("نسخه پشتیبان دیتابیس با موفقیت ایجاد شد.");
+        toast.success("نسخه پشتیبان دیتابیس با موفقیت ایجاد شد.");
         window.location.reload();
       }
     } catch {
-      alert("خطایی در سرور رخ داد.");
+      toast.error("خطایی در سرور رخ داد.");
     } finally {
       setIsBackupPending(false);
     }
@@ -185,28 +182,40 @@ export default function BackupClient({
     try {
       const res = await triggerSourceCodeBackup();
       if (res.error) {
-        alert(res.error);
+        toast.error(res.error);
       } else {
-        alert("نسخه پشتیبان سورس‌کد با موفقیت ایجاد شد.");
+        toast.success("نسخه پشتیبان سورس‌کد با موفقیت ایجاد شد.");
         window.location.reload();
       }
     } catch {
-      alert("خطایی در سرور رخ داد.");
+      toast.error("خطایی در سرور رخ داد.");
     } finally {
       setIsCodeBackupPending(false);
     }
   };
 
   // حذف پشتیبان
-  const handleDelete = async (id: number) => {
-    if (!confirm("آیا از حذف فیزیکی این نسخه پشتیبان مطمئن هستید؟ این عمل غیرقابل بازگشت است.")) return;
+  const handleDelete = (id: number) => {
+    setDeleteTargetId(id);
+  };
 
-    const res = await deleteBackup(id);
-    if (res.error) {
-      alert(res.error);
-    } else {
-      setBackups((prev) => prev.filter((b) => b.id !== id));
-      alert("نسخه پشتیبان با موفقیت حذف شد.");
+  const handleConfirmDelete = async () => {
+    if (!deleteTargetId) return;
+
+    setIsDeletePending(true);
+    try {
+      const res = await deleteBackup(deleteTargetId);
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        setBackups((prev) => prev.filter((b) => b.id !== deleteTargetId));
+        toast.success("نسخه پشتیبان با موفقیت حذف شد.");
+        setDeleteTargetId(null);
+      }
+    } catch {
+      toast.error("خطا در برقراری ارتباط با سرور");
+    } finally {
+      setIsDeletePending(false);
     }
   };
 
@@ -603,6 +612,18 @@ export default function BackupClient({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deleteTargetId !== null}
+        title="حذف نسخه پشتیبان"
+        message="آیا از حذف فیزیکی این نسخه پشتیبان مطمئن هستید؟ این عمل غیرقابل بازگشت است."
+        confirmText="حذف فیزیکی پشتیبان"
+        cancelText="انصراف"
+        variant="danger"
+        isLoading={isDeletePending}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </div>
   );
 }

@@ -7,8 +7,10 @@ import { TrainType } from "@/lib/enums";
 
 import { updateTrainStatus, importTrainsFromExcel, updateTrainFlags, bulkUpdateTrainStatus, bulkUpdateTrainFlags, bulkToggleTrainDisposed } from "@/app/actions/train";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTransition } from "react";
+import { useTransition, useState } from "react";
 import type { ListParams } from "@/lib/list-query";
+import { useToast } from "@/components/ui/Toast";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 
 interface LookupValue {
   code: number;
@@ -48,6 +50,27 @@ export default function TrainsTableClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
+
+  const [bulkDisposeTarget, setBulkDisposeTarget] = useState<{ items: any[]; clear: () => void } | null>(null);
+  const [isDisposing, setIsDisposing] = useState(false);
+
+  const handleConfirmBulkDispose = async () => {
+    if (!bulkDisposeTarget) return;
+    setIsDisposing(true);
+    const { items, clear } = bulkDisposeTarget;
+    const ids = items.map((i) => i.id);
+    const res = await bulkToggleTrainDisposed(ids, true);
+    setIsDisposing(false);
+    setBulkDisposeTarget(null);
+    if (res.error) {
+      toast.error(res.error);
+    } else {
+      toast.success(`${ids.length} قطار با موفقیت غیرفعال شدند.`);
+      clear();
+      router.refresh();
+    }
+  };
 
   const getTrainTypeLabel = (code: number) => {
     return trainTypes.find((v) => v.code === code)?.label || TrainType[code] || `نوع ${code}`;
@@ -152,7 +175,7 @@ export default function TrainsTableClient({
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error(error);
-      alert("خطا در خروجی گرفتن اکسل.");
+      toast.error("خطا در خروجی گرفتن اکسل.");
     }
   };
 
@@ -197,7 +220,7 @@ export default function TrainsTableClient({
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error(error);
-      alert("خطا در تولید فایل نمونه اکسل.");
+      toast.error("خطا در تولید فایل نمونه اکسل.");
     }
   };
 
@@ -237,20 +260,20 @@ export default function TrainsTableClient({
         });
 
         if (rows.length === 0) {
-          alert("هیچ داده معتبری در فایل پیدا نشد.");
+          toast.warning("هیچ داده معتبری در فایل پیدا نشد.");
           return;
         }
 
         const res = await importTrainsFromExcel(rows);
         if (res.error) {
-          alert(res.error);
+          toast.error(res.error);
         } else {
-          alert(`تعداد ${res.count} قطار جدید با موفقیت درج شدند.`);
+          toast.success(`تعداد ${res.count} قطار جدید با موفقیت درج شدند.`);
           window.location.reload();
         }
       } catch (err) {
         console.error(err);
-        alert("فرمت فایل اکسل معتبر نیست یا خطا در خواندن رخ داد.");
+        toast.error("فرمت فایل اکسل معتبر نیست یا خطا در خواندن رخ داد.");
       }
     };
     reader.readAsArrayBuffer(file);
@@ -291,8 +314,9 @@ export default function TrainsTableClient({
                 startTransition(async () => {
                   const res = await updateTrainStatus(t.id, val);
                   if (res.error) {
-                    alert(res.error);
+                    toast.error(res.error);
                   } else {
+                    toast.success("وضعیت قطار بروزرسانی شد.");
                     router.refresh();
                   }
                 });
@@ -464,8 +488,9 @@ export default function TrainsTableClient({
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
           const res = await bulkUpdateTrainStatus(ids, 1);
-          if (res.error) alert(res.error);
+          if (res.error) toast.error(res.error);
           else {
+            toast.success(`وضعیت ${ids.length} قطار به «آماده» تغییر یافت.`);
             clear();
             router.refresh();
           }
@@ -478,8 +503,9 @@ export default function TrainsTableClient({
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
           const res = await bulkUpdateTrainStatus(ids, 2);
-          if (res.error) alert(res.error);
+          if (res.error) toast.error(res.error);
           else {
+            toast.success(`وضعیت ${ids.length} قطار به «تعمیرات» تغییر یافت.`);
             clear();
             router.refresh();
           }
@@ -492,8 +518,9 @@ export default function TrainsTableClient({
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
           const res = await bulkUpdateTrainStatus(ids, 3);
-          if (res.error) alert(res.error);
+          if (res.error) toast.error(res.error);
           else {
+            toast.success(`وضعیت ${ids.length} قطار به «غیرفعال» تغییر یافت.`);
             clear();
             router.refresh();
           }
@@ -506,8 +533,9 @@ export default function TrainsTableClient({
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
           const res = await bulkUpdateTrainFlags(ids, { hasKafshak: true });
-          if (res.error) alert(res.error);
+          if (res.error) toast.error(res.error);
           else {
+            toast.success(`کفشک برای ${ids.length} قطار فعال شد.`);
             clear();
             router.refresh();
           }
@@ -520,8 +548,9 @@ export default function TrainsTableClient({
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
           const res = await bulkUpdateTrainFlags(ids, { noAtp: true });
-          if (res.error) alert(res.error);
+          if (res.error) toast.error(res.error);
           else {
+            toast.success(`عدم ATP برای ${ids.length} قطار ثبت شد.`);
             clear();
             router.refresh();
           }
@@ -533,8 +562,9 @@ export default function TrainsTableClient({
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
           const res = await bulkUpdateTrainFlags(ids, { movadDavvar: "A" });
-          if (res.error) alert(res.error);
+          if (res.error) toast.error(res.error);
           else {
+            toast.success(`موعد دوّار A برای ${ids.length} قطار اعمال شد.`);
             clear();
             router.refresh();
           }
@@ -547,8 +577,9 @@ export default function TrainsTableClient({
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
           const res = await bulkUpdateTrainFlags(ids, { noLicense: true });
-          if (res.error) alert(res.error);
+          if (res.error) toast.error(res.error);
           else {
+            toast.success(`وضعیت بدون مجوز برای ${ids.length} قطار اعمال شد.`);
             clear();
             router.refresh();
           }
@@ -559,18 +590,11 @@ export default function TrainsTableClient({
         label: "🚫 غیرفعال‌سازی سیستم",
         variant: "danger",
         onClick: async (items, clear) => {
-          if (!confirm(`آیا از غیرفعال‌سازی سیستم برای ${items.length} قطار مطمئن هستید؟`)) return;
-          const ids = items.map((i) => i.id);
-          const res = await bulkToggleTrainDisposed(ids, true);
-          if (res.error) alert(res.error);
-          else {
-            clear();
-            router.refresh();
-          }
+          setBulkDisposeTarget({ items, clear });
         },
       },
     ];
-  }, [canEdit, canDelete, router]);
+  }, [canEdit, canDelete, router, toast]);
 
   return (
     <>
@@ -772,6 +796,18 @@ export default function TrainsTableClient({
           />
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={Boolean(bulkDisposeTarget)}
+        title="غیرفعال‌سازی سیستم قطارها"
+        message={`آیا از غیرفعال‌سازی سیستم برای ${bulkDisposeTarget?.items.length ?? 0} قطار انتخاب‌شده مطمئن هستید؟`}
+        confirmText="غیرفعال‌سازی سیستم"
+        cancelText="انصراف"
+        variant="danger"
+        isLoading={isDisposing}
+        onConfirm={handleConfirmBulkDispose}
+        onCancel={() => setBulkDisposeTarget(null)}
+      />
     </>
   );
 }

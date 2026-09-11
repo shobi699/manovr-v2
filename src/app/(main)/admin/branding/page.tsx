@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { hasPerm } from "@/lib/perms";
 import { getBrandingSettings } from "@/app/actions/lookups";
+import { getOfflinePolicy } from "@/lib/settings";
 import BrandingClient from "./BrandingClient";
 
 export const dynamic = "force-dynamic";
@@ -26,14 +27,15 @@ export default async function AdminBrandingPage() {
   }
 
   const branding = await getBrandingSettings();
+  const offlinePolicy = await getOfflinePolicy();
 
   return (
     <>
       <div className="topbar">
-        <h1>شخصی‌سازی نام و پانویس سامانه</h1>
+        <h1>شخصی‌سازی نام و تنظیمات سامانه</h1>
       </div>
       <div className="content">
-        <BrandingClient initialSettings={branding} />
+        <BrandingClient initialSettings={branding} initialOfflinePolicy={offlinePolicy} />
       </div>
     </>
   );

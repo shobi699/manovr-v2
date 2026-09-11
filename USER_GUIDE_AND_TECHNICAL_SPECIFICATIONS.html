@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>دستورالعمل تفصیلی کاربری و مشخصات فنی سامانه دپو و مانور پایانه فتح‌آباد</title>
+  <style>
+    :root {
+      --primary: #1e3a8a;
+      --primary-dark: #172554;
+      --primary-light: #2563eb;
+      --accent: #d97706;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --text-muted: #475569;
+      --border: #cbd5e1;
+      --success: #15803d;
+      --danger: #b91c1c;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Vazirmatn', 'Segoe UI', Tahoma, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.85;
+      padding: 24px;
+      direction: rtl;
+    }
+
+    .container {
+      max-width: 1150px;
+      margin: 0 auto;
+      background: var(--card);
+      border-radius: 16px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, var(--primary-dark), var(--primary), var(--primary-light));
+      color: #ffffff;
+      padding: 44px 36px;
+      text-align: center;
+      position: relative;
+    }
+
+    .header-banner h1 {
+      font-size: 26px;
+      margin-bottom: 12px;
+      font-weight: 800;
+    }
+
+    .header-banner p {
+      font-size: 15px;
+      opacity: 0.95;
+      max-width: 850px;
+      margin: 0 auto;
+    }
+
+    .meta-bar {
+      background: #f1f5f9;
+      padding: 16px 36px;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13.5px;
+      color: var(--text-muted);
+    }
+
+    .content {
+      padding: 40px 36px;
+    }
+
+    h2 {
+      color: var(--primary-dark);
+      font-size: 21px;
+      margin: 40px 0 20px 0;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    h3 {
+      color: #1e293b;
+      font-size: 17.5px;
+      margin: 28px 0 14px 0;
+    }
+
+    h4 {
+      color: #334155;
+      font-size: 15px;
+      margin: 16px 0 8px 0;
+      font-weight: 700;
+    }
+
+    p, ul, ol {
+      margin-bottom: 16px;
+      color: #334155;
+      font-size: 14.5px;
+    }
+
+    ul, ol {
+      padding-right: 24px;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    .step-card {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 28px;
+      margin-bottom: 36px;
+      box-shadow: 0 4px 8px -2px rgba(0, 0, 0, 0.04);
+    }
+
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .step-number {
+      background: var(--primary);
+      color: white;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .step-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--primary-dark);
+    }
+
+    .instruction-block {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 16px 0;
+    }
+
+    .screenshot-wrapper {
+      margin: 22px 0;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 2px solid #94a3b8;
+      box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.12);
+      background: #0f172a;
+      text-align: center;
+    }
+
+    .screenshot-wrapper img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .screenshot-caption {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 10px 18px;
+      font-size: 13.5px;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: bold;
+      margin-left: 6px;
+    }
+    .badge-green { background: #dcfce7; color: #166534; }
+    .badge-blue { background: #dbeafe; color: #1e40af; }
+    .badge-orange { background: #ffedd5; color: #9a3412; }
+    .badge-red { background: #fee2e2; color: #991b1b; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 22px 0;
+      font-size: 14px;
+    }
+
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 12px 14px;
+      text-align: right;
+    }
+
+    th {
+      background-color: #f1f5f9;
+      color: var(--primary-dark);
+      font-weight: 700;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+
+    .alert-box {
+      background-color: #eff6ff;
+      border-right: 4px solid var(--primary-light);
+      padding: 18px;
+      border-radius: 0 8px 8px 0;
+      margin: 22px 0;
+      font-size: 14.5px;
+    }
+
+    .code-box {
+      background-color: #0f172a;
+      color: #38bdf8;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-family: Consolas, monospace;
+      font-size: 14px;
+      direction: ltr;
+      text-align: left;
+      margin: 10px 0;
+    }
+
+    .action-bar {
+      margin-top: 36px;
+      text-align: center;
+      padding: 24px;
+      border-top: 1px solid var(--border);
+    }
+
+    .btn-print {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 12px 28px;
+      font-size: 15px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      transition: background 0.2s;
+    }
+    .btn-print:hover {
+      background: var(--primary-dark);
+    }
+
+    @media print {
+      body { background: white; padding: 0; }
+      .container { border: none; box-shadow: none; max-width: 100%; }
+      .action-bar { display: none; }
+      .step-card { page-break-inside: avoid; margin-bottom: 24px; }
+      .screenshot-wrapper { border-color: #ccc; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header-banner">
+    <h1>سامانه جامع مدیریت، پایش و هدایت پایانه و مانور (سامانه دپو)</h1>
+    <p>کتابچه تفصیلی آموزش کاربری و سند مشخصات فنی معماری — پایانه فتح‌آباد (مدیریت عملیات خط یک متروی تهران)</p>
+  </div>
+
+  <div class="meta-bar">
+    <div><strong>مخاطبان:</strong> مدیریت محترم عملیات، سرپرستان شیفت و عوامل اجرایی پایانه فتح‌آباد</div>
+    <div><strong>نسخه مستند:</strong> ۲.۰ (تفصیلی و آموزشی)</div>
+    <div><strong>بستر استقرار:</strong> شبکه داخلی خط یک مترو (Intranet)</div>
+    <div><strong>تاریخ انتشار:</strong> شهریور ۱۴۰۵</div>
+  </div>
+
+  <div class="content">
+
+    <div class="alert-box">
+      <strong>هدف راهنمای تفصیلی:</strong> این سند به عنوان مرجع رسمی آموزش کاربری و دستورالعمل اجرایی تدوین گردیده تا پرسنل و مدیران در کلیه سطوح سازمانی بتوانند کارکرد هر دکمه، فرم، گزارش و نماد فنی را به صورت عمیق درک کرده و در نوبت‌های کاری پایانه فتح‌آباد به بهترین شکل مورد بهره‌برداری قرار دهند.
+    </div>
+
+    <h2>📌 ۱. کتابچه راهنمای تفصیلی و گام‌به‌گام کاربری سامانه</h2>
+
+    <!-- Step 1 -->
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-number">۱</div>
+        <div class="step-title">اتصال به سامانه، امنیت نشست و فرآیند احراز هویت کاربری (Authentication)</div>
+      </div>
+      
+      <h4>🎯 هدف و اهمیت عملیاتی:</h4>
+      <p>ورود به سامانه منوط به احراز هویت کنترل‌شده است تا هرگونه ثبت جابه‌جایی ناوگان یا تغییر شاخص‌های فنی مستقیماً به نام کاربر واردشده سند بخورد و از ثبت رکوردهای مجهول در سیستم جلوگیری به عمل آید.</p>
+
+      <h4>💻 نحوه اتصال و دسترسی در شبکه داخلی مترو:</h4>
+      <div class="instruction-block">
+        <ol>
+          <li><strong>دسترسی از طریق پوشه اشتراکی ویندوز (DFS Share):</strong>  
+            کلیدهای میانبر <code>Win + R</code> را بفشارید یا در نوار آدرس پنجره فایل ویندوز آدرس زیر را تایپ نمایید:
+            <div class="code-box">\\srvdfs01\Line1\Depo\</div>
+            سپس بر روی فایل <strong>ManovrSystem 0.1.0</strong> کلیک‌راست کرده و گزینه <code>Send to ➔ Desktop</code> را انتخاب کنید تا میانبر نرم‌افزار روی میزکار ایجاد شود.
+          </li>
+          <li><strong>دسترسی از طریق مرورگر وب:</strong>  
+            وارد کردن آدرس IP وب‌سرور دپو در مرورگرهای استاندارد (مانند <code>http://192.168.1.100:3000</code>).
+          </li>
+        </ol>
+      </div>
+
+      <h4>🔑 آموزش ورود به سامانه:</h4>
+      <p>نام کاربری و رمز عبور اختصاصی خود را در کادر مربوطه درج نموده و دکمه <strong>«ورود»</strong> را بزنید. سیستم پس از اعتبارسنجی رمزنگاری‌شده (Bcrypt)، توکن امنیتی JWT را ایجاد نموده و شما را متناسب با سطح دسترسی به محیط نرم‌افزار هدایت می‌کند.</p>
+
+      <h4>⚠️ هشدارهای امنیتی شیفت:</h4>
+      <p>در انتهای نوبت کاری، حتماً از دکمه آبی‌رنگ <strong>«خروج»</strong> در انتهای منوی سمت راست استفاده کنید تا نشست کاری شما بسته شده و اقدامات شیفت بعدی به نام شما ثبت نگردد.</p>
+
+      <div class="screenshot-wrapper">
+        <img src="./public/screenshots/01_login_screen.png" alt="صفحه ورود سامانه">
+        <div class="screenshot-caption">تصویر شماره ۱: صفحه ورود ایمن و احراز هویت دوسطحی سامانه دپو و مانور</div>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-number">۲</div>
+        <div class="step-title">نمای تعاملی دپو و مانیتورینگ جامع چیدمان ناوگان در خطوط (۲بعدی)</div>
+      </div>
+
+      <h4>🎯 هدف و اهمیت عملیاتی:</h4>
+      <p>این صفحه قلب تپنده و رصدخانه پایانه فتح‌آباد است که به عوامل دیسپاچینگ، سرپرست شیفت و مدیران خط دیدی لحظه‌ای و بدون نیاز به تماس بیسیم از وضعیت پارک ناوگان می‌دهد.</p>
+
+      <h4>🗺️ کالبدشکافی زون‌های پایانه فتح‌آباد در نرم‌افزار:</h4>
+      <ul>
+        <li><strong>پارکینگ جنوبی (خطوط ۱ تا ۲۵):</strong> خطوط اصلی استقرار و پارک شبانه قطارهای مسافری خط یک.</li>
+        <li><strong>پارکینگ شمالی (خطوط ۱ تا ۲۵):</strong> خطوط آماده‌سازی، انباشت و خطوط اعزامی سرفاصله صبحگاهی.</li>
+        <li><strong>خط اصلی (سوله مرکزی):</strong> دارای جایگاه‌های اصلی (۱ تا ۱۸) برای استقرار هم‌زمان قطارهای AC و دیزل‌های DC به همراه بیش از ۷۰ جایگاه خالی در امتداد سوله.</li>
+        <li><strong>سوله واگن‌سازی (خطوط ۱ تا ۱۶):</strong> خطوط جک‌ها، تعمیرات اساسی، خط بادگیری فیلترها و خط کور ۱.</li>
+        <li><strong>دیزل‌شاپ (خطوط خدماتی):</strong> خط تست، خط D7G، باطری‌خانه، دیزل‌شاپ B1 و B2 و کارخانه‌های ۱ و ۲ و ۳ جهت سرویس ناوگان خدماتی.</li>
+        <li><strong>خطوط فرعی ۱ و ۲:</strong> خط کور ۲، آبگیری، پیت‌لاین، متروواش (شست‌وشوی اتوماتیک)، مجاور سوله و خطوط دوار شرقی و غربی.</li>
+      </ul>
+
+      <h4>🚦 راهنمای رنگ‌ها و علائم ایمنی ناوگان:</h4>
+      <p>هر نشان قطار روی ریل دارای کد رنگی و نمادهای استاندارد زیر است:</p>
+      <ul>
+        <li><span class="badge badge-green">سبز — آماده به کار</span>: قطار کاملاً سالم و آماده برای اعزام مسافری.</li>
+        <li><span class="badge badge-orange">نارنجی — تحت تعمیر</span>: قطار دارای ایراد فنی در دست اقدام تکنسین‌ها.</li>
+        <li><span class="badge badge-red">قرمز — غیرفعال / خراب</span>: قطار متوقف یا دارای نقص حاد فنی.</li>
+        <li><span class="badge badge-blue">آبی — آماده اعزام</span>: قطار شسته‌شده و تست‌شده جهت اعزام به خط مسافری.</li>
+        <li><strong>⚡ کفشک:</strong> مشخص‌کننده قطارهایی که کفشک جریان‌گیر آن‌ها فاقد اتصال یا در دست تعویض است.</li>
+        <li><strong>🚨 عدم ATP:</strong> اخطار سیگنالینگی مبنی بر خاموش بودن یا نقص سیستم کنترل اتوماتیک قطار.</li>
+        <li><strong>🔄 دوار (A/B/C):</strong> موعد فرارسیدن بازدیدهای دوره‌ای و اندازه‌گیری سایش چرخ‌ها.</li>
+        <li><strong>🛑 بدون مجوز:</strong> عدم صدور مجوز خروج از پایانه توسط بازرسان ایمنی.</li>
+      </ul>
+
+      <h4>🖱️ قابلیت ثبت مانور به صورت کلیک (Modal Window):</h4>
+      <p>با کلیک مستقیم ماوس بر روی هر ریل یا پلاک قطار، یک پنجره پاپ‌آپ (Modal) بدون خروج از صفحه باز می‌شود:</p>
+      <ul>
+        <li><strong>تب اول (قطارهای مستقر):</strong> فهرست قطارهای روی خط با ذکر شماره اسلات پارک.</li>
+        <li><strong>تب دوم (ثبت مانور جابه‌جایی):</strong> انتخاب قطار، خط مقصد، دکمه سریع <code>⚡ مانور در محل (ثبت روی همین خط)</code>، نوع مانور و انتخاب راهبران با قابلیت ذخیره آنی.</li>
+        <li><strong>دکمه 🔴 مسدود کردن خط:</strong> امکان مسدودسازی خط به دلیل تعمیرات ریل؛ سیستم بلافاصله خط را قرمز کرده و مانع ورود قطار به آن می‌شود.</li>
+      </ul>
+
+      <h4>🖐️ قابلیت هوشمند درگ و دراپ ماوس (Drag & Drop):</h4>
+      <p>با کشیدن (درگ) پلاک قطار با کلیک ماوس و رها کردن (دراپ) آن روی ریل مقصد:</p>
+      <ul>
+        <li>سیستم ظرفیت خط مقصد را ارزیابی کرده و در صورت داشتن جایگاه خالی، پنجره ثبت مانور را باز می‌کند.</li>
+        <li>فیلدهای <strong>قطار، خط مبدأ و خط مقصد</strong> به صورت اتوماتیک پر می‌شوند.</li>
+        <li>کاربر تنها راهبر ۱ و ۲ را انتخاب کرده و دکمه ثبت نهایی را می‌زند؛ بدین ترتیب فرآیند ثبت مانور تنها در چند ثانیه انجام می‌شود.</li>
+      </ul>
+
+      <div class="screenshot-wrapper">
+        <img src="./public/screenshots/02_depot_view.png" alt="نمای تعاملی پایانه دپو">
+        <div class="screenshot-caption">تصویر شماره ۲-الف: نقشه زنده وکتور دوبعدی پایانه فتح‌آباد و وضعیت استقرار قطارها</div>
+      </div>
+      <div class="screenshot-wrapper">
+        <img src="./public/screenshots/02b_line_modal_manovr.png" alt="مدال اطلاعات قطار">
+        <div class="screenshot-caption">تصویر شماره ۲-ب: پنجره مدال سریع اطلاعات قطار و شروع مانور با یک کلیک</div>
+      </div>
+      <div class="screenshot-wrapper">
+        <img src="./public/screenshots/02d_line_modal_register_manovr.png" alt="مدال ثبت مانور">
+        <div class="screenshot-caption">تصویر شماره ۲-ج: پنجره مدال ثبت و اعمال مانور با قابلیت پر شدن خودکار از طریق درگ و دراپ</div>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-number">۳</div>
+        <div class="step-title">نمای سه‌بعدی شبیه‌سازی‌شده پایانه دپو (3D Real-time Digital Twin)</div>
+      </div>
+
+      <h4>🎯 هدف و اهمیت عملیاتی:</h4>
+      <p>نمای سه‌بعدی به مدیران ارشد و ناظران اتاق کنترل امکان می‌دهد بدون حضور فیزیکی در پایانه وسیع فتح‌آباد، درک فضایی ملموس از چینش قطارها، پر یا خالی بودن خطوط موازی و تراکم ناوگان در سوله‌ها به دست آورند.</p>
+
+      <h4>🎮 کنترل‌های ناوبری ۳بعدی با ماوس:</h4>
+      <ul>
+        <li><strong>چرخش زاویه دید (Orbit):</strong> نگه داشتن کلیک چپ ماوس و حرکت نشانگر به اطراف جهت مشاهده پایانه از هر زاویه دلخواه.</li>
+        <li><strong>جابه‌جایی افقی دوربین (Pan):</strong> نگه داشتن کلیک راست ماوس جهت حرکت در طول و عرض سوله.</li>
+        <li><strong>بزرگ‌نمایی و تمرکز (Zoom):</strong> چرخاندن غلتک ماوس جهت بررسی دقیق‌تر یک خط ریل یا قطار.</li>
+      </ul>
+
+      <h4>⚡ کارکرد بهینه در سیستم‌های اداری (Low-Poly):</h4>
+      <p>مدل سه‌بعدی با شتاب‌دهنده سخت‌افزاری WebGL و با تعداد پولیگون‌های کنترل‌شده بازسازی شده است؛ لذا حتی در رایانه‌های اداری فاقد کارت گرافیک اختصاصی با سرعت ۶۰ فریم بر ثانیه به شکلی روان اجرا می‌شود.</p>
+
+      <div class="screenshot-wrapper">
+        <img src="./public/screenshots/03_3d_depot_view.png" alt="نمای سه‌بعدی پایانه دپو">
+        <div class="screenshot-caption">تصویر شماره ۳: نمای سه‌بعدی تعاملی پایانه فتح‌آباد با موتور گرافیکی Three.js</div>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-number">۴</div>
+        <div class="step-title">داشبورد پایش آماری، کنترل عملیات و تابلوی اعلانات پایانه (Operations Dashboard)</div>
+      </div>
+
+      <h4>🎯 هدف و اهمیت عملیاتی:</h4>
+      <p>این بخش مرکز هدایت و تصمیم‌گیری سریع مدیران عملیات است که اطلاعات پراکنده پایانه را به شاخص‌های کلیدی عملکرد (KPI) تبدیل می‌کند.</p>
+
+      <h4>📊 تحلیل کارت‌های آماری بالای داشبورد:</h4>
+      <ul>
+        <li><strong>تعداد کل خطوط (۱۰۴ خط):</strong> ظرفیت زیرساختی کل ریل‌های پایانه فتح‌آباد.</li>
+        <li><strong>خطوط اشغال‌شده (۲۴ خط):</strong> تعداد خطوطی که در لحظه فعلی ناوگان روی آن‌ها پارک است.</li>
+        <li><strong>قطارهای فعال (۱۹۳ قطار):</strong> مجموع قطارهای مسافری و دیزل‌های آماده یا تحت نگهداری.</li>
+        <li><strong>مانورهای در جریان (۳۱ مانور):</strong> عملیات‌های کلیدخورده‌ای که هنوز گزارش خاتمه آن‌ها ثبت نشده است.</li>
+        <li><strong>پرسنل شیفت حاضر (۸۵ نفر):</strong> عوامل فعال در نوبت کاری روز جاری.</li>
+      </ul>
+
+      <h4>🚨 هشدار مانورهای معوقه و اقدام فوری:</h4>
+      <p>کادر هشدار قرمز رنگ بالای صفحه، تعداد مانورهایی را که نیازمند تأیید نهایی توسط مسئول شیفت هستند نشان می‌دهد. سرپرست با فشردن دکمه <strong>«بررسی و تأیید»</strong> مستقیماً اقدام لازم را انجام می‌دهد.</p>
+
+      <h4>📢 سامانه انتشار اعلانات پایانه (Broadcast System):</h4>
+      <p>مدیریت پایانه می‌تواند هشدارهای فوری (مانند لغزندگی خطوط به دلیل بارش یا دستورالعمل‌های ایمنی) را با تعیین سطح اهمیت (اطلاعیه عمومی، هشدار زرد، پیام بحرانی قرمز) به صورت همگانی مخابره کند تا بر روی صفحه تمام پرسنل آنلاین پایانه ظاهر شود.</p>
+
+      <div class="screenshot-wrapper">
+        <img src="./public/screenshots/04_dashboard.png" alt="داشبورد و آمار پایانه">
+        <div class="screenshot-caption">تصویر شماره ۴: داشبورد تحلیلی، کارت‌های آماری و تابلوی اعلانات مدیریت پایانه</div>
+      </div>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-number">۵</div>
+        <div class="step-title">فرم ثبت سریع مانور و مدیریت جابه‌جایی ناوگان (Maneuver Dispatching)</div>
+      </div>
+
+      <h4>🎯 هدف و اهمیت عملیاتی:</h4>
+      <p>ثبت سیستمی هرگونه حرکت ناوگان، مبنای جلوگیری از سوانح، تداخل ریل‌ها و رصد ساعت کار راهبران است.</p>
+
+      <h4>📝 فیلدهای کاربردی فرم ثبت:</h4>
+      <ul>
+        <li><strong>نوع مانور (*):</strong> انتخاب از بین گزینه‌های استاندارد (انتقال قطار، تعویض کفشک، شست‌وشو، دیزل، بادگیری، تعمیرات، تست ترمز).</li>
+        <li><strong>انتخاب قطار (*):</strong> جستجوی سریع قطار برقی یا دیزل.</li>
+        <li><strong>گزینه «مانور در محل (ثبت روی همان خط بدون جابه‌جایی)»:</strong>  
+          برای فعالیت‌هایی نظیر تعویض کفشک یا بازدید فنی که قطار روی ریل خود ثابت می‌ماند؛ با فعال‌سازی این گزینه، خط مقصد خودکار برابر خط مبدأ تنظیم می‌شود.
+        </li>
+        <li><strong>خط مبدأ و خط مقصد (*):</strong> تعیین ایستگاه ریل شروع و پایان مانور.</li>
+        <li><strong>راهبر ۱ و راهبر ۲ (کمکی):</strong> درج مشخصات راهبران مجری.</li>
+        <li><strong>زمان اجرای مانور (*):</strong> تقویم شمسی جلالی و ساعت به وقت تهران با دقت دقیقه.</li>
+      </ul>
+
+      <div class="screenshot-wrapper">
+        <img src="./public/screenshots/05_new_manovr.png" alt="فرم ثبت مانور جدید">
+        <div class="screenshot-caption">تصویر شماره ۵: فرم استاندارد و اعتبارسنجی‌شده ثبت مانور جدید</div>
+      </div>
+    </div>
+
+    <!-- Step 6 -->
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-number">۶</div>
+        <div class="step-title">سوابق، تاریخچه و فرآیند دو مرحله‌ای تأیید مانورها توسط سرپرست شیفت (Workflow Approvals)</div>
+      </div>
+
+      <h4>🎯 هدف و اهمیت عملیاتی:</h4>
+      <p>بستن هر پرونده مانوری نیازمند صحه‌گذاری رسمی است تا مشخص گردد ناوگان به سلامت در خط مقصد مستقر شده و مسدودی خطوط برطرف شده است.</p>
+
+      <h4>🔄 چرخه حیات دو مرحله‌ای مانورها:</h4>
+      <ol>
+        <li><strong>مرحله اجرا:</strong> پس از ثبت فرم، مانور با برچسب زرد «شروع شده» نمایش داده می‌شود. پس از اتمام فیزیکی کار در محوطه، راهبر یا مسئول خط دکمه <strong>«اتمام»</strong> را کلیک می‌کند تا وضعیت به «پایان‌یافته» تغییر یابد.</li>
+        <li><strong>مرحله تأیید سرپرست شیفت:</strong> سرپرست شیفت با بررسی استقرار صحیح قطار، دکمه <strong>«تأیید»</strong> را می‌زند تا مهر تأیید رسمی بر سند درج گردد.</li>
+      </ol>
+
+      <div class="screenshot-wrapper">
+        <img src="./public/screenshots/06_manovrs_history.png" alt="تاریخچه مانورها">
+        <div class="screenshot-caption">تصویر شماره ۶: کارتابل سوابق، تاریخچه و گردش کار تأییدات نهایی مانورها</div>
+      </div>
+    </div>
+
+    <!-- Step 7 -->
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-number">۷</div>
+        <div class="step-title">شناسنامه جامع ناوگان و مدیریت وضعیت فنی قطارها و دیزل‌ها (Fleet Management)</div>
+      </div>
+
+      <h4>🎯 هدف و اهمیت عملیاتی:</h4>
+      <p>پایش آمادگی ۱۹۵ دستگاه ناوگان پایانه فتح‌آباد و اطمینان از سلامت تجهیزات حیاتی قبل از اعزام به خط یک مسافری.</p>
+
+      <h4>🛠️ امکانات ویرایش و تغییر سریع مشخصات:</h4>
+      <ul>
+        <li><strong>تفکیک نوع ناوگان:</strong> ۱۵۱ قطار مسافری AC و ۴۱ لوکوموتیو مانوری DC.</li>
+        <li><strong>کلیک‌های تغییر وضعیت:</strong> سوئیچ سریع بین حالت «کفشک‌دار / بدون کفشک»، «ATP فعال / خراب»، «تعیین دوره دوار A/B/C» و «صدور/لغو مجوز سیر».</li>
+        <li><strong>ابزارهای اکسل:</strong> دریافت خروجی کامل اکسل ناوگان، یا ویرایش گروهی از طریق بارگذاری مجدد فایل اکسل (Import).</li>
+      </ul>
+
+      <div class="screenshot-wrapper">
+        <img src="./public/screenshots/07_trains_management.png" alt="مدیریت قطارها">
+        <div class="screenshot-caption">تصویر شماره ۷: شناسنامه ناوگان، پایش تجهیزات فنی و ابزارهای ورود/خروج اکسل</div>
+      </div>
+    </div>
+
+    <!-- Step 8 -->
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-number">۸</div>
+        <div class="step-title">موتور گزارش‌ساز پویا، تحلیلگر داده‌ها و خروجی‌های رسمی سازمانی (Analytics & Reports)</div>
+      </div>
+
+      <h4>🎯 هدف و اهمیت عملیاتی:</h4>
+      <p>استخراج کارنامه عملکرد شیفت‌ها، ساعات کاری راهبران، آمار ترافیک ریل‌ها و ارزیابی بهره‌وری بدون وابستگی به گزارش‌های سنتی.</p>
+
+      <h4>📑 قالب‌های پیش‌ساخته گزارش:</h4>
+      <p>شامل ۱۰ قالب آماده: تاریخچه مانورها، قطارهای مستقر در دپو، قطارهای منلت‌شده (مثلث/متروواش)، آمار ترافیک خطوط، قطارهای بادگیری‌شده، مانورهای منتظر تأیید، عملکرد راهبران و توزیع شیفت پرسنل.</p>
+
+      <h4>🖨️ استانداردهای تولید اسناد رسمی:</h4>
+      <ul>
+        <li><strong>خروجی اکسل راست‌چین (RTL):</strong> شیت‌های استاندارد فارسی با چیدمان اصولی جهت تحلیل‌های اداری.</li>
+        <li><strong>خروجی PDF رسمی:</strong> تولید فایل PDF با فونت فارسی تعبیه‌شده وزیرمتن (Vazirmatn) بدون به هم ریختگی حروف، آماده برای بایگانی رسمی.</li>
+        <li><strong>نمودارهای تحلیلی:</strong> قابلیت تغییر نحوه نمایش بین جدول، نمودار ستونی، نمودار دایره‌ای و خطی.</li>
+      </ul>
+
+      <div class="screenshot-wrapper">
+        <img src="./public/screenshots/08_dynamic_reports.png" alt="گزارش‌ساز پویا">
+        <div class="screenshot-caption">تصویر شماره ۸: موتور گزارش‌ساز پیشرفته، فیلترینگ چندمعیاره و خروجی‌های رسمی</div>
+      </div>
+    </div>
+
+    <!-- Step 9 -->
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-number">۹</div>
+        <div class="step-title">مدیریت سطوح دسترسی، امنیت و تفکیک وظایف بر پایه نقش (Fine-Grained RBAC)</div>
+      </div>
+
+      <h4>🎯 هدف و اهمیت عملیاتی:</h4>
+      <p>تضمین انضباط عملیاتی از طریق تفکیک دقیق وظایف نظارتی از اجرایی و جلوگیری از تداخل اختیارات کاربران.</p>
+
+      <h4>👥 نقش‌های استاندارد در پایانه فتح‌آباد:</h4>
+      <ul>
+        <li><strong>نقش ادمین:</strong> مدیریت کل سیستم، کاربران، خطوط، برندینگ و پشتیبان‌گیری.</li>
+        <li><strong>نقش مسئول شیفت:</strong> ثبت و تأیید مانورها، تغییر وضعیت خطوط و ناوگان.</li>
+        <li><strong>نقش مشاهده (ویژه مدیران ارشد و مانیتورینگ):</strong> دسترسی کامل به کلیه نماها، نقشه‌های ۲بعدی و ۳بعدی، داشبورد و گزارش‌ها **صرفاً جهت دیدن و پایش**، بدون وجود دکمه‌های ویرایش یا حذف؛ بدین ترتیب مدیران می‌توانند بدون دغدغه تغییر سهوی داده‌ها پایانه را رصد فرمایند.</li>
+        <li><strong>نقش‌های سفارشی:</strong> امکان تعریف نقش‌های جدید با انتخاب از میان ۴۰ مجوز دانه‌بندی‌شده.</li>
+      </ul>
+
+      <div class="screenshot-wrapper">
+        <img src="./public/screenshots/09_roles_permissions.png" alt="مدیریت نقش‌ها">
+        <div class="screenshot-caption">تصویر شماره ۹: ماتریس سطوح دسترسی کاربران و تفکیک وظایف نظارتی از اجرایی</div>
+      </div>
+    </div>
+
+    <!-- Step 10 -->
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-number">۱۰</div>
+        <div class="step-title">لاگ وقایع امنیتی، ردگیری تغییرات و کارنامه عملیاتی (Audit Trail & Compliance)</div>
+      </div>
+
+      <h4>🎯 هدف و اهمیت عملیاتی:</h4>
+      <p>شفافیت کامل در بررسی علل رخدادها، سوانح مانوری و تأخیرات خط یک مترو از طریق ثبت غیرقابل‌تغییر تمامی رویدادها.</p>
+
+      <h4>🔍 ویژگی‌های رهگیری وقایع:</h4>
+      <ul>
+        <li>ثبت خودکار هویت کاربر عامل، تاریخ شمسی، زمان با دقت ثانیه و شرح دقیق تغییر به زبان فارسی (مانند: «ثبت مانور برای قطار ۱۱۷»، «تغییر وضعیت کفشک قطار ۵۲۵»).</li>
+        <li><strong>دکمه «مشاهده جزئیات فیلدی»:</strong> امکان مقایسه مقادیر پیشین و جدید برای پاسخگویی در کمیسیون‌های سوانح و بازرسی.</li>
+      </ul>
+
+      <div class="screenshot-wrapper">
+        <img src="./public/screenshots/10_audit_logs.png" alt="لاگ وقایع سیستم">
+        <div class="screenshot-caption">تصویر شماره ۱۰: کارنامه ثبت وقایع، امنیت داده و رهگیری تغییرات سیستم</div>
+      </div>
+    </div>
+
+    <h2>⚙️ ۲. خلاصه مشخصات فنی و معماری نرم‌افزار</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>لایه معماری</th>
+          <th>تکنولوژی استفاده‌شده</th>
+          <th>ویژگی‌ها و مزیت عملیاتی</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>هسته فرانت‌اند</strong></td>
+          <td>Next.js 16 (App Router) + React 19</td>
+          <td>سرعت پاسخ‌دهی بالا، رندر کارآمد و پایداری سازمانی با لود زیر نیم ثانیه</td>
+        </tr>
+        <tr>
+          <td><strong>زبان توسعه</strong></td>
+          <td>TypeScript 5 (Strict Mode)</td>
+          <td>قابلیت نگهداری بالا و حذف خطاهای زمان اجرا (Zero Runtime Error)</td>
+        </tr>
+        <tr>
+          <td><strong>طراحی و رابط کاربری</strong></td>
+          <td>Tailwind CSS v4 (RTL Native)</td>
+          <td>ارگونومی کاربری بالا، پشتیبانی کامل زبان فارسی، طراحی شیشه‌ای مدرن</td>
+        </tr>
+        <tr>
+          <td><strong>رندر سه‌بعدی</strong></td>
+          <td>Three.js & WebGL</td>
+          <td>نمایش بلادرنگ سوله و خطوط پایانه با گرافیک شتاب‌یافته سخت‌افزاری (Low-Poly)</td>
+        </tr>
+        <tr>
+          <td><strong>پایگاه داده و ORM</strong></td>
+          <td>Prisma ORM v6 + SQLite / PostgreSQL</td>
+          <td>ساختار سبک و صفر-پیکربندی برای شبکه داخلی با امنیت بالای تراکنش‌ها</td>
+        </tr>
+        <tr>
+          <td><strong>تولید فایل و گزارش</strong></td>
+          <td>ExcelJS (RTL) + PDFMake (Vazirmatn)</td>
+          <td>تولید اسناد رسمی سازمانی مطابق با استانداردهای دبیرخانه و بایگانی</td>
+        </tr>
+        <tr>
+          <td><strong>بسته‌بندی دسکتاپ</strong></td>
+          <td>ElectronJS (v43)</td>
+          <td>خروجی فایل نصبی و پرتابل مستقل ویندوز (.exe) بدون نیاز به اینترنت</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>🛡️ ۳. مرزهای عملکردی و الزامات پدافند غیرعامل و ایمنی مترو</h2>
+    <ul>
+      <li><strong>استقلال ۱۰۰٪ از اینترنت عمومی (Offline-First):</strong> سامانه برای فعالیت، بارگذاری فونت‌ها، نمودارها یا پردازش به هیچ منبع خارج از شبکه داخلی مترو وابسته نیست و در بالاترین سطح استانداردهای امنیتی تاسیسات حساس قرار دارد.</li>
+      <li><strong>عدم تداخل با سیستم‌های سخت‌افزاری و سوزن‌ها:</strong> سامانه ابزار مدیریت و ثبت است و هیچ فرمانی به ادوات فیزیکی ریل ارسال نمی‌کند تا هیچ ریسک ناخواسته‌ای در ایمنی سیر ایجاد نگردد.</li>
+      <li><strong>پشتیبان‌گیری متمرکز (Backup & Restore):</strong> ابزار پشتیبان‌گیری داخلی امکان تهیه ایمپورت و اکسپورت دوره‌ای داده‌ها را با یک کلیک فراهم می‌سازد.</li>
+    </ul>
+
+    <h2>🖥️ ۴. نیازمندی‌های سخت‌افزاری جهت استقرار در پایانه فتح‌آباد</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>بخش</th>
+          <th>حداقل سخت‌افزار مورد نیاز</th>
+          <th>مشخصات پیشنهادی</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>پردازنده (CPU)</strong></td>
+          <td>Intel Core i3 نسل ۵ به بالا</td>
+          <td>Intel Core i5 / Core i7 یا پردازنده سروری Xeon</td>
+        </tr>
+        <tr>
+          <td><strong>حافظه اصلی (RAM)</strong></td>
+          <td>۴ گیگابایت</td>
+          <td>۸ الی ۱۶ گیگابایت</td>
+        </tr>
+        <tr>
+          <td><strong>فضای ذخیره‌سازی (Storage)</strong></td>
+          <td>۲۰ گیگابایت فضای خالی</td>
+          <td>۵۰ گیگابایت SSD</td>
+        </tr>
+        <tr>
+          <td><strong>ارتباط شبکه</strong></td>
+          <td>اتصال کابلی LAN با پهنای باند 100Mbps</td>
+          <td>کارت شبکه گیگابیت 1Gbps در شبکه دپو</td>
+        </tr>
+        <tr>
+          <td><strong>مرورگر کاربران</strong></td>
+          <td>Google Chrome نسخه ۱۰۰+ / Microsoft Edge</td>
+          <td>مرورگر استاندارد سازمانی با فعال بودن WebGL</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="action-bar">
+      <button class="btn-print" onclick="window.print()">🖨️ چاپ این سند تفصیلی / ذخیره به عنوان PDF رسمی</button>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

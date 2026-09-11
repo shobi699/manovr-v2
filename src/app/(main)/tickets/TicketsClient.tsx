@@ -8,6 +8,7 @@ import {
   reassignTicket,
   getActivePersonnel,
 } from "@/app/actions/tickets";
+import { useToast } from "@/components/ui/Toast";
 
 interface TicketReply {
   id: number;
@@ -91,6 +92,7 @@ export default function TicketsClient({
 
   const [replyBody, setReplyBody] = useState("");
   const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
 
   const activeTicket = tickets.find((t) => t.id === selectedTicketId);
 
@@ -134,7 +136,7 @@ export default function TicketsClient({
   const handleCreateTicket = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTicketTitle.trim() || !newTicketBody.trim()) {
-      alert("لطفاً عنوان و شرح تیکت را وارد کنید.");
+      toast.warning("لطفاً عنوان و شرح تیکت را وارد کنید.");
       return;
     }
 
@@ -143,7 +145,7 @@ export default function TicketsClient({
     startTransition(async () => {
       const res = await createTicket(newTicketTitle, newTicketBody, assigneeVal);
       if (res.ok && res.data) {
-        alert("تیکت جدید با موفقیت ثبت شد.");
+        toast.success("تیکت جدید با موفقیت ثبت شد.");
         
         // انتساب‌شونده در صورت وجود
         const assigneeUser = assigneeVal
@@ -196,7 +198,7 @@ export default function TicketsClient({
         setNewTicketAssignee("");
         setIsCreateOpen(false);
       } else {
-        alert(res.error || "خطا در ثبت تیکت");
+        toast.error(res.error || "خطا در ثبت تیکت");
       }
     });
   };
@@ -205,7 +207,7 @@ export default function TicketsClient({
   const handleForwardTicket = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTicketId || !forwardTargetId) {
-      alert("لطفاً همکار مورد نظر را برای ارجاع تیکت انتخاب کنید.");
+      toast.warning("لطفاً همکار مورد نظر را برای ارجاع تیکت انتخاب کنید.");
       return;
     }
 
@@ -214,7 +216,7 @@ export default function TicketsClient({
     startTransition(async () => {
       const res = await reassignTicket(selectedTicketId, targetUserId, forwardNote);
       if (res.ok && res.data) {
-        alert("تیکت با موفقیت ارجاع شد.");
+        toast.success("تیکت با موفقیت ارجاع شد.");
 
         const targetUser = personnel.find((p) => p.id === targetUserId);
         
@@ -265,7 +267,7 @@ export default function TicketsClient({
         setForwardNote("");
         setIsForwardOpen(false);
       } else {
-        alert(res.error || "خطا در ارجاع تیکت");
+        toast.error(res.error || "خطا در ارجاع تیکت");
       }
     });
   };
@@ -309,8 +311,9 @@ export default function TicketsClient({
           )
         );
         setReplyBody("");
+        toast.success("پاسخ با موفقیت ارسال شد.");
       } else {
-        alert(res.error || "خطا در ارسال پاسخ");
+        toast.error(res.error || "خطا در ارسال پاسخ");
       }
     });
   };
@@ -345,9 +348,9 @@ export default function TicketsClient({
               : t
           )
         );
-        alert(`وضعیت تیکت به "${statusText}" تغییر یافت.`);
+        toast.success(`وضعیت تیکت به "${statusText}" تغییر یافت.`);
       } else {
-        alert(res.error || "خطا در تغییر وضعیت تیکت");
+        toast.error(res.error || "خطا در تغییر وضعیت تیکت");
       }
     });
   };

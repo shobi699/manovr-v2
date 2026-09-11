@@ -10,6 +10,8 @@ import { ManovrType, ManovrStatus, ConfirmationStatus, TrainType, Terminal, Shif
 import ExcelJS from "exceljs";
 import JalaliDateTimePicker from "@/components/JalaliDateTimePicker";
 import DataTable, { Column } from "@/components/DataTable";
+import { useToast } from "@/components/ui/Toast";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 
 const CHART_COLORS = ["#1f3a5f", "#d8842a", "#2e7d5b", "#b23b3b", "#6d28d9", "#4b5563"];
 
@@ -101,6 +103,9 @@ export default function ReportBuilderClient({
   const [recipients, setRecipients] = useState(String(userId));
   const [outputDir, setOutputDir] = useState("");
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [deleteReportTarget, setDeleteReportTarget] = useState<any | null>(null);
+  const [deleteScheduleTarget, setDeleteScheduleTarget] = useState<any | null>(null);
+  const { toast } = useToast();
 
   // کانفیگ جاری گزارش‌ساز
   const [entity, setEntity] = useState<"manovr" | "train" | "line" | "personnel">("manovr");
@@ -421,13 +426,13 @@ export default function ReportBuilderClient({
   // ذخیره گزارش جاری
   const handleSaveReport = async () => {
     if (!reportName.trim()) {
-      alert("لطفاً نام گزارش را وارد کنید.");
+      toast.warning("لطفاً نام گزارش را وارد کنید.");
       return;
     }
     const config: ReportConfig = { entity, fields, filters, groupBy: groupBy || undefined, chart, sortField, sortDirection };
     const res = await saveReportAction(reportName, config, true);
     if (res.error) {
-      alert(res.error);
+      toast.error(res.error);
     } else if (res.report) {
       setSavedReports((prev) => [
         {
@@ -441,7 +446,7 @@ export default function ReportBuilderClient({
         ...prev,
       ]);
       setReportName("");
-      alert("گزارش با موفقیت ذخیره شد.");
+      toast.success("گزارش با موفقیت ذخیره شد.");
     }
   };
 
@@ -456,20 +461,27 @@ export default function ReportBuilderClient({
       setChart(config.chart || "table");
       setSortField(config.sortField || "");
       setSortDirection(config.sortDirection || "desc");
-      alert(`گزارش "${rep.name}" بارگذاری شد.`);
+      toast.info(`گزارش "${rep.name}" بارگذاری شد.`);
     } catch {
-      alert("خطا در بارگذاری گزارش.");
+      toast.error("خطا در بارگذاری گزارش.");
     }
   };
 
   // حذف گزارش ذخیره شده
-  const handleDeleteReport = async (id: number) => {
-    if (!confirm("آیا از حذف این گزارش مطمئن هستید؟")) return;
+  const handleDeleteReport = (rep: any) => {
+    setDeleteReportTarget(rep);
+  };
+
+  const handleConfirmDeleteReport = async () => {
+    if (!deleteReportTarget) return;
+    const id = deleteReportTarget.id;
     const res = await deleteSavedReportAction(id);
     if (res.error) {
-      alert(res.error);
+      toast.error(res.error);
     } else {
       setSavedReports((p) => p.filter((r) => r.id !== id));
+      toast.success("گزارش با موفقیت حذف شد.");
+      setDeleteReportTarget(null);
     }
   };
 
@@ -493,9 +505,9 @@ export default function ReportBuilderClient({
       outputDir
     );
     if (res.error) {
-      alert(res.error);
+      toast.error(res.error);
     } else {
-      alert("برنامه زمان‌بندی گزارش با موفقیت ثبت شد.");
+      toast.success("برنامه زمان‌بندی گزارش با موفقیت ثبت شد.");
       setIsScheduleModalOpen(false);
       setScheduledReports((prev: any) => [res.report, ...prev]);
     }
@@ -504,21 +516,29 @@ export default function ReportBuilderClient({
   const handleToggleSchedule = async (id: number, active: boolean) => {
     const res = await toggleScheduledReport(id, active);
     if (res.error) {
-      alert(res.error);
+      toast.error(res.error);
     } else {
       setScheduledReports((prev: any) =>
         prev.map((s: any) => (s.id === id ? { ...s, isActive: active } : s))
       );
+      toast.success(active ? "برنامه زمان‌بندی فعال شد." : "برنامه زمان‌بندی غیرفعال شد.");
     }
   };
 
-  const handleDeleteSchedule = async (id: number) => {
-    if (!confirm("آیا از حذف این برنامه زمان‌بندی مطمئن هستید؟")) return;
+  const handleDeleteSchedule = (sr: any) => {
+    setDeleteScheduleTarget(sr);
+  };
+
+  const handleConfirmDeleteSchedule = async () => {
+    if (!deleteScheduleTarget) return;
+    const id = deleteScheduleTarget.id;
     const res = await deleteScheduledReport(id);
     if (res.error) {
-      alert(res.error);
+      toast.error(res.error);
     } else {
       setScheduledReports((prev: any) => prev.filter((s: any) => s.id !== id));
+      toast.success("برنامه زمان‌بندی با موفقیت حذف شد.");
+      setDeleteScheduleTarget(null);
     }
   };
 
@@ -547,7 +567,7 @@ export default function ReportBuilderClient({
       body: JSON.stringify(config),
     });
     if (!response.ok) {
-      alert("خطا در دانلود اکسل.");
+      toast.error("خطا در دانلود اکسل.");
       return;
     }
     const blob = await response.blob();
@@ -557,6 +577,7 @@ export default function ReportBuilderClient({
     a.download = `report-${entity}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
+    toast.success("فایل اکسل با موفقیت دانلود شد.");
   };
 
   // فراخوانی API اکسپورت PDF
@@ -568,7 +589,7 @@ export default function ReportBuilderClient({
       body: JSON.stringify(config),
     });
     if (!response.ok) {
-      alert("خطا در دانلود PDF.");
+      toast.error("خطا در دانلود PDF.");
       return;
     }
     const blob = await response.blob();
@@ -578,6 +599,7 @@ export default function ReportBuilderClient({
     a.download = `report-${entity}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
+    toast.success("فایل PDF با موفقیت دانلود شد.");
   };
 
   // دانلود تصویر نمودار به صورت PNG
@@ -617,13 +639,14 @@ export default function ReportBuilderClient({
           document.body.appendChild(downloadLink);
           downloadLink.click();
           document.body.removeChild(downloadLink);
+          toast.success("تصویر نمودار دانلود شد.");
         }
         DOMURL.revokeObjectURL(url);
       };
       img.src = url;
     } catch (e) {
       console.error("Failed to download chart", e);
-      alert("خطا در دانلود تصویر نمودار.");
+      toast.error("خطا در دانلود تصویر نمودار.");
     }
   };
 
@@ -668,7 +691,7 @@ export default function ReportBuilderClient({
         });
         setImportPreview(rows);
       } catch (err) {
-        alert("فرمت فایل اکسل معتبر نیست یا خطا در خواندن رخ داد.");
+        toast.error("فرمت فایل اکسل معتبر نیست یا خطا در خواندن رخ داد.");
       }
     };
     reader.readAsArrayBuffer(file);
@@ -680,12 +703,12 @@ export default function ReportBuilderClient({
     startTransition(async () => {
       const res = await importPersonnelFromExcel(importPreview);
       if (res.error) {
-        alert(res.error);
+        toast.error(res.error);
       } else {
         setImportCount(res.count || 0);
         setImportPreview([]);
         setImportFile(null);
-        alert(`تعداد ${res.count} پرسنل جدید با موفقیت درج شدند.`);
+        toast.success(`تعداد ${res.count} پرسنل جدید با موفقیت درج شدند.`);
       }
     });
   };
@@ -1129,7 +1152,7 @@ export default function ReportBuilderClient({
                           <button
                             className="btn sm"
                             style={{ padding: "2px 4px", fontSize: "10px", color: "var(--crit)", borderColor: "transparent" }}
-                            onClick={() => handleDeleteReport(rep.id)}
+                            onClick={() => handleDeleteReport(rep)}
                           >
                             حذف
                           </button>
@@ -1175,7 +1198,7 @@ export default function ReportBuilderClient({
                       <button
                         className="btn sm outline"
                         style={{ padding: "2px 4px", fontSize: "10px", color: "var(--crit)", borderColor: "transparent", width: "100%", marginTop: "4px" }}
-                        onClick={() => handleDeleteSchedule(sr.id)}
+                        onClick={() => handleDeleteSchedule(sr)}
                       >
                         حذف برنامه
                       </button>
@@ -1702,6 +1725,28 @@ export default function ReportBuilderClient({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(deleteReportTarget)}
+        title="حذف گزارش ذخیره‌شده"
+        message={`آیا از حذف گزارش «${deleteReportTarget?.name ?? ""}» اطمینان دارید؟`}
+        confirmText="حذف گزارش"
+        cancelText="انصراف"
+        variant="danger"
+        onConfirm={handleConfirmDeleteReport}
+        onCancel={() => setDeleteReportTarget(null)}
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(deleteScheduleTarget)}
+        title="حذف برنامه زمان‌بندی"
+        message="آیا از حذف این برنامه زمان‌بندی اطمینان دارید؟"
+        confirmText="حذف برنامه"
+        cancelText="انصراف"
+        variant="danger"
+        onConfirm={handleConfirmDeleteSchedule}
+        onCancel={() => setDeleteScheduleTarget(null)}
+      />
     </>
   );
 }

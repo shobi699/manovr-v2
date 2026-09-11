@@ -132,7 +132,26 @@ export function startScheduler() {
 
       for (const sr of activeSchedules) {
         if (cronMatch(sr.cron, now)) {
-          console.log(`[Scheduler] Match found! Enqueuing scheduled report: ${sr.savedReport.name} (Cron: ${sr.cron})`);
+          // قفل اتمیک در دیتابیس مشترک شبکه: فقط کلاینتی که بتواند lastRunAt را رزرو کند مجاز به اجرای گزارش است
+          const lockThreshold = new Date(now.getTime() - 55000);
+          const claim = await prisma.scheduledReport.updateMany({
+            where: {
+              id: sr.id,
+              isActive: true,
+              OR: [
+                { lastRunAt: null },
+                { lastRunAt: { lt: lockThreshold } }
+              ]
+            },
+            data: { lastRunAt: now },
+          });
+
+          if (claim.count === 0) {
+            // گزارش قبلاً توسط سیستم دیگری در شبکه اجرا شده است
+            continue;
+          }
+
+          console.log(`[Scheduler] Network lock acquired for report: ${sr.savedReport.name} (Cron: ${sr.cron})`);
           let entityName = "manovr";
           try {
             const parsedConfig = JSON.parse(sr.savedReport.config);

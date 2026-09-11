@@ -6,6 +6,14 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { hasPerm } from "@/lib/perms";
 import { audit } from "@/lib/audit";
+import {
+  createTrainSchema,
+  updateTrainSchema,
+  formatZodError,
+} from "@/lib/validations";
+import { getOfflinePolicy } from "@/lib/settings";
+import { getNetworkStatus } from "@/lib/network-status";
+import { recordOfflineAction } from "@/lib/offline-sync";
 
 export async function createTrain(
   _prev: { error?: string } | null,
@@ -15,23 +23,19 @@ export async function createTrain(
   if (!session || !(await hasPerm(session, "train.create")))
     return { error: "دسترسی ندارید. فقط نقش‌های دارای مجوز مجاز به افزودن قطار هستند." };
 
-  const code = String(fd.get("code") ?? "").trim();
-  const type = Number(fd.get("type"));
-  const lineId = fd.get("lineId") ? Number(fd.get("lineId")) : null;
-  const slotIndex = fd.get("slotIndex") ? Number(fd.get("slotIndex")) : 0;
-  let hasKafshak = fd.get("hasKafshak") === "1";
-  let noAtp = fd.get("noAtp") === "1";
-  const movadDavvarRaw = String(fd.get("movadDavvar") ?? "").trim();
-  let movadDavvar = ["A", "B", "C"].includes(movadDavvarRaw) ? movadDavvarRaw : null;
-  let noLicense = fd.get("noLicense") === "1";
+  const rawInput = Object.fromEntries(fd.entries());
+  const parsed = createTrainSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { error: formatZodError(parsed.error) };
+  }
+
+  const { code, type, lineId, slotIndex } = parsed.data;
+  let { hasKafshak, noAtp, movadDavvar, noLicense } = parsed.data;
 
   if (!(await hasPerm(session, "train.status.kafshak"))) hasKafshak = false;
   if (!(await hasPerm(session, "train.status.atp"))) noAtp = false;
   if (!(await hasPerm(session, "train.status.rotary"))) movadDavvar = null;
   if (!(await hasPerm(session, "train.status.license"))) noLicense = false;
-
-  if (!code) return { error: "کد قطار الزامی است." };
-  if (isNaN(type)) return { error: "نوع قطار را انتخاب کنید." };
 
   const exists = await prisma.train.findFirst({ where: { code } });
   if (exists) return { error: "قطاری با این کد وجود دارد." };
@@ -64,33 +68,40 @@ export async function updateTrain(
   if (!session || !(await hasPerm(session, "train.edit")))
     return { error: "دسترسی ندارید. فقط نقش‌های دارای مجوز مجاز به ویرایش قطار هستند." };
 
-  const id = Number(fd.get("id"));
-  const code = String(fd.get("code") ?? "").trim();
-  const type = Number(fd.get("type"));
-  const lineId = fd.get("lineId") ? Number(fd.get("lineId")) : null;
-  const slotIndex = fd.get("slotIndex") ? Number(fd.get("slotIndex")) : undefined;
-  const isDisposed = fd.get("isDisposed") === "1";
+  const rawInput = Object.fromEntries(fd.entries());
+  const parsed = updateTrainSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { error: formatZodError(parsed.error) };
+  }
+
+  const { id, code, type, lineId, slotIndex, isDisposed } = parsed.data;
   const before = await prisma.train.findUnique({ where: { id } });
   if (!before) return { error: "قطار یافت نشد." };
 
-  let hasKafshak = fd.get("hasKafshak") === "1";
-  let noAtp = fd.get("noAtp") === "1";
-  const movadDavvarRaw = String(fd.get("movadDavvar") ?? "").trim();
-  let movadDavvar = ["A", "B", "C"].includes(movadDavvarRaw) ? movadDavvarRaw : null;
-  let noLicense = fd.get("noLicense") === "1";
+  let { hasKafshak, noAtp, movadDavvar, noLicense } = parsed.data;
 
   if (!(await hasPerm(session, "train.status.kafshak"))) hasKafshak = before.hasKafshak;
   if (!(await hasPerm(session, "train.status.atp"))) noAtp = before.noAtp;
-  if (!(await hasPerm(session, "train.status.rotary"))) movadDavvar = before.movadDavvar;
+  if (!(await hasPerm(session, "train.status.rotary"))) {
+    movadDavvar = before.movadDavvar === "A" || before.movadDavvar === "B" || before.movadDavvar === "C" ? before.movadDavvar : null;
+  }
   if (!(await hasPerm(session, "train.status.license"))) noLicense = before.noLicense;
-
-  if (!code) return { error: "کد قطار الزامی است." };
 
   const dup = await prisma.train.findFirst({ where: { code, NOT: { id } } });
   if (dup) return { error: "قطاری با این کد وجود دارد." };
   const after = await prisma.train.update({
     where: { id },
-    data: { code, type, lineId, slotIndex, isDisposed, hasKafshak, noAtp, movadDavvar, noLicense },
+    data: {
+      code,
+      type,
+      lineId,
+      ...(slotIndex !== null && slotIndex !== undefined ? { slotIndex } : {}),
+      isDisposed,
+      hasKafshak,
+      noAtp,
+      movadDavvar,
+      noLicense,
+    },
   });
 
   await audit(
@@ -156,6 +167,15 @@ export async function relocateTrainDirectly(
     return { error: "دسترسی ندارید." };
   }
 
+  const netStatus = await getNetworkStatus();
+  const offlinePolicy = await getOfflinePolicy();
+  if (!netStatus.isShared && offlinePolicy === "read_only") {
+    return {
+      error:
+        "ارتباط با سرور متمرکز دپو قطع است (حالت فقط مشاهده). جابجایی قطار تا برقراری ارتباط با سرور مجاز نیست.",
+    };
+  }
+
   try {
     const before = await prisma.train.findUnique({ where: { id: trainId } });
     const after = await prisma.train.update({
@@ -173,6 +193,20 @@ export async function relocateTrainDirectly(
       `قطار پلاک ${before?.code} مستقیماً روی نقشه دپو جابجا شد.`
     );
 
+    if (!netStatus.isShared) {
+      try {
+        await recordOfflineAction({
+          actionType: "RELOCATE_TRAIN",
+          data: { trainId, destinationLineId: lineId, slotIndex },
+          timestamp: new Date().toISOString(),
+          userId: session.id,
+          userFullName: (session as any).name || (session as any).username || "کاربر سیستم",
+        });
+      } catch (e) {
+        console.error("[relocateTrainDirectly] خطا در ثبت صف آفلاین:", e);
+      }
+    }
+
     revalidatePath("/depot");
     revalidatePath("/trains");
     revalidatePath("/dashboard");
@@ -186,6 +220,15 @@ export async function updateTrainStatus(trainId: number, status: number) {
   const session = await getSession();
   if (!session || !(await hasPerm(session, "train.edit"))) {
     return { error: "دسترسی ندارید. مجوز تغییر وضعیت قطار وجود ندارد." };
+  }
+
+  const netStatus = await getNetworkStatus();
+  const offlinePolicy = await getOfflinePolicy();
+  if (!netStatus.isShared && offlinePolicy === "read_only") {
+    return {
+      error:
+        "ارتباط با سرور متمرکز دپو قطع است (حالت فقط مشاهده). تغییر وضعیت قطار تا برقراری ارتباط با سرور مجاز نیست.",
+    };
   }
 
   try {
@@ -204,6 +247,20 @@ export async function updateTrainStatus(trainId: number, status: number) {
       after,
       `وضعیت فنی قطار پلاک ${before?.code} تغییر یافت.`
     );
+
+    if (!netStatus.isShared) {
+      try {
+        await recordOfflineAction({
+          actionType: "UPDATE_TRAIN_STATUS",
+          data: { trainId, status },
+          timestamp: new Date().toISOString(),
+          userId: session.id,
+          userFullName: (session as any).name || (session as any).username || "کاربر سیستم",
+        });
+      } catch (e) {
+        console.error("[updateTrainStatus] خطا در ثبت صف آفلاین:", e);
+      }
+    }
 
     revalidatePath("/depot");
     revalidatePath("/trains");
@@ -285,6 +342,15 @@ export async function updateTrainFlags(
     return { error: "شما مجوز تغییر وضعیت مجوز قطار را ندارید." };
   }
 
+  const netStatus = await getNetworkStatus();
+  const offlinePolicy = await getOfflinePolicy();
+  if (!netStatus.isShared && offlinePolicy === "read_only") {
+    return {
+      error:
+        "ارتباط با سرور متمرکز دپو قطع است (حالت فقط مشاهده). تغییر نشانگرهای قطار تا برقراری ارتباط با سرور مجاز نیست.",
+    };
+  }
+
   try {
     const before = await prisma.train.findUnique({ where: { id: trainId } });
     const after = await prisma.train.update({
@@ -301,6 +367,20 @@ export async function updateTrainFlags(
       after,
       `تغییر وضعیت فنی قطار ${before?.code} (کفشک/ATP/دوّار/مجوز)`
     );
+
+    if (!netStatus.isShared) {
+      try {
+        await recordOfflineAction({
+          actionType: "UPDATE_TRAIN_FLAGS",
+          data: { trainId, ...flags },
+          timestamp: new Date().toISOString(),
+          userId: session.id,
+          userFullName: (session as any).name || (session as any).username || "کاربر سیستم",
+        });
+      } catch (e) {
+        console.error("[updateTrainFlags] خطا در ثبت صف آفلاین:", e);
+      }
+    }
 
     revalidatePath("/depot");
     revalidatePath("/trains");

@@ -40,9 +40,11 @@ import {
   ArrowClockwise,
   FloppyDisk,
   Funnel,
+  BookOpen,
 } from "@phosphor-icons/react";
 
 export const Icons = {
+  Help: BookOpen,
   Depot: MapTrifold,
   Dashboard: ChartBar,
   Approvals: ShieldCheck,

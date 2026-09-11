@@ -10,6 +10,7 @@ import { Icons } from "@/lib/icons";
 import { motion } from "motion/react";
 import { useTheme } from "@/components/ThemeProvider";
 import { safeAccentColor } from "@/lib/branding";
+import ServerStatusBadge from "@/components/ServerStatusBadge";
 
 const DYNAMIC_NAV = [
   { grp: "عملیات پایانه" },
@@ -28,6 +29,7 @@ const DYNAMIC_NAV = [
   { href: "/profile", icKey: "Profile", label: "پروفایل من" },
   { href: "/tickets", icKey: "Tickets", label: "تیکت‌های پشتیبانی", perm: "ticket.create" },
   { href: "/reports", icKey: "Reports", label: "گزارش‌ساز پویا", perm: "report.build" },
+  { href: "/help", icKey: "Help", label: "راهنما و آموزش" },
   { href: "/settings", icKey: "Settings", label: "شخصی‌سازی تم" },
   { href: "/admin/terminals", icKey: "Lookups", label: "مدیریت ترمینال‌ها", perm: "terminal.view" },
   { href: "/admin/lookups", icKey: "Lookups", label: "مدیریت مقادیر پویا", perm: "lookups.manage" },
@@ -118,23 +120,22 @@ export default function Sidebar({
     }
   };
 
-  // بررسی دسترسی کاربر به یک لینک خاص
-  const hasPermission = (perm?: string) => {
-    if (role === 4) return true; // سوپرادمین به همه جا دسترسی دارد
-    if (!perm) return true;
-    return perms.includes(perm);
-  };
-
   // فیلتر کردن منوهای ناوبری بر اساس مجوزها
   const filteredNav = React.useMemo(() => {
+    const checkPermission = (perm?: string) => {
+      if (role === 4) return true; // سوپرادمین به همه جا دسترسی دارد
+      if (!perm) return true;
+      return perms.includes(perm);
+    };
+
     const allowedItems = DYNAMIC_NAV.filter((n) => {
       if ("href" in n && n.perm) {
-        return hasPermission(n.perm);
+        return checkPermission(n.perm);
       }
       return true;
     });
 
-    const result: any[] = [];
+    const result: (typeof DYNAMIC_NAV[number])[] = [];
     for (let i = 0; i < allowedItems.length; i++) {
       const current = allowedItems[i];
       if ("grp" in current) {
@@ -163,8 +164,6 @@ export default function Sidebar({
     }
     return path === href || (path.startsWith(href) && href !== "/dashboard" && href !== "/depot");
   };
-
-  const LogoIcon = Icons.Trains;
 
   return (
     <aside className="sidebar">
@@ -198,6 +197,11 @@ export default function Sidebar({
               <NotificationBell userId={userId} />
             </div>
           )}
+        </div>
+
+        {/* نشانگر وضعیت ارتباط با سرور متمرکز دپو */}
+        <div style={{ width: "100%", marginTop: "2px", marginBottom: "2px" }}>
+          <ServerStatusBadge isCollapsed={isCollapsed} />
         </div>
 
         {/* دکمه جمع‌کردن منو */}

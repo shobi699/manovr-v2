@@ -3,6 +3,7 @@ import "./globals.css";
 import { getSession } from "@/lib/auth";
 import { getUserSetting, DEFAULT_APPEARANCE } from "@/lib/settings";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { ToastProvider } from "@/components/ui/Toast";
 import { getBrandingSettings } from "@/app/actions/lookups";
 
 export const metadata: Metadata = {
@@ -32,7 +33,9 @@ export default async function RootLayout({
     : DEFAULT_APPEARANCE;
 
   const branding = await getBrandingSettings();
-  const accentColor = branding.accentColor || "#d8842a";
+  const rawAccent = branding.accentColor?.trim() || "#d8842a";
+  const isHex6 = /^#[0-9a-fA-F]{6}$/.test(rawAccent);
+  const accentColor = isHex6 ? rawAccent : "#d8842a";
 
   return (
     <html lang="fa" dir="rtl">
@@ -48,7 +51,9 @@ export default async function RootLayout({
       </head>
       <body>
         <ThemeProvider initialAppearance={appearance}>
-          {children}
+          <ToastProvider>
+            {children}
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>

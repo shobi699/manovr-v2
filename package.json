@@ -32,7 +32,8 @@
     "react-dom": "19.2.4",
     "recharts": "^3.9.2",
     "three": "^0.185.1",
-    "zustand": "^5.0.14"
+    "zustand": "^5.0.14",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -57,7 +58,7 @@
     "productName": "ManovrSystem",
     "publish": null,
     "asar": true,
-    "compression": "maximum",
+    "compression": "normal",
     "asarUnpack": [
       ".next/standalone/**/*"
     ],
@@ -75,7 +76,8 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "differentialPackage": false
     },
     "portable": {
       "requestExecutionLevel": "user"
@@ -84,12 +86,17 @@
       {
         "from": "prisma/dev.db",
         "to": "dev.db"
+      },
+      {
+        "from": "manovr-config.json",
+        "to": "manovr-config.json"
       }
     ],
     "files": [
       "main.js",
       "preload.js",
       "splash.html",
+      "manovr-config.json",
       ".next/standalone/**/*",
       "!.next/standalone/**/.env*",
       "public/**/*",

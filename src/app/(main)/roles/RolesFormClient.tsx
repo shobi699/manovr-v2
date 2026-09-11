@@ -2,6 +2,8 @@
 
 import React, { useState, useTransition } from "react";
 import { createRole, updateRole, deleteRole } from "@/app/actions/role";
+import { useToast } from "@/components/ui/Toast";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 
 export default function RolesFormClient({
   mode,
@@ -29,6 +31,8 @@ export default function RolesFormClient({
   const [selectedPerms, setSelectedPerms] = useState<string[]>(activePerms);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const { toast } = useToast();
 
   const handleTogglePerm = (perm: string) => {
     setSelectedPerms((prev) =>
@@ -58,73 +62,69 @@ export default function RolesFormClient({
   const renderPermsList = (maxHeight = "350px") => (
     <div
       style={{
-        maxHeight,
-        overflowY: "auto",
-        border: "1px solid var(--line)",
-        borderRadius: "9px",
-        padding: "10px",
         display: "flex",
         flexDirection: "column",
         gap: "12px",
+        maxHeight,
+        overflowY: "auto",
+        padding: "8px",
+        border: "1px solid var(--line)",
+        borderRadius: "6px",
+        background: "rgba(0, 0, 0, 0.02)",
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "8px", borderBottom: "1px solid var(--line-soft)" }}>
-        <label style={{ fontSize: "13px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center" }}>
-          <input
-            type="checkbox"
-            checked={selectedPerms.length === allPerms.length && allPerms.length > 0}
-            onChange={(e) => {
-              if (e.target.checked) {
-                setSelectedPerms([...allPerms]);
-              } else {
-                setSelectedPerms([]);
-              }
-            }}
-            style={{ accentColor: "var(--accent)", marginInlineEnd: "8px" }}
-          />
-          انتخاب همه
-        </label>
-        <span className="muted" style={{ fontSize: "12px" }}>
-          {selectedPerms.length} / {allPerms.length} دسترسی
-        </span>
-      </div>
       {Object.entries(groupedPerms).map(([category, perms]) => {
-        const allCategorySelected = perms.every((p) => selectedPerms.includes(p));
-        const someCategorySelected = perms.some((p) => selectedPerms.includes(p)) && !allCategorySelected;
+        const allSelected = perms.every((p) => selectedPerms.includes(p));
+        const someSelected = perms.some((p) => selectedPerms.includes(p));
 
         return (
-          <div key={category} style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "8px", backgroundColor: "var(--panel)", borderRadius: "6px" }}>
-            <label style={{ fontSize: "13px", fontWeight: "bold", display: "flex", alignItems: "center", cursor: "pointer", borderBottom: "1px solid var(--line-soft)", paddingBottom: "4px" }}>
-              <input
-                type="checkbox"
-                checked={allCategorySelected}
-                ref={(el) => {
-                  if (el) el.indeterminate = someCategorySelected;
-                }}
-                onChange={() => toggleCategory(category, perms)}
-                style={{ accentColor: "var(--accent)", marginInlineEnd: "8px" }}
-              />
-              {category.toUpperCase()}
-            </label>
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px", paddingInlineStart: "24px" }}>
-              {perms.map((perm) => (
+          <div key={category} style={{ borderBottom: "1px solid var(--line-soft)", paddingBottom: "8px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "6px",
+                background: "var(--panel-2, rgba(0,0,0,0.03))",
+                padding: "4px 8px",
+                borderRadius: "4px",
+              }}
+            >
+              <span style={{ fontWeight: "bold", fontSize: "13px" }}>
+                گروه: {category.toUpperCase()}
+              </span>
+              <button
+                type="button"
+                className="btn sm"
+                style={{ padding: "2px 6px", fontSize: "11px" }}
+                onClick={() => toggleCategory(category, perms)}
+              >
+                {allSelected ? "لغو همه" : someSelected ? "انتخاب همه" : "انتخاب همه"}
+              </button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "6px", paddingRight: "8px" }}>
+              {perms.map((p) => (
                 <label
-                  key={perm}
+                  key={p}
                   style={{
                     display: "flex",
                     alignItems: "center",
                     gap: "8px",
-                    fontSize: "12px",
                     cursor: "pointer",
+                    fontSize: "12px",
+                    color: "var(--ink)",
                   }}
                 >
                   <input
                     type="checkbox"
-                    checked={selectedPerms.includes(perm)}
-                    onChange={() => handleTogglePerm(perm)}
-                    style={{ accentColor: "var(--accent)" }}
+                    checked={selectedPerms.includes(p)}
+                    onChange={() => handleTogglePerm(p)}
+                    style={{ cursor: "pointer" }}
                   />
-                  <span style={{ minWidth: "120px" }}><b>{perm}</b></span> <span className="muted">· {permLabels[perm] || perm}</span>
+                  <span>{permLabels[p] || p}</span>
+                  <span className="muted" style={{ fontSize: "10px", marginRight: "auto" }}>
+                    {p}
+                  </span>
                 </label>
               ))}
             </div>
@@ -147,8 +147,10 @@ export default function RolesFormClient({
       const res = mode === "create" ? await createRole(null, fd) : await updateRole(null, fd);
       if (res?.error) {
         setError(res.error);
+        toast.error(res.error);
       } else {
         setIsOpen(false);
+        toast.success(mode === "create" ? "نقش جدید با موفقیت ثبت شد." : "نقش با موفقیت به‌روزرسانی شد.");
         if (mode === "create") {
           setName("");
           setSelectedPerms([]);
@@ -157,14 +159,16 @@ export default function RolesFormClient({
     });
   };
 
-  const handleDelete = async () => {
+  const handleConfirmDelete = async () => {
     if (!roleId) return;
-    if (!confirm("آیا از حذف این نقش مطمئن هستید؟")) return;
 
     startTransition(async () => {
       const res = await deleteRole(roleId);
       if (res?.error) {
-        alert(res.error);
+        toast.error(res.error);
+      } else {
+        toast.success("نقش با موفقیت حذف شد.");
+        setShowDeleteConfirm(false);
       }
     });
   };
@@ -204,7 +208,7 @@ export default function RolesFormClient({
         </button>
       )}
       {canDelete && !isSystem && (
-        <button className="btn sm" style={{ color: "var(--crit)", borderColor: "var(--crit)" }} onClick={handleDelete} disabled={isPending}>
+        <button className="btn sm" style={{ color: "var(--crit)", borderColor: "var(--crit)" }} onClick={() => setShowDeleteConfirm(true)} disabled={isPending}>
           حذف
         </button>
       )}
@@ -278,6 +282,18 @@ export default function RolesFormClient({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        title="حذف نقش"
+        message={`آیا از حذف نقش «${roleName}» اطمینان دارید؟`}
+        confirmText="حذف نقش"
+        cancelText="انصراف"
+        variant="danger"
+        isLoading={isPending}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </>
   );
 }

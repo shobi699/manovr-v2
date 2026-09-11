@@ -4,6 +4,7 @@ import path from "path";
 import { getSession } from "@/lib/auth";
 import { hasPerm } from "@/lib/perms";
 import { prisma } from "@/lib/prisma";
+import { resolveBackupPath } from "@/lib/backup";
 
 export async function GET(req: NextRequest) {
   try {
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest) {
     const id = parseInt(searchParams.get("id") || "");
     const fileType = searchParams.get("type"); // "db" | "app"
 
-    if (isNaN(id) || !fileType) {
+    if (isNaN(id) || !fileType || (fileType !== "db" && fileType !== "app")) {
       return new NextResponse("پارامترهای نامعتبر", { status: 400 });
     }
 
@@ -51,7 +52,8 @@ export async function GET(req: NextRequest) {
       filePaths = { db: "", app: "" };
     }
 
-    const targetPath = fileType === "db" ? filePaths.db : filePaths.app;
+    const rawTargetPath = fileType === "db" ? filePaths.db : filePaths.app;
+    const targetPath = resolveBackupPath(rawTargetPath, fileType);
 
     if (!targetPath || !fs.existsSync(targetPath)) {
       return new NextResponse("فایل روی سرور وجود ندارد یا حذف شده است", { status: 404 });

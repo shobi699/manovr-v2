@@ -5,6 +5,7 @@ import DataTable from "@/components/DataTable";
 import LineRowActions from "./LineRowActions";
 import { Terminal } from "@/lib/enums";
 import { importLinesFromExcel } from "@/app/actions/line";
+import { useToast } from "@/components/ui/Toast";
 
 interface LookupValue {
   code: number;
@@ -23,6 +24,7 @@ export default function LinesTableClient({ lines, terminals, canCreate, canEdit,
   const [filterTerminal, setFilterTerminal] = React.useState<string>("all");
   const [filterType, setFilterType] = React.useState<string>("all");
   const [filterStatus, setFilterStatus] = React.useState<string>("all");
+  const { toast } = useToast();
 
   const filteredLines = React.useMemo(() => {
     return lines.filter((l) => {
@@ -87,7 +89,7 @@ export default function LinesTableClient({ lines, terminals, canCreate, canEdit,
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error(error);
-      alert("خطا در خروجی گرفتن اکسل.");
+      toast.error("خطا در خروجی گرفتن اکسل.");
     }
   };
 
@@ -132,7 +134,7 @@ export default function LinesTableClient({ lines, terminals, canCreate, canEdit,
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error(error);
-      alert("خطا در تولید فایل نمونه اکسل.");
+      toast.error("خطا در تولید فایل نمونه اکسل.");
     }
   };
 
@@ -172,20 +174,20 @@ export default function LinesTableClient({ lines, terminals, canCreate, canEdit,
         });
 
         if (rows.length === 0) {
-          alert("هیچ داده معتبری در فایل پیدا نشد.");
+          toast.warning("هیچ داده معتبری در فایل پیدا نشد.");
           return;
         }
 
         const res = await importLinesFromExcel(rows);
         if (res.error) {
-          alert(res.error);
+          toast.error(res.error);
         } else {
-          alert(`تعداد ${res.count} خط جدید با موفقیت درج شدند.`);
+          toast.success(`تعداد ${res.count} خط جدید با موفقیت درج شدند.`);
           window.location.reload();
         }
       } catch (err) {
         console.error(err);
-        alert("فرمت فایل اکسل معتبر نیست یا خطا در خواندن رخ داد.");
+        toast.error("فرمت فایل اکسل معتبر نیست یا خطا در خواندن رخ داد.");
       }
     };
     reader.readAsArrayBuffer(file);

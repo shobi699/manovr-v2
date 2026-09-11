@@ -3,10 +3,25 @@
 import React, { useState, useMemo } from "react";
 import DataTable, { BulkAction } from "@/components/DataTable";
 import UserRowActions from "./UserRowActions";
-import { Role, OrgPosition, Shift, PersonnelType, ManovrType, ManovrStatus, ConfirmationStatus } from "@/lib/enums";
-import { importPersonnelFromExcel, bulkUpdateUserShift, bulkUpdateUserOrgPosition, bulkDeleteUsers } from "@/app/actions/user";
-import { useRouter, useSearchParams } from "next/navigation";
-import type { ListParams } from "@/lib/list-query";
+import {
+  Role,
+  OrgPosition,
+  Shift,
+  PersonnelType,
+  ManovrType,
+  ManovrStatus,
+  ConfirmationStatus,
+} from "@/lib/enums";
+import {
+  importPersonnelFromExcel,
+  bulkUpdateUserShift,
+  bulkUpdateUserOrgPosition,
+  bulkDeleteUsers,
+  bulkCreateUserAccounts,
+} from "@/app/actions/user";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ui/Toast";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 
 interface LookupValue {
   code: number;
@@ -17,8 +32,6 @@ interface LookupValue {
 interface UsersTableClientProps {
   accounts: any[];
   nonAccounts: any[];
-  totalRows?: number;
-  params?: ListParams;
   canCreate: boolean;
   canEdit: boolean;
   canDelete: boolean;
@@ -33,8 +46,6 @@ interface UsersTableClientProps {
 export default function UsersTableClient({
   accounts,
   nonAccounts,
-  totalRows = 0,
-  params,
   canCreate,
   canEdit,
   canDelete,
@@ -46,19 +57,10 @@ export default function UsersTableClient({
   roles = [],
 }: UsersTableClientProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const { toast } = useToast();
 
-  const updateUrl = (updates: Record<string, string | number | undefined>) => {
-    const current = new URLSearchParams(Array.from(searchParams?.entries() || []));
-    for (const [key, value] of Object.entries(updates)) {
-      if (value === undefined || value === "") {
-        current.delete(key);
-      } else {
-        current.set(key, String(value));
-      }
-    }
-    router.push(`/users?${current.toString()}`);
-  };
+  const [bulkDeleteTarget, setBulkDeleteTarget] = useState<{ items: any[]; clear: () => void } | null>(null);
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
   const getOrgPosLabel = (code: number) => orgPositions.find((v) => v.code === code)?.label || OrgPosition[code] || `پست ${code}`;
   const getShiftLabel = (code: number) => shifts.find((v) => v.code === code)?.label || Shift[code] || `شیفت ${code}`;
   const getRoleLabel = (code: number) => roles.find((v) => v.code === code)?.label || Role[code] || `نقش ${code}`;
@@ -68,6 +70,23 @@ export default function UsersTableClient({
   const [filterOrgPosition, setFilterOrgPosition] = useState<string>("all");
   const [filterPersonnelType, setFilterPersonnelType] = useState<string>("all");
   const [filterRole, setFilterRole] = useState<string>("all");
+
+  const handleConfirmBulkDelete = async () => {
+    if (!bulkDeleteTarget) return;
+    setIsDeletingBulk(true);
+    const { items, clear } = bulkDeleteTarget;
+    const ids = items.map((i) => i.id);
+    const res = await bulkDeleteUsers(ids);
+    setIsDeletingBulk(false);
+    setBulkDeleteTarget(null);
+    if (res.error) {
+      toast.error(res.error);
+    } else {
+      toast.success(`${ids.length} کاربر با موفقیت حذف شدند.`);
+      clear();
+      router.refresh();
+    }
+  };
 
   const userBulkActions: BulkAction<any>[] = useMemo(() => {
     if (!canEdit && !canDelete) return [];
@@ -79,8 +98,10 @@ export default function UsersTableClient({
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
           const res = await bulkUpdateUserShift(ids, 1);
-          if (res.error) alert(res.error);
-          else {
+          if (res.error) {
+            toast.error(res.error);
+          } else {
+            toast.success("شیفت پرسنل انتخاب‌شده به شیفت ۱ تغییر یافت.");
             clear();
             router.refresh();
           }
@@ -92,8 +113,10 @@ export default function UsersTableClient({
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
           const res = await bulkUpdateUserShift(ids, 2);
-          if (res.error) alert(res.error);
-          else {
+          if (res.error) {
+            toast.error(res.error);
+          } else {
+            toast.success("شیفت پرسنل انتخاب‌شده به شیفت ۲ تغییر یافت.");
             clear();
             router.refresh();
           }
@@ -105,8 +128,10 @@ export default function UsersTableClient({
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
           const res = await bulkUpdateUserShift(ids, 3);
-          if (res.error) alert(res.error);
-          else {
+          if (res.error) {
+            toast.error(res.error);
+          } else {
+            toast.success("شیفت پرسنل انتخاب‌شده به شیفت ۳ تغییر یافت.");
             clear();
             router.refresh();
           }
@@ -119,8 +144,26 @@ export default function UsersTableClient({
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
           const res = await bulkUpdateUserOrgPosition(ids, 1);
-          if (res.error) alert(res.error);
-          else {
+          if (res.error) {
+            toast.error(res.error);
+          } else {
+            toast.success("سمت پرسنل انتخاب‌شده به راهبر قطار تغییر یافت.");
+            clear();
+            router.refresh();
+          }
+        },
+      },
+      {
+        key: "create_accounts",
+        label: "🔑 ساخت حساب کاربری (رمز: ۱۲۳۴۵۶)",
+        variant: "accent",
+        onClick: async (items, clear) => {
+          const ids = items.map((i) => i.id);
+          const res = await bulkCreateUserAccounts(ids);
+          if (res.error) {
+            toast.error(res.error);
+          } else {
+            toast.success(res.message || `برای ${res.count} پرسنل حساب کاربری با رمز ۱۲۳۴۵۶ فعال شد.`);
             clear();
             router.refresh();
           }
@@ -130,19 +173,12 @@ export default function UsersTableClient({
         key: "bulk_delete",
         label: "🗑️ حذف دسته‌جمعی پرسنل",
         variant: "danger",
-        onClick: async (items, clear) => {
-          if (!confirm(`آیا از حذف دسته‌جمعی ${items.length} کاربر مطمئن هستید؟ این عملیات غیرقابل بازگشت است.`)) return;
-          const ids = items.map((i) => i.id);
-          const res = await bulkDeleteUsers(ids);
-          if (res.error) alert(res.error);
-          else {
-            clear();
-            router.refresh();
-          }
+        onClick: (items, clear) => {
+          setBulkDeleteTarget({ items, clear });
         },
       },
     ];
-  }, [canEdit, canDelete, router]);
+  }, [canEdit, canDelete, router, toast]);
 
   // استخراج تمام نقش‌های متمایز موجود در حساب‌ها برای نمایش در دراپ‌داون فیلتر
   const uniqueRoles = React.useMemo(() => {
@@ -224,7 +260,7 @@ export default function UsersTableClient({
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error(error);
-      alert("خطا در خروجی گرفتن اکسل.");
+      toast.error("خطا در خروجی گرفتن اکسل.");
     }
   };
 
@@ -284,7 +320,7 @@ export default function UsersTableClient({
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error(error);
-      alert("خطا در تولید فایل نمونه اکسل.");
+      toast.error("خطا در تولید فایل نمونه اکسل.");
     }
   };
 
@@ -334,20 +370,24 @@ export default function UsersTableClient({
         });
 
         if (rows.length === 0) {
-          alert("هیچ داده معتبری در فایل پیدا نشد.");
+          toast.warning("هیچ داده معتبری در فایل پیدا نشد.");
           return;
         }
 
         const res = await importPersonnelFromExcel(rows);
         if (res.error) {
-          alert(res.error);
+          toast.error(res.error);
         } else {
-          alert(`تعداد ${res.count} پرسنل جدید با موفقیت درج شدند.`);
-          window.location.reload();
+          toast.success(
+            `تعداد ${res.count} پرسنل جدید با موفقیت درج شدند (برای رکوردهای دارای نام کاربری، حساب با رمز ۱۲۳۴۵۶ فعال شد).`
+          );
+          router.refresh();
         }
       } catch (err) {
         console.error(err);
-        alert("فرمت فایل اکسل معتبر نیست یا خطا در خواندن رخ داد.");
+        toast.error("فرمت فایل اکسل معتبر نیست یا خطا در خواندن رخ داد.");
+      } finally {
+        e.target.value = "";
       }
     };
     reader.readAsArrayBuffer(file);
@@ -510,10 +550,7 @@ export default function UsersTableClient({
                 <label style={{ fontSize: "12px", color: "var(--ink-soft)", fontWeight: 600 }}>شیفت کاری:</label>
                 <select
                   value={filterShift}
-                  onChange={(e) => {
-                    setFilterShift(e.target.value);
-                    if (params) updateUrl({ shiftFilter: e.target.value, page: 1 });
-                  }}
+                  onChange={(e) => setFilterShift(e.target.value)}
                   style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--line)", background: "var(--panel)", fontSize: "13px" }}
                 >
                   <option value="all">همه شیفت‌ها</option>
@@ -533,10 +570,7 @@ export default function UsersTableClient({
                 <label style={{ fontSize: "12px", color: "var(--ink-soft)", fontWeight: 600 }}>سمت سازمانی:</label>
                 <select
                   value={filterOrgPosition}
-                  onChange={(e) => {
-                    setFilterOrgPosition(e.target.value);
-                    if (params) updateUrl({ posFilter: e.target.value, page: 1 });
-                  }}
+                  onChange={(e) => setFilterOrgPosition(e.target.value)}
                   style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--line)", background: "var(--panel)", fontSize: "13px" }}
                 >
                   <option value="all">همه سمت‌ها</option>
@@ -571,10 +605,7 @@ export default function UsersTableClient({
                 <label style={{ fontSize: "12px", color: "var(--ink-soft)", fontWeight: 600 }}>نقش دسترسی سامانه:</label>
                 <select
                   value={filterRole}
-                  onChange={(e) => {
-                    setFilterRole(e.target.value);
-                    if (params) updateUrl({ roleFilter: e.target.value, page: 1 });
-                  }}
+                  onChange={(e) => setFilterRole(e.target.value)}
                   style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--line)", background: "var(--panel)", fontSize: "13px" }}
                 >
                   <option value="all">همه نقش‌ها</option>
@@ -593,7 +624,6 @@ export default function UsersTableClient({
                       setFilterOrgPosition("all");
                       setFilterPersonnelType("all");
                       setFilterRole("all");
-                      router.push("/users");
                     }}
                     className="btn"
                     style={{
@@ -621,28 +651,16 @@ export default function UsersTableClient({
             <div className="card-head" style={{ padding: "0 0 12px 0", borderBottom: "1px solid var(--line)" }}>
               <h2>حساب‌های کاربری فعال</h2>
               <span className="spacer" />
-              <span className="pill p-mut">{params ? totalRows : filteredAccounts.length} پرسنل</span>
+              <span className="pill p-mut">{filteredAccounts.length} حساب فعال</span>
             </div>
             <div style={{ marginTop: "14px" }}>
               <DataTable
                 tableName="user_accounts"
                 columns={accountColumns}
                 data={filteredAccounts}
-                searchPlaceholder="جستجو بر اساس نام کاربری، نام یا نام خانوادگی..."
-                searchFields={["userName", "firstName", "lastName"]}
+                searchPlaceholder="جستجو بر اساس نام کاربری، نام، نام خانوادگی، کد پرسنلی..."
+                searchFields={["userName", "firstName", "lastName", "personnelCode"]}
                 bulkActions={userBulkActions}
-                server={params ? {
-                  page: params.page,
-                  pageSize: params.pageSize,
-                  totalRows,
-                  onPageChange: (p) => updateUrl({ page: p }),
-                  onPageSizeChange: (ps) => updateUrl({ pageSize: ps, page: 1 }),
-                  search: params.search,
-                  onSearchChange: (s) => updateUrl({ search: s, page: 1 }),
-                  sortCol: params.sortField,
-                  sortDir: params.sortDir,
-                  onSortChange: (col, dir) => updateUrl({ sort: col, dir }),
-                } : undefined}
               />
             </div>
           </div>
@@ -652,15 +670,15 @@ export default function UsersTableClient({
             <div className="card-head" style={{ padding: "0 0 12px 0", borderBottom: "1px solid var(--line)" }}>
               <h2>پرسنل بدون حساب کاربری</h2>
               <span className="spacer" />
-              <span className="pill p-mut">{filteredNonAccounts.length} پرسنل</span>
+              <span className="pill p-mut">{filteredNonAccounts.length} پرسنل بدون حساب</span>
             </div>
             <div style={{ marginTop: "14px" }}>
               <DataTable
                 tableName="user_personnel"
                 columns={nonAccountColumns}
                 data={filteredNonAccounts}
-                searchPlaceholder="جستجو بر اساس نام یا نام خانوادگی..."
-                searchFields={["firstName", "lastName"]}
+                searchPlaceholder="جستجو بر اساس نام، نام خانوادگی، کد پرسنلی..."
+                searchFields={["firstName", "lastName", "personnelCode"]}
                 bulkActions={userBulkActions}
               />
             </div>
@@ -684,6 +702,19 @@ export default function UsersTableClient({
           </div>
         </div>
       )}
+
+      {/* مدال تایید حذف گروهی */}
+      <ConfirmModal
+        isOpen={!!bulkDeleteTarget}
+        title="تأیید حذف دسته‌جمعی پرسنل"
+        message={`آیا از حذف دسته‌جمعی ${bulkDeleteTarget?.items.length || 0} پرسنل انتخاب‌شده مطمئن هستید؟ این عملیات غیرقابل بازگشت است.`}
+        confirmText="حذف دسته‌جمعی"
+        cancelText="انصراف"
+        variant="danger"
+        isLoading={isDeletingBulk}
+        onConfirm={handleConfirmBulkDelete}
+        onCancel={() => setBulkDeleteTarget(null)}
+      />
     </>
   );
 }

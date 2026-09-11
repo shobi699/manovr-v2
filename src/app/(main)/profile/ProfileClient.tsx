@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { updateUserProfile, updateUserSecurity } from "@/app/actions/profile";
 import { Role, OrgPosition, Shift } from "@/lib/enums";
-
+import { useToast } from "@/components/ui/Toast";
 
 interface UserProfile {
   id: number;
@@ -38,14 +38,14 @@ interface ActivityLog {
 }
 
 const AVATAR_COLORS = [
-  "#4b5563", // خاکستری
-  "#d8842a", // نارنجی برندینگ
-  "#3b82f6", // آبی
+  "#2563eb", // آبی
   "#10b981", // سبز
+  "#f59e0b", // کهربایی
   "#ef4444", // قرمز
   "#8b5cf6", // بنفش
   "#ec4899", // صورتی
-  "#0ea5e9", // آسمانی
+  "#06b6d4", // فیروزه‌ای
+  "#64748b", // طوسی
 ];
 
 export default function ProfileClient({
@@ -64,6 +64,7 @@ export default function ProfileClient({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
   const [profileForm, setProfileForm] = useState({
     phone1: user.phone1,
     phone2: user.phone2,
@@ -102,9 +103,9 @@ export default function ProfileClient({
     startProfileTransition(async () => {
       const res = await updateUserProfile(profileForm);
       if (res.error) {
-        alert(res.error);
+        toast.error(res.error);
       } else {
-        alert("اطلاعات عمومی پروفایل با موفقیت بروزرسانی شد.");
+        toast.success("اطلاعات عمومی پروفایل با موفقیت بروزرسانی شد.");
       }
     });
   };
@@ -113,7 +114,7 @@ export default function ProfileClient({
   const handleSaveSecurity = (e: React.FormEvent) => {
     e.preventDefault();
     if (securityForm.newPassword && securityForm.newPassword !== securityForm.confirmPassword) {
-      alert("رمز عبور جدید با تکرار آن مطابقت ندارد.");
+      toast.warning("رمز عبور جدید با تکرار آن مطابقت ندارد.");
       return;
     }
 
@@ -124,9 +125,9 @@ export default function ProfileClient({
         newPassword: securityForm.newPassword || undefined,
       });
       if (res.error) {
-        alert(res.error);
+        toast.error(res.error);
       } else {
-        alert("اطلاعات کاربری و رمز عبور با موفقیت بروزرسانی شد.");
+        toast.success("اطلاعات کاربری و رمز عبور با موفقیت بروزرسانی شد.");
         setSecurityForm({
           ...securityForm,
           currentPassword: "",

@@ -255,14 +255,27 @@ export default function EditUserForm({
                 </select>
               </div>
             </div>
-            <div className="field" style={{ maxWidth: "320px" }}>
-              <label htmlFor="accessRoleId">نقش سفارشی (سیستم دسترسی جدید V3)</label>
-              <select id="accessRoleId" name="accessRoleId" className="input" defaultValue={user.accessRoleId ?? ""}>
-                <option value="">-- بدون نقش سفارشی (استفاده از نقش سیستمی) --</option>
-                {roles.map((r) => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
-                ))}
-              </select>
+            <div className="grid2">
+              <div className="field">
+                <label htmlFor="password">رمز عبور (اختیاری)</label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  className="input"
+                  dir="ltr"
+                  placeholder={user.hasAccount ? "خالی بگذارید تا رمز تغییر نکند" : "پیش‌فرض: 123456"}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="accessRoleId">نقش سفارشی (سیستم دسترسی جدید V3)</label>
+                <select id="accessRoleId" name="accessRoleId" className="input" defaultValue={user.accessRoleId ?? ""}>
+                  <option value="">-- بدون نقش سفارشی (استفاده از نقش سیستمی) --</option>
+                  {roles.map((r) => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
         )}

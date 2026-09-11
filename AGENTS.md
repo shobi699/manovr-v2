@@ -24,3 +24,5 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ## زمان و تقویم رسمی (Tehran Timezone & Jalali Calendar)
 1. **منطقه زمانی تهران**: تمامی تاریخ‌ها و زمان‌ها در پروژه باید به وقت تهران (`Asia/Tehran`) نمایش داده شوند.
 2. **تقویم شمسی جلالی**: تمام تاریخ‌ها در فرانت‌اند، گزارش‌ساز، خروجی‌های PDF و Excel باید با فرمت تقویم شمسی (`fa-IR` با آپشن‌های `calendar: "persian"` و `timeZone: "Asia/Tehran"`) رندر شوند.
+ 
+ 

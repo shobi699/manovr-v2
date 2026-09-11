@@ -60,16 +60,17 @@ export default function JalaliDateTimePicker({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Sync state if value prop changes
-  useEffect(() => {
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
     if (value) {
       const parsed = new Date(value);
       if (!isNaN(parsed.getTime())) {
-        setSelectedDate((prev) => (prev.getTime() === parsed.getTime() ? prev : parsed));
-        setViewDate((prev) => (prev.getTime() === parsed.getTime() ? prev : parsed));
+        setSelectedDate(parsed);
+        setViewDate(parsed);
       }
     }
-  }, [value]);
+  }
 
   // Click away listener
   useEffect(() => {

@@ -6,7 +6,7 @@ import path from "path";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { hasPerm } from "@/lib/perms";
-import { performBackup, performSourceCodeBackup } from "@/lib/backup";
+import { performBackup, performSourceCodeBackup, getActiveDbPath, getBackupBaseDir, resolveBackupPath } from "@/lib/backup";
 import { audit } from "@/lib/audit";
 import bcrypt from "bcryptjs";
 
@@ -53,8 +53,8 @@ export async function getBackupsList() {
       filePaths = { db: "", app: "" };
     }
 
-    const dbExists = filePaths.db ? fs.existsSync(filePaths.db) : false;
-    const appExists = filePaths.app ? fs.existsSync(filePaths.app) : false;
+    const dbExists = !!resolveBackupPath(filePaths.db, "db");
+    const appExists = !!resolveBackupPath(filePaths.app, "app");
 
     return {
       ...b,
@@ -131,8 +131,11 @@ export async function deleteBackup(id: number) {
     }
 
     // حذف فیزیکی فایل‌ها
-    if (filePaths.db && fs.existsSync(filePaths.db)) fs.unlinkSync(filePaths.db);
-    if (filePaths.app && fs.existsSync(filePaths.app)) fs.unlinkSync(filePaths.app);
+    const targetDb = resolveBackupPath(filePaths.db, "db") || filePaths.db;
+    if (targetDb && fs.existsSync(targetDb)) fs.unlinkSync(targetDb);
+
+    const targetApp = resolveBackupPath(filePaths.app, "app") || filePaths.app;
+    if (targetApp && fs.existsSync(targetApp)) fs.unlinkSync(targetApp);
 
     // حذف از دیتابیس
     await prisma.backup.delete({ where: { id } });
@@ -292,16 +295,17 @@ export async function restoreDatabaseAction(formData: FormData) {
     } catch {
       filePaths = {};
     }
-    if (!filePaths.db || !fs.existsSync(filePaths.db)) {
+    const resolvedDbPath = resolveBackupPath(filePaths.db, "db");
+    if (!resolvedDbPath) {
       return { error: "فایل فیزیکی دیتابیس روی سرور یافت نشد." };
     }
-    sourceBackupPath = filePaths.db;
+    sourceBackupPath = resolvedDbPath;
   } else if (dbFile && dbFile.size > 0) {
     // اگر فایل آپلود شده است، ابتدا آن را موقتاً ذخیره می‌کنیم
     if (!dbFile.name.endsWith(".db")) {
       return { error: "فرمت فایل نامعتبر است. فقط فایل‌های با پسوند db. مجاز هستند." };
     }
-    const tempUploadDir = path.join(process.cwd(), "backups", "temp");
+    const tempUploadDir = path.join(getBackupBaseDir(), "temp");
     if (!fs.existsSync(tempUploadDir)) {
       fs.mkdirSync(tempUploadDir, { recursive: true });
     }
@@ -317,23 +321,36 @@ export async function restoreDatabaseAction(formData: FormData) {
 
   // ۶. اجرای عملیات بازگردانی
   try {
-    const dbPath = path.join(process.cwd(), "prisma", "dev.db");
-    const tempBakPath = path.join(process.cwd(), "prisma", "dev.db.bak");
+    const dbPath = getActiveDbPath();
+    const tempBakPath = `${dbPath}.bak`;
+    const walPath = `${dbPath}-wal`;
+    const shmPath = `${dbPath}-shm`;
+    const tempWalPath = `${walPath}.bak`;
 
     // بستن اتصالات پریزما برای آزادسازی قفل فایل SQLite
     await prisma.$disconnect();
 
-    // پشتیبان‌گیری موقت از دیتابیس فعلی
+    // پشتیبان‌گیری موقت از دیتابیس فعلی و فایل‌های WAL
     if (fs.existsSync(dbPath)) {
       fs.copyFileSync(dbPath, tempBakPath);
     }
+    if (fs.existsSync(walPath)) {
+      fs.copyFileSync(walPath, tempWalPath);
+    }
 
     try {
+      // پاکسازی فایل‌های WAL و SHM فعلی قبل از جایگزینی دیتابیس
+      if (fs.existsSync(walPath)) fs.unlinkSync(walPath);
+      if (fs.existsSync(shmPath)) fs.unlinkSync(shmPath);
+
       fs.copyFileSync(sourceBackupPath, dbPath);
       
-      // پاک کردن فایل موقت بکاپ در صورت موفقیت
+      // پاک کردن فایل موقت پشتیبان در صورت موفقیت
       if (fs.existsSync(tempBakPath)) {
         fs.unlinkSync(tempBakPath);
+      }
+      if (fs.existsSync(tempWalPath)) {
+        fs.unlinkSync(tempWalPath);
       }
       
       // اگر فایل موقت از آپلود ساخته شده بود، آن را هم پاک می‌کنیم
@@ -345,6 +362,10 @@ export async function restoreDatabaseAction(formData: FormData) {
       if (fs.existsSync(tempBakPath)) {
         fs.copyFileSync(tempBakPath, dbPath);
         fs.unlinkSync(tempBakPath);
+      }
+      if (fs.existsSync(tempWalPath)) {
+        fs.copyFileSync(tempWalPath, walPath);
+        fs.unlinkSync(tempWalPath);
       }
       throw restoreErr;
     }

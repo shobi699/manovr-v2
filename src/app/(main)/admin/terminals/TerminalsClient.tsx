@@ -6,6 +6,8 @@ import { saveLookupValue, deleteLookupValue } from "@/app/actions/lookups";
 import PageHeader from "@/components/PageHeader";
 import DataTable, { Column } from "@/components/DataTable";
 import { Icons } from "@/lib/icons";
+import { useToast } from "@/components/ui/Toast";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 
 interface TerminalItem {
   id: number;
@@ -45,6 +47,8 @@ export default function TerminalsClient({
   const [terminals, setTerminals] = useState<TerminalItem[]>(initialTerminals);
   const [editingItem, setEditingItem] = useState<TerminalItem | null>(null);
   const [isNew, setIsNew] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<TerminalItem | null>(null);
+  const { toast } = useToast();
 
   // فیلدهای فرم ویرایش/ایجاد
   const [code, setCode] = useState<number>(1);
@@ -87,7 +91,10 @@ export default function TerminalsClient({
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!label.trim()) return alert("لطفاً عنوان ترمینال را وارد کنید.");
+    if (!label.trim()) {
+      toast.warning("لطفاً عنوان ترمینال را وارد کنید.");
+      return;
+    }
 
     const metaObj = {
       x: Number(posX),
@@ -108,9 +115,9 @@ export default function TerminalsClient({
       });
 
       if (!res.ok) {
-        alert(res.error || "خطا در ثبت اطلاعات");
+        toast.error(res.error || "خطا در ثبت اطلاعات");
       } else {
-        alert("اطلاعات ترمینال با موفقیت ثبت شد.");
+        toast.success("اطلاعات ترمینال با موفقیت ثبت شد.");
         setEditingItem(null);
         setIsNew(false);
         router.refresh();
@@ -127,16 +134,18 @@ export default function TerminalsClient({
     });
   };
 
-  const handleDelete = async (t: TerminalItem) => {
-    if (!confirm(`آیا از حذف ترمینال "${t.label}" اطمینان دارید؟`)) return;
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    const t = deleteTarget;
 
     startTransition(async () => {
       const res = await deleteLookupValue(typeId, t.code);
       if (!res.ok) {
-        alert(res.error || "خطا در حذف ترمینال");
+        toast.error(res.error || "خطا در حذف ترمینال");
       } else {
-        alert("ترمینال با موفقیت حذف شد.");
+        toast.success("ترمینال با موفقیت حذف شد.");
         setTerminals((prev) => prev.filter((x) => x.code !== t.code));
+        setDeleteTarget(null);
         router.refresh();
       }
     });
@@ -238,7 +247,7 @@ export default function TerminalsClient({
                       <button
                         className="btn sm outline text-crit"
                         style={{ borderColor: "rgba(239, 68, 68, 0.2)" }}
-                        onClick={() => handleDelete(t)}
+                        onClick={() => setDeleteTarget(t)}
                       >
                         <Icons.Trash size={12} style={{ marginInlineEnd: 4 }} />
                         حذف
@@ -384,6 +393,18 @@ export default function TerminalsClient({
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        title="حذف ترمینال"
+        message={`آیا از حذف ترمینال «${deleteTarget?.label ?? ""}» اطمینان دارید؟`}
+        confirmText="حذف ترمینال"
+        cancelText="انصراف"
+        variant="danger"
+        isLoading={isPending}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

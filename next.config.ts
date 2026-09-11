@@ -14,6 +14,8 @@ const nextConfig: NextConfig = {
       "**/*.zip",
       "**/.env*",
       "**/backups/**",
+      "**/export/**",
+      "**/data/**",
       "**/seed/**",
       "**/src/**",
       "**/scripts/**",
@@ -22,6 +24,8 @@ const nextConfig: NextConfig = {
       "**/.claude/**",
       "**/*.tsbuildinfo",
       "**/graphify-out/**",
+      "**/*.docx",
+      "**/*.pdf",
     ],
   },
 };

@@ -28,6 +28,12 @@ describe("audit-summaries helpers", () => {
     const noAcc = personnelCreatedSummary({ firstName: "علی", lastName: "رضایی", hasAccount: false });
     expect(noAcc).toContain("علی رضایی");
     expect(noAcc).toContain("بدون حساب کاربری");
+
+    const updated = personnelUpdatedSummary({ firstName: "رضا", lastName: "کاظمی" });
+    expect(updated).toContain("رضا کاظمی");
+
+    const deleted = personnelDeletedSummary({ firstName: "حسین", lastName: "علوی" });
+    expect(deleted).toContain("حسین علوی");
   });
 
   it("handles missing name fields gracefully", () => {

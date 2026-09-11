@@ -174,6 +174,13 @@ export function permsInclude(perms: string[], perm: Perm) {
 export async function hasPerm(session: Session | null, perm: Perm): Promise<boolean> {
   if (!session) return false;
   if (session.role === 4) return true; // سوپرادمین همواره به تمامی بخش‌ها دسترسی کامل دارد
+  if (Array.isArray(session.perms)) {
+    if (session.perms.includes(perm)) return true;
+    const prefix = perm.split(".")[0];
+    if (session.perms.includes(`${prefix}.manage` as any) || session.perms.includes("*")) {
+      return true;
+    }
+  }
   const perms = await getUserPerms(session.id, session.role);
   return perms.includes(perm);
 }
