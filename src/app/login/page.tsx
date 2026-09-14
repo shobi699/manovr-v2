@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import LoginForm from "./LoginForm";
+import LoginConnectionStatus from "./LoginConnectionStatus";
 import { getBrandingSettings } from "@/app/actions/lookups";
 
 export default async function LoginPage() {
@@ -38,6 +39,7 @@ export default async function LoginPage() {
         <div className="card">
           <div className="card-body">
             <LoginForm />
+            <LoginConnectionStatus />
           </div>
         </div>
         <p style={{ textAlign: "center", color: "var(--ink-faint)", fontSize: 12, marginTop: 16, fontFamily: "var(--mono)" }}>
@@ -52,7 +54,7 @@ export default async function LoginPage() {
           paddingTop: "14px",
         }}>
           برنامه‌نویسی و توسعه توسط <b>سید شبیر موسوی</b>
-          <div style={{ marginTop: "4px", fontSize: "10px" }}>حق تکثیر محفوظ است © ۲۰۲۶</div>
+          <div style={{ marginTop: "4px", fontSize: "10px" }}>سامانه نسخه ۰.۱.۱ • حق تکثیر محفوظ است © ۲۰۲۶</div>
         </div>
       </div>
     </div>

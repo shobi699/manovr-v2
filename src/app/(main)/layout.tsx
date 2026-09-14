@@ -3,6 +3,8 @@ import { getSession } from "@/lib/auth";
 import Sidebar from "@/components/Sidebar";
 import { getBrandingSettings } from "@/app/actions/lookups";
 import { getUserPerms } from "@/lib/perms";
+import { prisma } from "@/lib/prisma";
+import { ContextMenuProvider } from "@/components/context-menu";
 
 export default async function MainLayout({
   children,
@@ -12,13 +14,23 @@ export default async function MainLayout({
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const perms = await getUserPerms(session.id, session.role);
-  const branding = await getBrandingSettings();
+  const [perms, branding, currentUser] = await Promise.all([
+    getUserPerms(session.id, session.role),
+    getBrandingSettings(),
+    prisma.personnel.findUnique({
+      where: { id: session.id },
+      select: { accessRole: { select: { name: true } } },
+    }),
+  ]);
+
+  const roleName = currentUser?.accessRole?.name;
 
   return (
-    <div className="shell">
-      <Sidebar userId={session.id} fullName={session.fullName} role={session.role} perms={perms} />
-      <main className="main">
+    <ContextMenuProvider>
+      <div className="shell">
+        <Sidebar userId={session.id} fullName={session.fullName} role={session.role} roleName={roleName} perms={perms} />
+        <main className="main">
+
         {branding.announcementActive && branding.announcementText && (
           <div className={`banner-${branding.announcementKind}`} style={{
             padding: "12px 18px",
@@ -42,6 +54,8 @@ export default async function MainLayout({
         )}
         {children}
       </main>
-    </div>
+      </div>
+    </ContextMenuProvider>
   );
 }
+

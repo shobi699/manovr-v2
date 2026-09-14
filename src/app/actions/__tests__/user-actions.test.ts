@@ -8,12 +8,18 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     personnel: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
       delete: vi.fn(),
       deleteMany: vi.fn(),
       create: vi.fn(),
+    },
+    accessRole: {
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
     },
     manovr: {
       findMany: vi.fn(),
@@ -40,7 +46,7 @@ vi.mock("next/navigation", () => ({
 
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { bulkDeleteUsers, bulkUpdateUserShift } from "@/app/actions/user";
+import { bulkDeleteUsers, bulkUpdateUserShift, updateUser, createUser } from "@/app/actions/user";
 
 /**
  * نشست یک ادمین با مجوز user.manage.
@@ -190,3 +196,89 @@ describe("user server actions — bulk guards (plan 016)", () => {
     });
   });
 });
+
+describe("V3 user server actions — accessRoleId exclusive management", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("updateUser: successfully updates accessRoleId and computes legacy role automatically", async () => {
+    mockAdminSession(1, 1);
+    vi.mocked(prisma.personnel.findUnique).mockImplementation(((args: any) => {
+      if (args.where.id === 1) {
+        return Promise.resolve({ id: 1, role: 1, accessRole: null } as any);
+      }
+      return Promise.resolve({
+        id: 15,
+        role: 3,
+        accessRoleId: 3,
+        shift: 1,
+        orgPosition: 1,
+        personnelType: 1,
+        passwordHash: "hash123",
+      } as any);
+    }) as any);
+
+    vi.mocked(prisma.accessRole.findUnique).mockResolvedValue({
+      id: 2,
+      name: "مسئول",
+      permissions: "[]",
+      isSystem: true,
+    } as any);
+
+    vi.mocked(prisma.personnel.update).mockResolvedValue({
+      id: 15,
+      role: 2,
+      accessRoleId: 2,
+    } as any);
+
+    const fd = new FormData();
+    fd.set("id", "15");
+    fd.set("firstName", "احمد");
+    fd.set("lastName", "صبحی");
+    fd.set("hasAccount", "1");
+    fd.set("userName", "a_sobhi");
+    fd.set("accessRoleId", "2");
+
+    const res = await updateUser(null, fd);
+    expect(res).toBeUndefined(); // Next redirect/revalidate on success
+    expect(prisma.personnel.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 15 },
+        data: expect.objectContaining({
+          accessRoleId: 2,
+          role: 2, // Automatically mapped from 'مسئول'
+        }),
+      })
+    );
+  });
+
+  it("updateUser: prevents changing own role", async () => {
+    mockAdminSession(1, 1);
+    vi.mocked(prisma.personnel.findUnique).mockResolvedValue({
+      id: 1,
+      role: 1,
+      accessRoleId: 1,
+    } as any);
+
+    vi.mocked(prisma.accessRole.findUnique).mockResolvedValue({
+      id: 2,
+      name: "مسئول",
+      permissions: "[]",
+      isSystem: true,
+    } as any);
+
+    const fd = new FormData();
+    fd.set("id", "1");
+    fd.set("firstName", "مدیر");
+    fd.set("lastName", "سامانه");
+    fd.set("hasAccount", "1");
+    fd.set("userName", "admin");
+    fd.set("accessRoleId", "2");
+
+    const res = await updateUser(null, fd);
+    expect(res?.error).toContain("تغییر نقش کاربری خود");
+    expect(prisma.personnel.update).not.toHaveBeenCalled();
+  });
+});
+

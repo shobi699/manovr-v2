@@ -14,19 +14,22 @@ export default async function UsersPage() {
   const session = await getSession();
   if (!session) return null;
 
-  const [currentUser, orgPosLookup, shiftLookup, roleLookup] = await Promise.all([
+  const [currentUser, orgPosLookup, shiftLookup, accessRoles] = await Promise.all([
     prisma.personnel.findUnique({
       where: { id: session.id },
       select: { id: true, orgPosition: true, shift: true, personnelType: true },
     }),
     getCachedLookup("org_position"),
     getCachedLookup("shift"),
-    getCachedLookup("role"),
+    prisma.accessRole.findMany({
+      orderBy: { id: "asc" },
+      select: { id: true, name: true },
+    }),
   ]);
 
   const orgPositions = orgPosLookup?.values || [];
   const shifts = shiftLookup?.values || [];
-  const roles = roleLookup?.values || [];
+  const roles = accessRoles.map((r) => ({ code: r.id, label: r.name }));
 
   const isShiftSupervisor = currentUser?.orgPosition === ORG_POSITIONS.RESPONSIBLE;
   const canViewAll = await hasPerm(session, "user.view");
@@ -46,36 +49,27 @@ export default async function UsersPage() {
       }
     : {};
 
-  const [
-    people,
-    totalCount,
-    accountCount,
-    rahbarCount,
-    supervisorCount,
-    technicianCount,
-  ] = await Promise.all([
-    prisma.personnel.findMany({
-      where: baseWhereClause,
-      orderBy: [
-        { hasAccount: "desc" },
-        { orgPosition: "asc" },
-        { lastName: "asc" },
-        { firstName: "asc" },
-      ],
-      select: {
-        ...PERSONNEL_SAFE_SELECT,
-        accessRole: true,
-      },
-    }),
-    prisma.personnel.count({ where: baseWhereClause }),
-    prisma.personnel.count({ where: { ...baseWhereClause, hasAccount: true } }),
-    prisma.personnel.count({ where: { ...baseWhereClause, orgPosition: 1 } }),
-    prisma.personnel.count({ where: { ...baseWhereClause, orgPosition: 2 } }),
-    prisma.personnel.count({ where: { ...baseWhereClause, orgPosition: 4 } }),
-  ]);
+  const people = await prisma.personnel.findMany({
+    where: baseWhereClause,
+    orderBy: [
+      { hasAccount: "desc" },
+      { orgPosition: "asc" },
+      { lastName: "asc" },
+      { firstName: "asc" },
+    ],
+    select: {
+      ...PERSONNEL_SAFE_SELECT,
+      accessRole: true,
+    },
+  });
 
+  const totalCount = people.length;
   const accounts = people.filter((p) => p.hasAccount);
   const nonAccounts = people.filter((p) => !p.hasAccount);
+  const accountCount = accounts.length;
+  const rahbarCount = people.filter((p) => p.orgPosition === 1).length;
+  const supervisorCount = people.filter((p) => p.orgPosition === 2).length;
+  const technicianCount = people.filter((p) => p.orgPosition === 4).length;
 
   // لود مانورهای امروز پرسنل شیفت برای مسئول شیفت
   let todayManeuvers: any[] = [];

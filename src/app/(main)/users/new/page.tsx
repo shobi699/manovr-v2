@@ -10,7 +10,7 @@ export default async function NewUserPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const [currentUser, roles, orgPosLookup, shiftLookup, roleLookup] = await Promise.all([
+  const [currentUser, roles, orgPosLookup, shiftLookup] = await Promise.all([
     prisma.personnel.findUnique({
       where: { id: session.id },
     }),
@@ -19,7 +19,6 @@ export default async function NewUserPage() {
     }),
     getCachedLookup("org_position"),
     getCachedLookup("shift"),
-    getCachedLookup("role"),
   ]);
 
   const hasManagePerm = await hasPerm(session, "user.create");
@@ -46,7 +45,6 @@ export default async function NewUserPage() {
               currentUser={serializableUser}
               orgPositions={orgPosLookup?.values || []}
               shifts={shiftLookup?.values || []}
-              systemRoles={roleLookup?.values || []}
             />
           </div>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Html, ContactShadows, Environment, Grid } from "@react-three/drei";
 import * as THREE from "three";
@@ -118,6 +118,34 @@ export default function Depot3DCanvas({
   onTrainDragStart,
   onSelectEmptySlot,
 }: Depot3DCanvasProps) {
+  // تمیزکاری سراسری اشاره‌گر ماوس در صورت خروج غیرمنتظره از صحنه
+  useEffect(() => {
+    return () => {
+      if (typeof document !== "undefined") {
+        document.body.style.cursor = "auto";
+      }
+    };
+  }, []);
+
+  // کش هوشمند اسلات‌های خالی برای جلوگیری از محاسبات سنگین O(N^2) در هر فریم
+  const emptySlotsByLine = useMemo(() => {
+    if (!selectedTrain) return new Map<number, number[]>();
+    const map = new Map<number, number[]>();
+    for (const line of lines) {
+      const occupied = new Set(
+        trains.filter((t) => t.lineId === line.id).map((t) => t.slotIndex)
+      );
+      const empty: number[] = [];
+      for (let i = 0; i < line.capacity; i++) {
+        if (!occupied.has(i)) {
+          empty.push(i);
+        }
+      }
+      map.set(line.id, empty);
+    }
+    return map;
+  }, [selectedTrain, lines, trains]);
+
   return (
     <Canvas
       shadows
@@ -172,6 +200,19 @@ export default function Depot3DCanvas({
         followCamera={false}
       />
 
+      {/* سایه‌ی نرم و یکپارچه پایانه با ایجاد تنها یک FBO به جای تکثیر به ازای هر زون */}
+      {currentQuality === "high" && (
+        <ContactShadows
+          position={[0, 0.04, 0]}
+          opacity={appearance.theme === "dark" ? 0.55 : 0.35}
+          scale={1200}
+          blur={2.2}
+          far={30}
+          resolution={1024}
+          color="#000000"
+        />
+      )}
+
       {/* کامپوننت هدایت زنده دوربین */}
       <CameraDirector focusTarget={cameraFocusTarget} controlsRef={controlsRef} />
 
@@ -204,19 +245,6 @@ export default function Depot3DCanvas({
                 opacity={appearance.theme === "dark" ? 0.22 : 0.28}
               />
             </mesh>
-
-            {/* سایه‌ی نرم زیر سوله برای عمق تصویری */}
-            {currentQuality === "high" && (
-              <ContactShadows
-                position={[zone.x, 0.06, zone.z]}
-                opacity={appearance.theme === "dark" ? 0.55 : 0.35}
-                scale={Math.max(gW, gD) * 1.1}
-                blur={2.4}
-                far={20}
-                resolution={512}
-                color="#000000"
-              />
-            )}
 
             {/* سازه سه‌بعدی سوله */}
             <IndustrialShed
@@ -329,16 +357,11 @@ export default function Depot3DCanvas({
         );
       })}
 
-      {/* رندر نشانگرهای اسلات خالی جهت مانور قطار منتخب */}
+      {/* رندر نشانگرهای اسلات خالی جهت مانور قطار منتخب با استفاده از کش O(1) */}
       {selectedTrain &&
         lines.map((line) => {
-          const occupiedSlots = trains.filter((t) => t.lineId === line.id).map((t) => t.slotIndex);
-          const emptySlots: number[] = [];
-          for (let i = 0; i < line.capacity; i++) {
-            if (!occupiedSlots.includes(i)) {
-              emptySlots.push(i);
-            }
-          }
+          const emptySlots = emptySlotsByLine.get(line.id) || [];
+          if (emptySlots.length === 0) return null;
 
           const angle = (line.rotation * Math.PI) / 180;
           const slotSpacing = line.length / Math.max(1, line.capacity);
@@ -358,10 +381,12 @@ export default function Depot3DCanvas({
                   e.stopPropagation();
                   onSelectEmptySlot(selectedTrain.lineId, line.id, slotIdx);
                 }}
-                onPointerOver={() => {
+                onPointerOver={(e) => {
+                  e.stopPropagation();
                   document.body.style.cursor = "pointer";
                 }}
-                onPointerOut={() => {
+                onPointerOut={(e) => {
+                  e.stopPropagation();
                   document.body.style.cursor = "auto";
                 }}
               >

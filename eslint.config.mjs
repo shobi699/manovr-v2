@@ -14,6 +14,10 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    files: ["**/*.{js,jsx,mjs,ts,tsx,mts,cts}"],
+    plugins: {
+      ...nextVitals[0].plugins,
+    },
     rules: {
       // به تعویق افتاده، نه بخشیده‌شده: حدود ۲۰۶ مورد any در src/ پیش از وجود هرگونه
       // تست نوشته شده‌اند. تایپ‌کردن آنها جداگانه پیگیری می‌شود؛ تا آن زمان نباید
@@ -33,6 +37,7 @@ const eslintConfig = defineConfig([
       "react-hooks/set-state-in-effect": "warn",
       "react-hooks/immutability": "warn",
       "react-hooks/purity": "warn",
+      "react-hooks/preserve-manual-memoization": "warn",
     },
   },
   globalIgnores([
@@ -40,6 +45,11 @@ const eslintConfig = defineConfig([
     "**/.next/**",
     "node_modules/**",
     "**/node_modules/**",
+    ".agents/**",
+    "e2e-skills-1.16.0/**",
+    "qa-skills-1.13.3/**",
+    "e2e/**",
+    "workflows/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

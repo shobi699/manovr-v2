@@ -29,8 +29,13 @@ export default async function NewManovrPage() {
       orderBy: { code: "asc" },
     }),
     prisma.personnel.findMany({
-      where: { orgPosition: 1 },
-      orderBy: { firstName: "asc" },
+      where: {
+        OR: [
+          { orgPosition: 1 },
+          { isPartTimeDriver: true },
+        ],
+      },
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
     getCachedLookup("manovr_type"),
   ]);
@@ -52,7 +57,7 @@ export default async function NewManovrPage() {
               }))}
               rahbaran={rahbaran.map((p) => ({
                 id: p.id,
-                name: `${p.firstName} ${p.lastName}`.trim(),
+                name: `${p.firstName} ${p.lastName}${p.isPartTimeDriver && p.orgPosition !== 1 ? " (راهبر غیردائم)" : ""}`.trim(),
               }))}
               manovrTypes={manovrTypeLookup?.values || []}
             />

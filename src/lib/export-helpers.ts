@@ -2,7 +2,7 @@ import ExcelJS from "exceljs";
 import PdfPrinter from "pdfmake/js/Printer";
 import path from "path";
 import { PersianShaper } from "arabic-persian-reshaper";
-import { ManovrType, ManovrStatus, ConfirmationStatus, TrainType, Terminal, Shift, OrgPosition, PersonnelType, Role } from "@/lib/enums";
+import { ManovrType, ManovrStatus, ConfirmationStatus, TrainType, TrainTypeFull, Terminal, Shift, OrgPosition, PersonnelType, Role } from "@/lib/enums";
 
 export const MAX_EXPORT_RECORDS = 5000;
 
@@ -58,7 +58,7 @@ export function getVal(entity: string, item: ExportRecord, col: string, lookups?
     if (col === "executionTime") return item.executionTime ? new Date(item.executionTime).toLocaleString("fa-IR", { timeZone: "Asia/Tehran", calendar: "persian" }) : "—";
   }
   if (entity === "train") {
-    if (col === "type") return lookupVal("train_type", item.type) ?? TrainType[item.type] ?? String(item.type);
+    if (col === "type") return lookupVal("train_type", item.type) ?? TrainTypeFull[item.type] ?? TrainType[item.type] ?? String(item.type);
     if (col === "line") return item.line?.name ?? "—";
     if (col === "isDisposed") return item.isDisposed ? "غیرفعال" : "فعال";
   }
@@ -69,6 +69,7 @@ export function getVal(entity: string, item: ExportRecord, col: string, lookups?
   if (entity === "personnel") {
     if (col === "shift") return lookupVal("shift", item.shift) ?? Shift[item.shift] ?? String(item.shift);
     if (col === "orgPosition") return lookupVal("org_position", item.orgPosition) ?? OrgPosition[item.orgPosition] ?? String(item.orgPosition);
+    if (col === "isPartTimeDriver") return item.isPartTimeDriver ? "بله (دارای صلاحیت)" : "خیر";
     if (col === "role") return lookupVal("role", item.role) ?? Role[item.role] ?? String(item.role);
     if (col === "personnelType") return PersonnelType[item.personnelType] ?? String(item.personnelType);
   }
@@ -112,6 +113,7 @@ export const FIELD_LABELS: Record<string, string> = {
   address: "آدرس",
   shift: "شیفت",
   orgPosition: "سمت",
+  isPartTimeDriver: "راهبر غیردائم",
   personnelType: "نوع پرسنل",
   personnelCode: "کد پرسنلی",
 };

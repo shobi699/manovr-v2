@@ -33,7 +33,7 @@ export default function NewManovrForm({
   const router = useRouter();
 
   const [selectedTrainId, setSelectedTrainId] = useState<string>("");
-  const [selectedType, setSelectedType] = useState<string>("");
+  const [selectedType, setSelectedType] = useState<string>("2"); // پیش‌فرض: انتقال قطار (کد ۲)
   const [sourceLineId, setSourceLineId] = useState<string>("");
   const [destinationLineId, setDestinationLineId] = useState<string>("");
   const [rahbar1Id, setRahbar1Id] = useState<string>("");

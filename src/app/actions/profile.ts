@@ -1,6 +1,6 @@
 "use server";
 
-import { getSession } from "@/lib/auth";
+import { getSession, createSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
@@ -44,6 +44,7 @@ export async function updateUserProfile(data: {
 
     revalidatePath("/profile");
     revalidatePath("/phonebook");
+    revalidatePath("/", "layout");
     return { ok: true };
   } catch (err: any) {
     console.error(err);
@@ -102,6 +103,13 @@ export async function updateUserSecurity(data: {
       data: updateData
     });
 
+    if (updateData.userName) {
+      await createSession({
+        ...session,
+        userName: updateData.userName,
+      });
+    }
+
     await audit(
       session,
       "personnel",
@@ -113,6 +121,7 @@ export async function updateUserSecurity(data: {
     );
 
     revalidatePath("/profile");
+    revalidatePath("/", "layout");
     return { ok: true };
   } catch (err: any) {
     console.error(err);

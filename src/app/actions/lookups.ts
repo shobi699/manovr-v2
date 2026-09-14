@@ -8,6 +8,7 @@ import { audit } from "@/lib/audit";
 import { lookupSummary } from "@/lib/audit-summaries";
 import { emitSSEEvent } from "@/lib/events";
 import { safeAccentColor, safeLogoImage, safeText } from "@/lib/branding";
+import { revalidatePath } from "next/cache";
 
 // دریافت لیست تمام دسته‌بندی‌های لوکاپ
 export async function getLookupTypes() {
@@ -108,6 +109,14 @@ export async function saveLookupValue(data: {
     });
 
     invalidateLookupCache(type.key);
+    revalidatePath("/admin/lookups");
+    revalidatePath("/admin/terminals");
+    revalidatePath("/users");
+    revalidatePath("/trains");
+    if (type.key === "terminal") {
+      revalidatePath("/lines");
+      revalidatePath("/depot");
+    }
 
     await audit(
       session,
@@ -174,6 +183,14 @@ export async function deleteLookupValue(typeId: number, code: number) {
     });
 
     invalidateLookupCache(type.key);
+    revalidatePath("/admin/lookups");
+    revalidatePath("/admin/terminals");
+    revalidatePath("/users");
+    revalidatePath("/trains");
+    if (type.key === "terminal") {
+      revalidatePath("/lines");
+      revalidatePath("/depot");
+    }
 
     await audit(
       session,
@@ -259,6 +276,9 @@ export async function saveBrandingSettings(settings: {
 
     // ارسال لایو اعلان تغییرات برندینگ از طریق SSE
     emitSSEEvent("branding_changed", safeSettings);
+
+    revalidatePath("/", "layout");
+    revalidatePath("/admin/branding");
 
     return { ok: true };
   } catch (error: any) {

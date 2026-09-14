@@ -1,6 +1,6 @@
 {
   "name": "manovr-v2",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "main": "main.js",
   "scripts": {
@@ -10,7 +10,15 @@
     "lint": "eslint",
     "test": "vitest",
     "test:run": "vitest run",
-    "build:electron": "node scripts/build.js"
+    "test:e2e": "playwright test --config=e2e/desktop/playwright.config.ts",
+    "test:e2e:ui": "playwright test --config=e2e/desktop/playwright.config.ts --ui",
+    "build:electron": "node scripts/build.js",
+    "spec:check": "specify check",
+    "spec:status": "specify integration status",
+    "package:all": "node scripts/build.js",
+    "package:unpacked": "npx electron-builder --dir",
+    "package:installer": "npx electron-builder --win nsis",
+    "package:portable": "npx electron-builder --win portable"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -32,10 +40,11 @@
     "react-dom": "19.2.4",
     "recharts": "^3.9.2",
     "three": "^0.185.1",
-    "zustand": "^5.0.14",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/adm-zip": "^0.5.8",
     "@types/bcryptjs": "^2.4.6",
@@ -68,7 +77,8 @@
     "win": {
       "target": [
         "nsis",
-        "portable"
+        "portable",
+        "dir"
       ],
       "icon": "public/logo.png"
     },
@@ -80,7 +90,11 @@
       "differentialPackage": false
     },
     "portable": {
-      "requestExecutionLevel": "user"
+      "requestExecutionLevel": "user",
+      "artifactName": "${productName}-Portable-${version}.${ext}",
+      "unpackDirName": "ManovrSystem-Portable",
+      "splashImage": "public/splash.bmp",
+      "useZip": true
     },
     "extraResources": [
       {

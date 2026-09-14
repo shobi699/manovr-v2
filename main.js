@@ -1,8 +1,45 @@
 const { app, BrowserWindow, ipcMain, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { fork } = require('child_process');
 const http = require('http');
+
+// تفکیک قطعی مسیر داده‌های کلاینت از پوشه شبکه جهت جلوگیری مطلق از تصادم چندکاربره و قفل فایل کرومیوم (SingletonLock)
+const localAppDataRoot = process.env.LOCALAPPDATA || (process.platform === 'win32'
+  ? path.join(process.env.USERPROFILE || 'C:\\', 'AppData', 'Local')
+  : path.join(os.homedir(), '.config'));
+
+const clientUserDataDir = path.join(localAppDataRoot, 'ManovrSystem');
+try {
+  if (!fs.existsSync(clientUserDataDir)) {
+    fs.mkdirSync(clientUserDataDir, { recursive: true });
+  }
+  app.setPath('userData', clientUserDataDir);
+  app.setPath('sessionData', path.join(clientUserDataDir, 'Session'));
+  app.setPath('crashDumps', path.join(clientUserDataDir, 'Crashpad'));
+} catch (e) {
+  console.error('[UserData Path Isolation Error]', e);
+}
+
+// مدیریت خطاهای سراسری پردازه اصلی جهت جلوگیری از کرش با خطای UNKNOWN write
+process.on('uncaughtException', (err) => {
+  try {
+    console.error('[Main UncaughtException]', err);
+    if (typeof writeLog === 'function') {
+      writeLog(`CRITICAL UNCAUGHT EXCEPTION: ${err && err.stack ? err.stack : err}`);
+    }
+  } catch (e) {}
+});
+
+process.on('unhandledRejection', (reason) => {
+  try {
+    console.error('[Main UnhandledRejection]', reason);
+    if (typeof writeLog === 'function') {
+      writeLog(`UNHANDLED REJECTION: ${reason}`);
+    }
+  } catch (e) {}
+});
 
 let mainWindow = null;
 let splashWindow = null;
@@ -139,20 +176,63 @@ const { path: userDataPath, source: userDataSource } = resolveUserDataPath();
 const dbFolder = path.join(userDataPath, 'database');
 const dbPath = path.join(dbFolder, 'dev.db');
 
-const os = require('os');
 const hostname = os.hostname().replace(/[^a-zA-Z0-9_-]/g, '_');
 
-// ایجاد پوشه لاگ و جریان نوشتن لاگ‌ها به تفکیک نام هر سیستم
-const logFolder = path.join(userDataPath, 'logs');
-if (!fs.existsSync(logFolder)) {
-  fs.mkdirSync(logFolder, { recursive: true });
+// ۱. لاگ اولیه همواره به صورت محلی در AppData کلاینت ذخیره می‌شود تا در صورت قطعی شبکه سیستم کرش نکند
+const localLogFolder = path.join(app.getPath('userData'), 'logs');
+if (!fs.existsSync(localLogFolder)) {
+  try {
+    fs.mkdirSync(localLogFolder, { recursive: true });
+  } catch (e) {}
 }
-const logPath = path.join(logFolder, `server-${hostname}.log`);
-const logStream = fs.createWriteStream(logPath, { flags: 'a' });
+const localLogPath = path.join(localLogFolder, `app-${hostname}.log`);
+let localLogStream = null;
+try {
+  localLogStream = fs.createWriteStream(localLogPath, { flags: 'a' });
+  localLogStream.on('error', (err) => {
+    console.error('[LocalLogStream Error Suppressed]', err?.message);
+  });
+} catch (e) {}
+
+// ۲. لاگ متمرکز در پوشه داده شبکه در صورت امکان
+let remoteLogStream = null;
+try {
+  const logFolder = path.join(userDataPath, 'logs');
+  if (!fs.existsSync(logFolder)) {
+    fs.mkdirSync(logFolder, { recursive: true });
+  }
+  const logPath = path.join(logFolder, `server-${hostname}.log`);
+  remoteLogStream = fs.createWriteStream(logPath, { flags: 'a' });
+  remoteLogStream.on('error', (err) => {
+    console.error('[RemoteLogStream Error Suppressed]', err?.message);
+    try {
+      if (remoteLogStream) {
+        remoteLogStream.destroy();
+        remoteLogStream = null;
+      }
+    } catch {}
+  });
+} catch (e) {
+  console.error('[RemoteLogFolder Init Error]', e?.message);
+}
 
 function writeLog(message) {
-  const timestamp = new Date().toISOString();
-  logStream.write(`[${timestamp}] [${hostname}] ${message}\n`);
+  try {
+    const timestamp = new Date().toISOString();
+    const formatted = `[${timestamp}] [${hostname}] ${message}\n`;
+
+    if (localLogStream && !localLogStream.destroyed && localLogStream.writable) {
+      localLogStream.write(formatted, () => {});
+    }
+    if (remoteLogStream && !remoteLogStream.destroyed && remoteLogStream.writable) {
+      remoteLogStream.write(formatted, () => {});
+    }
+    if (!app.isPackaged) {
+      console.log(formatted.trim());
+    }
+  } catch (err) {
+    // جلوگیری قاطع از بالا آمدن خطای UNKNOWN write به عنوان Uncaught Exception
+  }
 }
 
 function getLanAddresses(port) {
@@ -177,57 +257,66 @@ const crypto = require('crypto');
 let authSecret = null;
 
 function setupAuthSecret() {
-  const configFolder = path.join(userDataPath, 'config');
-  if (!fs.existsSync(configFolder)) {
-    fs.mkdirSync(configFolder, { recursive: true });
+  try {
+    const configFolder = path.join(userDataPath, 'config');
+    if (!fs.existsSync(configFolder)) {
+      fs.mkdirSync(configFolder, { recursive: true });
+    }
+    const keyPath = path.join(configFolder, 'auth.key');
+    if (!fs.existsSync(keyPath)) {
+      const secret = crypto.randomBytes(48).toString('base64');
+      fs.writeFileSync(keyPath, secret, 'utf8');
+      writeLog(`Auth secret created successfully at: ${keyPath}`);
+    } else {
+      writeLog(`Auth secret loaded from: ${keyPath}`);
+    }
+    return fs.readFileSync(keyPath, 'utf8').trim();
+  } catch (e) {
+    writeLog(`Auth secret storage warning: ${e.message}. Using fallback local secret.`);
+    return 'fallback_manovr_secure_secret_key_fixed_token_2026';
   }
-  const keyPath = path.join(configFolder, 'auth.key');
-  if (!fs.existsSync(keyPath)) {
-    const secret = crypto.randomBytes(48).toString('base64');
-    fs.writeFileSync(keyPath, secret, 'utf8');
-    writeLog(`Auth secret created successfully at: ${keyPath}`);
-  } else {
-    writeLog(`Auth secret loaded from: ${keyPath}`);
-  }
-  return fs.readFileSync(keyPath, 'utf8').trim();
 }
 
 function setupDatabase() {
-  if (!fs.existsSync(dbFolder)) {
-    fs.mkdirSync(dbFolder, { recursive: true });
-  }
-
-  const templateDbPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'dev.db')
-    : path.join(__dirname, 'prisma', 'dev.db');
-
-  writeLog(`Looking for template database at: ${templateDbPath}`);
-
-  if (!fs.existsSync(dbPath)) {
-    if (fs.existsSync(templateDbPath)) {
-      fs.copyFileSync(templateDbPath, dbPath);
-      writeLog(`Database initialized successfully at: ${dbPath}`);
-    } else {
-      writeLog(`ERROR: Template database not found at: ${templateDbPath}`);
+  try {
+    if (!fs.existsSync(dbFolder)) {
+      fs.mkdirSync(dbFolder, { recursive: true });
     }
-  } else {
-    // در نسخه پروداکشن/پرتابل هرگز دیتابیس موجود کاربر رونویسی نمی‌شود تا اطلاعات از دست نرود
-    if (!app.isPackaged && fs.existsSync(templateDbPath)) {
-      try {
-        const templateStat = fs.statSync(templateDbPath);
-        const currentStat = fs.statSync(dbPath);
-        if (templateStat.mtimeMs > currentStat.mtimeMs) {
-          fs.copyFileSync(templateDbPath, dbPath);
-          writeLog(`[Dev Mode] Database updated from newer template at: ${dbPath}`);
-        } else {
-          writeLog(`Database already exists at: ${dbPath}`);
-        }
-      } catch (e) {
-        writeLog(`Database status check error: ${e.message}`);
+
+    const templateDbPath = app.isPackaged
+      ? path.join(process.resourcesPath, 'dev.db')
+      : path.join(__dirname, 'prisma', 'dev.db');
+
+    writeLog(`Looking for template database at: ${templateDbPath}`);
+
+    if (!fs.existsSync(dbPath)) {
+      if (fs.existsSync(templateDbPath)) {
+        fs.copyFileSync(templateDbPath, dbPath);
+        writeLog(`Database initialized successfully at: ${dbPath}`);
+      } else {
+        writeLog(`ERROR: Template database not found at: ${templateDbPath}`);
       }
     } else {
-      writeLog(`Database already exists at: ${dbPath}`);
+      // در نسخه پروداکشن/پرتابل هرگز دیتابیس موجود کاربر رونویسی نمی‌شود تا اطلاعات از دست نرود
+      if (!app.isPackaged && fs.existsSync(templateDbPath)) {
+        try {
+          const templateStat = fs.statSync(templateDbPath);
+          const currentStat = fs.statSync(dbPath);
+          if (templateStat.mtimeMs > currentStat.mtimeMs) {
+            fs.copyFileSync(templateDbPath, dbPath);
+            writeLog(`[Dev Mode] Database updated from newer template at: ${dbPath}`);
+          } else {
+            writeLog(`Database already exists at: ${dbPath}`);
+          }
+        } catch (e) {
+          writeLog(`Database status check error: ${e.message}`);
+        }
+      } else {
+        writeLog(`Database already exists at: ${dbPath}`);
+      }
     }
+  } catch (dbSetupErr) {
+    writeLog(`Database setup directory/file error: ${dbSetupErr.message}`);
   }
 }
 
@@ -267,41 +356,62 @@ function startNextServer(port) {
     return `file:${normalized}`;
   }
 
+  let serverCwd = app.isPackaged
+    ? path.join(process.resourcesPath, 'app.asar.unpacked', '.next', 'standalone')
+    : path.join(__dirname, '.next', 'standalone');
+
+  if (serverCwd.startsWith('\\\\')) {
+    writeLog(`Application is running directly from a UNC network share: ${serverCwd}`);
+    // ویندوز مسیرهای UNC را به عنوان Working Directory پردازه نمی‌پذیرد. تغییر مسیر کاری به دایرکتوری امن محلی
+    serverCwd = clientUserDataDir;
+    writeLog(`Switched server process working directory to local safe path: ${serverCwd}`);
+  }
+
   // فورک کردن پروسه سرور Next.js با استفاده از انجین Node داخلی الکترون
-  serverProcess = fork(serverPath, [], {
-    env: {
-      ...process.env,
-      ELECTRON_RUN_AS_NODE: '1',
-      PORT: String(port),
-      DATABASE_URL: formatDatabaseUrl(dbPath),
-      AUTH_SECRET: authSecret,
-      IS_MASTER_SERVER: 'true',
-      STORAGE_SOURCE: userDataSource,
-      STORAGE_PATH: userDataPath,
-      SHARED_DATA_TARGET: appConfig.sharedDataPath || '\\\\srvdfs01\\Line1\\Depo\\data',
-      NODE_ENV: 'production'
-    },
-    cwd: app.isPackaged
-      ? path.join(process.resourcesPath, 'app.asar.unpacked', '.next', 'standalone')
-      : path.join(__dirname, '.next', 'standalone'),
-    stdio: ['ignore', 'pipe', 'pipe', 'ipc']
-  });
+  try {
+    serverProcess = fork(serverPath, [], {
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
+        PORT: String(port),
+        DATABASE_URL: formatDatabaseUrl(dbPath),
+        AUTH_SECRET: authSecret,
+        IS_MASTER_SERVER: 'true',
+        STORAGE_SOURCE: userDataSource,
+        STORAGE_PATH: userDataPath,
+        SHARED_DATA_TARGET: appConfig.sharedDataPath || '\\\\srvdfs01\\Line1\\Depo\\data',
+        NODE_ENV: 'production'
+      },
+      cwd: serverCwd,
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc']
+    });
 
-  serverProcess.stdout.on('data', (data) => {
-    writeLog(`[Server Stdout] ${data.toString().trim()}`);
-  });
+    if (serverProcess.stdout) {
+      serverProcess.stdout.on('data', (data) => {
+        try {
+          writeLog(`[Server Stdout] ${data.toString().trim()}`);
+        } catch (e) {}
+      });
+    }
 
-  serverProcess.stderr.on('data', (data) => {
-    writeLog(`[Server Stderr] ${data.toString().trim()}`);
-  });
+    if (serverProcess.stderr) {
+      serverProcess.stderr.on('data', (data) => {
+        try {
+          writeLog(`[Server Stderr] ${data.toString().trim()}`);
+        } catch (e) {}
+      });
+    }
 
-  serverProcess.on('error', (err) => {
-    writeLog(`ERROR: Next.js server error: ${err.message}`);
-  });
+    serverProcess.on('error', (err) => {
+      writeLog(`ERROR: Next.js server error: ${err.message}`);
+    });
 
-  serverProcess.on('exit', (code) => {
-    writeLog(`Server process exited with code: ${code}`);
-  });
+    serverProcess.on('exit', (code) => {
+      writeLog(`Server process exited with code: ${code}`);
+    });
+  } catch (forkErr) {
+    writeLog(`FATAL: Failed to fork Next.js standalone process: ${forkErr.message}`);
+  }
 }
 
 function checkServerReady(port, callback, attempts = 0) {

@@ -74,6 +74,12 @@ export const TrainType: Record<number, string> = {
   2: "دیزل",
 };
 
+export const TrainTypeFull: Record<number, string> = {
+  0: "AC (برقی - نسل جدید)",
+  1: "DC (برقی - نسل قدیم)",
+  2: "دیزل (لوکوموتیو)",
+};
+
 export const Shift: Record<number, string> = {
   1: "A",
   2: "B",

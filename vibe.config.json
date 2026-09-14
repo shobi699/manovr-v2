@@ -1,0 +1,22 @@
+{
+  "url": "http://localhost:3000",
+  "mode": "deep",
+  "auth": {
+    "strategy": "skip"
+  },
+  "never_interact": [
+    "delete account",
+    "cancel subscription"
+  ],
+  "scope": {
+    "include": [
+      "/**"
+    ],
+    "exclude": [],
+    "max_routes": 30
+  },
+  "browser": {
+    "headed": true,
+    "slowMo": 40
+  }
+}

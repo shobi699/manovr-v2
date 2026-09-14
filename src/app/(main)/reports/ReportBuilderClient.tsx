@@ -6,11 +6,10 @@ import { type ReportConfig, type ReportFilter } from "@/lib/report-engine";
 import { createScheduledReport, toggleScheduledReport, deleteScheduledReport } from "@/app/actions/scheduled-report";
 import { importPersonnelFromExcel } from "@/app/actions/user";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from "recharts";
-import { ManovrType, ManovrStatus, ConfirmationStatus, TrainType, Terminal, Shift, OrgPosition, PersonnelType } from "@/lib/enums";
-import ExcelJS from "exceljs";
+import { ManovrType, ManovrStatus, ConfirmationStatus, TrainType, TrainTypeFull, Terminal, Shift, OrgPosition, PersonnelType } from "@/lib/enums";
 import JalaliDateTimePicker from "@/components/JalaliDateTimePicker";
 import DataTable, { Column } from "@/components/DataTable";
-import { useToast } from "@/components/ui/Toast";
+import { toast } from "@/components/ui/Toast";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 
 const CHART_COLORS = ["#1f3a5f", "#d8842a", "#2e7d5b", "#b23b3b", "#6d28d9", "#4b5563"];
@@ -95,6 +94,9 @@ export default function ReportBuilderClient({
   const [scheduledReports, setScheduledReports] = useState(initialScheduledReports);
   const [reportName, setReportName] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [isLoadingReport, setIsLoadingReport] = useState(false);
+  const [mainTab, setMainTab] = useState<"builder" | "saved" | "import">("builder");
+  const [showAllTemplates, setShowAllTemplates] = useState<boolean>(false);
 
   // وضعیت‌های مربوط به زمان‌بندی گزارش
   const [selectedReportToSchedule, setSelectedReportToSchedule] = useState<any | null>(null);
@@ -105,7 +107,6 @@ export default function ReportBuilderClient({
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [deleteReportTarget, setDeleteReportTarget] = useState<any | null>(null);
   const [deleteScheduleTarget, setDeleteScheduleTarget] = useState<any | null>(null);
-  const { toast } = useToast();
 
   // کانفیگ جاری گزارش‌ساز
   const [entity, setEntity] = useState<"manovr" | "train" | "line" | "personnel">("manovr");
@@ -157,16 +158,17 @@ export default function ReportBuilderClient({
       if (f === "type") val = ManovrType[r.type];
       else if (f === "status") val = ManovrStatus[r.status];
       else if (f === "confirmationStatus") val = ConfirmationStatus[r.confirmationStatus];
-      else if (f === "train") val = r.train?.code;
-      else if (f === "sourceLine") val = r.sourceLine?.name;
-      else if (f === "destinationLine") val = r.destinationLine?.name;
-      else if (f === "rahbar1") val = r.rahbar1 ? `${r.rahbar1.firstName} ${r.rahbar1.lastName}` : "";
-      else if (f === "creator") val = r.creator ? `${r.creator.firstName} ${r.creator.lastName}` : "سیستم";
-      else if (f === "createdAt") val = new Date(r.createdAt).toLocaleString("fa-IR", { timeZone: "Asia/Tehran", calendar: "persian" });
-      else if (f === "finishedAt") val = r.finishedAt ? new Date(r.finishedAt).toLocaleString("fa-IR", { timeZone: "Asia/Tehran", calendar: "persian" }) : "";
-      else if (f === "executionTime") val = r.executionTime ? new Date(r.executionTime).toLocaleString("fa-IR", { timeZone: "Asia/Tehran", calendar: "persian" }) : "";
+      else if (f === "train") val = r.train?.code ? `قطار ${r.train.code}` : "—";
+      else if (f === "sourceLine") val = r.sourceLine?.name || "—";
+      else if (f === "destinationLine") val = r.destinationLine?.name || "—";
+      else if (f === "rahbar1") val = r.rahbar1 ? `${r.rahbar1.firstName} ${r.rahbar1.lastName}`.trim() : "—";
+      else if (f === "rahbar2") val = r.rahbar2 ? `${r.rahbar2.firstName} ${r.rahbar2.lastName}`.trim() : "—";
+      else if (f === "creator") val = r.creator ? `${r.creator.firstName} ${r.creator.lastName}`.trim() : "سیستم";
+      else if (f === "createdAt") val = r.createdAt ? new Date(r.createdAt).toLocaleString("fa-IR", { timeZone: "Asia/Tehran", calendar: "persian" }) : "—";
+      else if (f === "finishedAt") val = r.finishedAt ? new Date(r.finishedAt).toLocaleString("fa-IR", { timeZone: "Asia/Tehran", calendar: "persian" }) : "—";
+      else if (f === "executionTime") val = r.executionTime ? new Date(r.executionTime).toLocaleString("fa-IR", { timeZone: "Asia/Tehran", calendar: "persian" }) : "—";
     } else if (ent === "train") {
-      if (f === "type") val = TrainType[r.type];
+      if (f === "type") val = TrainTypeFull[r.type] || TrainType[r.type];
       else if (f === "line") val = r.line?.name;
       else if (f === "isDisposed") val = r.isDisposed ? "غیرفعال" : "فعال";
     } else if (ent === "line") {
@@ -178,7 +180,17 @@ export default function ReportBuilderClient({
       else if (f === "personnelType") val = PersonnelType[r.personnelType];
       else if (f === "personnelCode") val = r.personnelCode;
     }
-    return val;
+
+    // گارد امنیتی ضد کرش برای اشیای React
+    if (val !== null && typeof val === "object") {
+      if (val.name) return String(val.name);
+      if (val.title) return String(val.title);
+      if (val.code) return String(val.code);
+      if (val.firstName || val.lastName) return `${val.firstName || ""} ${val.lastName || ""}`.trim();
+      return "—";
+    }
+
+    return val ?? "—";
   }, []);
 
   const tableColumns = React.useMemo<Column<any>[]>(() => {
@@ -195,9 +207,17 @@ export default function ReportBuilderClient({
     }));
   }, [fields, entity, getFieldValue]);
 
-  // واچر برای اعمال زنده فیلترهای تاریخچه مانورها، قطارهای بادگیری شده، مثلث شده و انتقال‌های دائم
+  // واچر برای اعمال زنده فیلترهای تاریخچه مانورها، قطارهای بادگیری شده، مثلث شده، انتقال‌های دائم، سولو و با کمکی
   useEffect(() => {
-    if (activeReportTab === "history" || activeReportTab === "triangulated" || activeReportTab === "air_charged" || activeReportTab === "permanent_transfers") {
+    if (
+      activeReportTab === "history" ||
+      activeReportTab === "triangulated" ||
+      activeReportTab === "air_charged" ||
+      activeReportTab === "permanent_transfers" ||
+      activeReportTab === "solo_manovrs" ||
+      activeReportTab === "assisted_manovrs" ||
+      activeReportTab === "month_manovrs"
+    ) {
       const activeFilters: ReportFilter[] = [];
 
       if (activeReportTab === "triangulated") {
@@ -210,11 +230,20 @@ export default function ReportBuilderClient({
         } else {
           activeFilters.push({ field: "type", operator: "between", value: "21", value2: "24" });
         }
+      } else if (activeReportTab === "solo_manovrs") {
+        activeFilters.push({ field: "isSolo", operator: "equals", value: "true" });
+      } else if (activeReportTab === "assisted_manovrs") {
+        activeFilters.push({ field: "crewType", operator: "equals", value: "assisted" });
       } else if (historyType) {
         activeFilters.push({ field: "type", operator: "equals", value: historyType });
       }
 
-      if (historyFromDate && historyToDate) {
+      if (activeReportTab === "month_manovrs") {
+        const d = new Date();
+        d.setDate(d.getDate() - 30);
+        d.setHours(0, 0, 0, 0);
+        activeFilters.push({ field: "executionTime", operator: "gt", value: d.toISOString() });
+      } else if (historyFromDate && historyToDate) {
         const start = new Date(historyFromDate);
         start.setHours(0, 0, 0, 0);
         const end = new Date(historyToDate);
@@ -382,33 +411,95 @@ export default function ReportBuilderClient({
       setChart("pie");
       setSortField("id");
       setSortDirection("desc");
+    } else if (type === "solo_manovrs") {
+      setEntity("manovr");
+      setFields(["id", "type", "train", "sourceLine", "destinationLine", "rahbar1", "executionTime", "status"]);
+      setFilters([{ field: "isSolo", operator: "equals", value: "true" }]);
+      setGroupBy("");
+      setChart("table");
+      setSortField("id");
+      setSortDirection("desc");
+    } else if (type === "assisted_manovrs") {
+      setEntity("manovr");
+      setFields(["id", "type", "train", "sourceLine", "destinationLine", "rahbar1", "rahbar2", "executionTime", "status"]);
+      setFilters([{ field: "crewType", operator: "equals", value: "assisted" }]);
+      setGroupBy("");
+      setChart("table");
+      setSortField("id");
+      setSortDirection("desc");
+    } else if (type === "shift_performance") {
+      setEntity("manovr");
+      setFields(["id", "type", "train", "sourceLine", "destinationLine", "rahbar1", "executionTime", "status"]);
+      setFilters([]);
+      setGroupBy("rahbar1");
+      setChart("bar");
+      setSortField("id");
+      setSortDirection("desc");
+    } else if (type === "month_manovrs") {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      d.setHours(0, 0, 0, 0);
+      setEntity("manovr");
+      setFields(["id", "type", "train", "sourceLine", "destinationLine", "rahbar1", "rahbar2", "executionTime", "status"]);
+      setFilters([{ field: "executionTime", operator: "gt", value: d.toISOString() }]);
+      setGroupBy("");
+      setChart("table");
+      setSortField("id");
+      setSortDirection("desc");
     }
     setTimeout(() => {
       setQueryTrigger((prev) => prev + 1);
     }, 50);
   };
 
+  // همگام‌سازی فیلد مرتب‌سازی با تغییر موجودیت
+  useEffect(() => {
+    const validFields = ENTITY_FIELDS[entity]?.map((f) => f.key) || [];
+    if (!validFields.includes(sortField)) {
+      setSortField(validFields[0] || "id");
+    }
+  }, [entity, sortField]);
+
   // اجرای کوئری گزارش
-  const handleQuery = useCallback(async () => {
+  const handleQuery = useCallback(async (isManual: boolean = false) => {
     setError(null);
+    setIsLoadingReport(true);
+    const validFields = ENTITY_FIELDS[entity]?.map((f) => f.key) || [];
+    const effectiveSortField = validFields.includes(sortField) ? sortField : (validFields[0] || "id");
+
     const config: ReportConfig = {
       entity,
       fields,
       filters,
       groupBy: groupBy || undefined,
       chart,
-      sortField,
+      sortField: effectiveSortField,
       sortDirection,
     };
 
-    startTransition(async () => {
+    try {
       const res = await runDynamicReport(config);
       if (res.error) {
         setError(res.error);
+        if (isManual) toast.error(res.error);
       } else {
+        const rowCount = res.records?.length || 0;
         setRecords(res.records || []);
+        if (isManual) {
+          if (rowCount === 0) {
+            toast.info("هیچ رکوردی مطابق با فیلترهای مشخص‌شده یافت نشد.");
+          } else {
+            toast.success(`گزارش زنده با موفقیت بارگذاری شد (${rowCount} رکورد).`);
+          }
+        }
       }
-    });
+    } catch (err: any) {
+      const msg = err?.message || "خطا در ارتباط با پایگاه داده";
+      setError(msg);
+      if (isManual) toast.error(msg);
+    } finally {
+      setIsLoadingReport(false);
+    }
   }, [entity, fields, filters, groupBy, chart, sortField, sortDirection]);
 
   // لود گزارش پیش‌فرض در شروع کار
@@ -419,7 +510,7 @@ export default function ReportBuilderClient({
   // اجرای خودکار کوئری با تغییر تریگر
   useEffect(() => {
     if (queryTrigger > 0) {
-      handleQuery();
+      handleQuery(false);
     }
   }, [queryTrigger, handleQuery]);
 
@@ -461,7 +552,10 @@ export default function ReportBuilderClient({
       setChart(config.chart || "table");
       setSortField(config.sortField || "");
       setSortDirection(config.sortDirection || "desc");
+      setActiveReportTab("");
+      setMainTab("builder");
       toast.info(`گزارش "${rep.name}" بارگذاری شد.`);
+      setTimeout(() => setQueryTrigger((p) => p + 1), 50);
     } catch {
       toast.error("خطا در بارگذاری گزارش.");
     }
@@ -670,6 +764,7 @@ export default function ReportBuilderClient({
     reader.onload = async (event) => {
       try {
         const arrayBuffer = event.target?.result as ArrayBuffer;
+        const { default: ExcelJS } = await import("exceljs");
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.load(arrayBuffer);
         const worksheet = workbook.worksheets[0];
@@ -739,23 +834,29 @@ export default function ReportBuilderClient({
         if (groupBy === "type") key = ManovrType[r.type] || String(r.type);
         else if (groupBy === "status") key = ManovrStatus[r.status] || String(r.status);
         else if (groupBy === "confirmationStatus") key = ConfirmationStatus[r.confirmationStatus] || String(r.confirmationStatus);
-        else if (groupBy === "train") key = r.train?.code || "—";
+        else if (groupBy === "train") key = r.train?.code ? `قطار ${r.train.code}` : "—";
         else if (groupBy === "sourceLine") key = r.sourceLine?.name || "—";
         else if (groupBy === "destinationLine") key = r.destinationLine?.name || "—";
         else if (groupBy === "rahbar1") key = r.rahbar1 ? `${r.rahbar1.firstName} ${r.rahbar1.lastName}`.trim() : "—";
-        else if (groupBy === "creator") key = r.creator ? `${r.creator.firstName} ${r.creator.lastName}`.trim() : "—";
+        else if (groupBy === "rahbar2") key = r.rahbar2 ? `${r.rahbar2.firstName} ${r.rahbar2.lastName}`.trim() : "تک‌نفره (بدون کمکی)";
+        else if (groupBy === "creator") key = r.creator ? `${r.creator.firstName} ${r.creator.lastName}`.trim() : "سیستم";
       } else if (entity === "train") {
-        if (groupBy === "type") key = TrainType[r.type] || String(r.type);
+        if (groupBy === "type") key = TrainTypeFull[r.type] || TrainType[r.type] || String(r.type);
         else if (groupBy === "line") key = r.line?.name || "—";
       } else if (entity === "line") {
         if (groupBy === "terminal") key = Terminal[r.terminal] || String(r.terminal);
         else if (groupBy === "isDynamic") key = r.isDynamic ? "دینامیک" : "ثابت";
       } else if (entity === "personnel") {
-        if (groupBy === "shift") key = Shift[r.shift] || String(r.shift);
+        if (groupBy === "shift") key = Shift[r.shift] ? `شیفت ${Shift[r.shift]}` : String(r.shift);
         else if (groupBy === "orgPosition") key = OrgPosition[r.orgPosition] || String(r.orgPosition);
         else if (groupBy === "personnelType") key = PersonnelType[r.personnelType] || String(r.personnelType);
       } else {
-        key = String(r[groupBy] || "نامشخص");
+        const raw = r[groupBy];
+        if (raw && typeof raw === "object") {
+          key = raw.name || raw.code || `${raw.firstName || ""} ${raw.lastName || ""}`.trim() || "نامشخص";
+        } else {
+          key = String(raw || "نامشخص");
+        }
       }
       counts[key] = (counts[key] || 0) + 1;
     });
@@ -785,6 +886,49 @@ export default function ReportBuilderClient({
               icon: (
                 <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                   <path d="M4 3v18M20 3v18M4 7h16M4 12h16M4 17h16" />
+                </svg>
+              )
+            },
+            {
+              id: "solo_manovrs",
+              title: "مانورهای تک‌نفره (سولو)",
+              desc: "مانورهای انجام‌شده بدون راهبر دوم (مستقل)",
+              icon: (
+                <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              )
+            },
+            {
+              id: "assisted_manovrs",
+              title: "مانورهای با راهبر کمکی",
+              desc: "مانورهای انجام‌شده با همراهی راهبر ۲",
+              icon: (
+                <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              )
+            },
+            {
+              id: "shift_performance",
+              title: "تحلیل شیفت‌های کاری",
+              desc: "آمار تجمیعی مانورها بر حسب شیفت و راهبران",
+              icon: (
+                <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              )
+            },
+            {
+              id: "month_manovrs",
+              title: "مانورهای ۳۰ روز اخیر",
+              desc: "گزارش کلیه عملیات مانور ماه گذشته",
+              icon: (
+                <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
                 </svg>
               )
             },
@@ -939,17 +1083,80 @@ export default function ReportBuilderClient({
           })}
         </div>
 
+        {/* بنر اتصال حرفه‌ای به تب عملکرد راهبران و شیفت‌ها در تاریخچه مانورها */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "14px 20px",
+            borderRadius: "12px",
+            background: "linear-gradient(135deg, rgba(31,58,95,0.08) 0%, rgba(216,132,42,0.09) 100%)",
+            border: "1px solid var(--line)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+            <div
+              style={{
+                width: "42px",
+                height: "42px",
+                borderRadius: "10px",
+                background: "var(--accent)",
+                color: "#fff",
+                display: "grid",
+                placeItems: "center",
+                boxShadow: "0 4px 12px rgba(216,132,42,0.3)"
+              }}
+            >
+              <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <div style={{ fontSize: "14px", fontWeight: "bold", color: "var(--ink)" }}>
+                گزارش عملکرد شیفت‌ها و مانورهای تک‌نفره (Solo) در تاریخچه مانورها
+              </div>
+              <div style={{ fontSize: "12px", color: "var(--ink-soft)", marginTop: "2px" }}>
+                برای تحلیل ماتریسی عملکرد، نمودارهای زمانی دوره‌ای و محاسبه دقیق درصد مانورهای سولو و با کمکی، مستقیماً به ماژول تاریخچه مراجعه فرمایید.
+              </div>
+            </div>
+          </div>
+          <a
+            href="/manovrs"
+            className="btn sm primary"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "8px 16px",
+              fontWeight: 600,
+              textDecoration: "none",
+              whiteSpace: "nowrap"
+            }}
+          >
+            <span>مشاهده گزارش کامل در تاریخچه مانورها</span>
+            <span>←</span>
+          </a>
+        </div>
+
         {/* پنل‌های فیلتر پیشرفته بر اساس الگوها */}
-        {(activeReportTab === "history" || activeReportTab === "triangulated" || activeReportTab === "air_charged" || activeReportTab === "permanent_transfers") && (
+        {(activeReportTab === "history" || activeReportTab === "triangulated" || activeReportTab === "air_charged" || activeReportTab === "permanent_transfers" || activeReportTab === "solo_manovrs" || activeReportTab === "assisted_manovrs" || activeReportTab === "month_manovrs") && (
           <div className="card" style={{ padding: "16px", borderRadius: "12px", background: "var(--panel)", overflow: "visible" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px", borderBottom: "1px solid var(--line)", paddingBottom: "8px" }}>
               <span style={{ fontSize: "14px", fontWeight: "bold", color: "var(--accent)" }}>
-                🔍 فیلترهای پیشرفته تاریخچه مانورها {activeReportTab === "triangulated" && " (قطارهای مثلث شده)"} {activeReportTab === "air_charged" && " (قطارهای بادگیری شده)"} {activeReportTab === "permanent_transfers" && " (گزارش انتقال‌های دائم)"}:
+                🔍 فیلترهای پیشرفته تاریخچه مانورها
+                {activeReportTab === "triangulated" && " (قطارهای مثلث شده)"}
+                {activeReportTab === "air_charged" && " (قطارهای بادگیری شده)"}
+                {activeReportTab === "permanent_transfers" && " (گزارش انتقال‌های دائم)"}
+                {activeReportTab === "solo_manovrs" && " (مانورهای تک‌نفره - Solo)"}
+                {activeReportTab === "assisted_manovrs" && " (مانورهای دونفره - با کمکی)"}
+                {activeReportTab === "month_manovrs" && " (عملیات ۳۰ روز اخیر)"}:
               </span>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "12px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "12px" }}>
               {/* از تاریخ */}
-              <div className="field" style={{ marginBottom: 0 }}>
+              <div className="field" style={{ marginBottom: 0, minWidth: 0 }}>
                 <label style={{ fontSize: "11px" }}>از تاریخ:</label>
                 <JalaliDateTimePicker
                   value={historyFromDate}
@@ -1047,7 +1254,7 @@ export default function ReportBuilderClient({
                 👤 فیلترهای پیشرفته عملکرد راهبران:
               </span>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1.5fr", gap: "12px", alignItems: "center" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", alignItems: "center" }}>
               {/* نام راهبر */}
               <div className="field" style={{ marginBottom: 0 }}>
                 <label style={{ fontSize: "11px" }}>نام راهبر:</label>
@@ -1120,126 +1327,9 @@ export default function ReportBuilderClient({
           </div>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: "20px" }}>
-
-          {/* پنل سمت راست: گزارش‌های ذخیره شده و ایمپورت */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-
-            <div className="card">
-              <div className="card-head">
-                <h2>گزارش‌های ذخیره‌شده</h2>
-              </div>
-              <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "320px", overflowY: "auto" }}>
-                {savedReports.length === 0 ? (
-                  <span className="muted text-xs">هیچ گزارش ذخیره شده‌ای وجود ندارد.</span>
-                ) : (
-                  savedReports.map((rep) => (
-                    <div key={rep.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 8px", backgroundColor: "var(--panel-2)", borderRadius: "6px" }}>
-                      <div style={{ cursor: "pointer", flex: 1 }} onClick={() => handleLoadReport(rep)}>
-                        <b style={{ fontSize: "13px" }}>{rep.name}</b>
-                        <div style={{ fontSize: "10px", color: "var(--ink-faint)" }}>سازنده: {rep.ownerName}</div>
-                      </div>
-                      <div style={{ display: "flex", gap: "4px" }}>
-                        <button
-                          className="btn sm outline"
-                          style={{ padding: "2px 6px", fontSize: "10px", borderColor: "var(--line)" }}
-                          onClick={() => handleOpenScheduleModal(rep)}
-                          title="زمان‌بندی دوره‌ای گزارش"
-                        >
-                          ⏱️
-                        </button>
-                        {rep.isOwner && (
-                          <button
-                            className="btn sm"
-                            style={{ padding: "2px 4px", fontSize: "10px", color: "var(--crit)", borderColor: "transparent" }}
-                            onClick={() => handleDeleteReport(rep)}
-                          >
-                            حذف
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* کارت زمان‌بندی‌های فعال */}
-            <div className="card">
-              <div className="card-head">
-                <h2>زمان‌بندی‌های فعال</h2>
-              </div>
-              <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "320px", overflowY: "auto" }}>
-                {scheduledReports.length === 0 ? (
-                  <span className="muted text-xs">هیچ زمان‌بندی فعالی وجود ندارد.</span>
-                ) : (
-                  scheduledReports.map((sr: any) => (
-                    <div key={sr.id} style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "8px", backgroundColor: "var(--panel-2)", borderRadius: "6px", fontSize: "11px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <b>{sr.savedReport?.name || `گزارش ${sr.savedReportId}`}</b>
-                        <span className="num muted" style={{ fontSize: "10px" }}>{sr.format.toUpperCase()}</span>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "var(--ink-soft)" }}>
-                        <span className="num" style={{ fontWeight: "bold" }}>{sr.cron}</span>
-                        <label style={{ display: "flex", alignItems: "center", gap: "4px", cursor: "pointer" }}>
-                          <input
-                            type="checkbox"
-                            checked={sr.isActive}
-                            onChange={(e) => handleToggleSchedule(sr.id, e.target.checked)}
-                          />
-                          فعال
-                        </label>
-                      </div>
-                      {sr.lastRunAt && (
-                        <div className="num muted" style={{ fontSize: "9px" }}>
-                          آخرین اجرا: {new Date(sr.lastRunAt).toLocaleString("fa-IR", { calendar: "persian", timeZone: "Asia/Tehran" })}
-                        </div>
-                      )}
-                      <button
-                        className="btn sm outline"
-                        style={{ padding: "2px 4px", fontSize: "10px", color: "var(--crit)", borderColor: "transparent", width: "100%", marginTop: "4px" }}
-                        onClick={() => handleDeleteSchedule(sr)}
-                      >
-                        حذف برنامه
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {canImport && (
-              <div className="card">
-                <div className="card-head">
-                  <h2>ورود پرسنل از اکسل</h2>
-                </div>
-                <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                  <span style={{ fontSize: "11px", color: "var(--ink-soft)" }}>
-                    یک فایل اکسل با سرستون‌های زیر آپلود کنید:
-                    <br />
-                    <b>نام | خانوادگی | نام‌کاربری | همراه۱ | همراه۲ | داخلی | آدرس</b>
-                  </span>
-                  <input type="file" accept=".xlsx" className="input" onChange={handleExcelImportChange} style={{ fontSize: "12px" }} />
-                  {importPreview.length > 0 && (
-                    <div style={{ marginTop: "8px" }}>
-                      <div style={{ fontSize: "11px", color: "var(--good)", marginBottom: "4px" }}>
-                        فایل آماده ایمپورت: {importPreview.length} ردیف
-                      </div>
-                      <button className="btn primary sm" style={{ width: "100%" }} onClick={handleImportSubmit} disabled={isPending}>
-                        شروع درج در دیتابیس
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* پنل سمت چپ: گزارش‌ساز پویا */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-
-            <div className="card" style={{ padding: "20px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px", marginBottom: "16px" }}>
+        {/* پنل گزارش‌ساز پویا (تمام‌عرض) */}
+        <div className="card" style={{ padding: "20px", width: "100%", maxWidth: "100%", minWidth: 0 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "16px" }}>
                 <div className="field">
                   <label>انتخاب موجودیت گزارش</label>
                   <select
@@ -1259,6 +1349,7 @@ export default function ReportBuilderClient({
                       setFilters([]);
                       setGroupBy("");
                       setActiveReportTab("");
+                      setTimeout(() => setQueryTrigger((p) => p + 1), 50);
                     }}
                   >
                     <option value="manovr">مانورهای پایانه</option>
@@ -1291,22 +1382,71 @@ export default function ReportBuilderClient({
 
               {/* انتخاب فیلدها */}
               <div className="field" style={{ marginBottom: "20px" }}>
-                <label>انتخاب ستون‌های نمایشی گزارش</label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", border: "1px solid var(--line)", padding: "12px", borderRadius: "9px" }}>
-                  {ENTITY_FIELDS[entity].map((f) => (
-                    <label key={f.key} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", cursor: "pointer" }}>
-                      <input
-                        type="checkbox"
-                        checked={fields.includes(f.key)}
-                        onChange={(e) => {
-                          if (e.target.checked) setFields((prev) => [...prev, f.key]);
-                          else setFields((prev) => prev.filter((k) => k !== f.key));
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "8px" }}>
+                  <label style={{ margin: 0, fontWeight: 600 }}>انتخاب ستون‌های نمایشی گزارش</label>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      type="button"
+                      className="btn sm outline"
+                      style={{ fontSize: "11px", padding: "2px 8px" }}
+                      onClick={() => setFields(ENTITY_FIELDS[entity].map((f) => f.key))}
+                    >
+                      انتخاب همه
+                    </button>
+                    <button
+                      type="button"
+                      className="btn sm outline"
+                      style={{ fontSize: "11px", padding: "2px 8px" }}
+                      onClick={() => setFields([ENTITY_FIELDS[entity][0]?.key || "id"])}
+                    >
+                      حداقل ستون
+                    </button>
+                  </div>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "8px",
+                    border: "1px solid var(--line)",
+                    padding: "12px",
+                    borderRadius: "9px",
+                    backgroundColor: "var(--panel-2)"
+                  }}
+                >
+                  {ENTITY_FIELDS[entity].map((f) => {
+                    const isChecked = fields.includes(f.key);
+                    return (
+                      <label
+                        key={f.key}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          fontSize: "12px",
+                          cursor: "pointer",
+                          padding: "5px 10px",
+                          borderRadius: "6px",
+                          backgroundColor: isChecked ? "rgba(216,132,42,0.12)" : "var(--panel)",
+                          border: isChecked ? "1px solid var(--accent)" : "1px solid var(--line)",
+                          color: isChecked ? "var(--accent)" : "var(--ink)",
+                          fontWeight: isChecked ? 600 : "normal",
+                          transition: "all 0.15s ease"
                         }}
-                        style={{ accentColor: "var(--accent)" }}
-                      />
-                      {f.label}
-                    </label>
-                  ))}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) setFields((prev) => [...prev, f.key]);
+                            else setFields((prev) => prev.filter((k) => k !== f.key));
+                          }}
+                          style={{ accentColor: "var(--accent)" }}
+                        />
+                        {f.label}
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1394,8 +1534,20 @@ export default function ReportBuilderClient({
 
                 <span className="spacer" />
 
-                <button className="btn primary" onClick={handleQuery} disabled={isPending}>
-                  {isPending ? "در حال استخراج..." : "اجرای گزارش زنده"}
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={() => handleQuery(true)}
+                  disabled={isLoadingReport}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    fontWeight: 600,
+                    padding: "8px 18px"
+                  }}
+                >
+                  <span>{isLoadingReport ? "⏳ در حال استخراج و تحلیل..." : "⚡ اجرای گزارش زنده"}</span>
                 </button>
               </div>
             </div>
@@ -1567,7 +1719,131 @@ export default function ReportBuilderClient({
                 </div>
               </div>
             )}
+
+        {/* چیدمان افقی ابزارهای تکمیلی: گزارش‌های ذخیره‌شده، زمان‌بندی‌های فعال، ورود پرسنل از اکسل */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: canImport
+              ? "repeat(auto-fit, minmax(300px, 1fr))"
+              : "repeat(auto-fit, minmax(380px, 1fr))",
+            gap: "20px",
+            width: "100%",
+            maxWidth: "100%",
+            minWidth: 0,
+            marginTop: "8px"
+          }}
+        >
+          {/* کارت ۱: گزارش‌های ذخیره‌شده */}
+          <div className="card" style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+            <div className="card-head">
+              <h2>گزارش‌های ذخیره‌شده</h2>
+            </div>
+            <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "320px", overflowY: "auto" }}>
+              {savedReports.length === 0 ? (
+                <span className="muted text-xs">هیچ گزارش ذخیره شده‌ای وجود ندارد.</span>
+              ) : (
+                savedReports.map((rep) => (
+                  <div key={rep.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 8px", backgroundColor: "var(--panel-2)", borderRadius: "6px" }}>
+                    <div style={{ cursor: "pointer", flex: 1 }} onClick={() => handleLoadReport(rep)}>
+                      <b style={{ fontSize: "13px" }}>{rep.name}</b>
+                      <div style={{ fontSize: "10px", color: "var(--ink-faint)" }}>سازنده: {rep.ownerName}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: "4px" }}>
+                      <button
+                        className="btn sm outline"
+                        style={{ padding: "2px 6px", fontSize: "10px", borderColor: "var(--line)" }}
+                        onClick={() => handleOpenScheduleModal(rep)}
+                        title="زمان‌بندی دوره‌ای گزارش"
+                      >
+                        ⏱️
+                      </button>
+                      {rep.isOwner && (
+                        <button
+                          className="btn sm"
+                          style={{ padding: "2px 4px", fontSize: "10px", color: "var(--crit)", borderColor: "transparent" }}
+                          onClick={() => handleDeleteReport(rep)}
+                        >
+                          حذف
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
+
+          {/* کارت ۲: زمان‌بندی‌های فعال */}
+          <div className="card" style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+            <div className="card-head">
+              <h2>زمان‌بندی‌های فعال</h2>
+            </div>
+            <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "320px", overflowY: "auto" }}>
+              {scheduledReports.length === 0 ? (
+                <span className="muted text-xs">هیچ زمان‌بندی فعالی وجود ندارد.</span>
+              ) : (
+                scheduledReports.map((sr: any) => (
+                  <div key={sr.id} style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "8px", backgroundColor: "var(--panel-2)", borderRadius: "6px", fontSize: "11px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <b>{sr.savedReport?.name || `گزارش ${sr.savedReportId}`}</b>
+                      <span className="num muted" style={{ fontSize: "10px" }}>{sr.format.toUpperCase()}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "var(--ink-soft)" }}>
+                      <span className="num" style={{ fontWeight: "bold" }}>{sr.cron}</span>
+                      <label style={{ display: "flex", alignItems: "center", gap: "4px", cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={sr.isActive}
+                          onChange={(e) => handleToggleSchedule(sr.id, e.target.checked)}
+                        />
+                        فعال
+                      </label>
+                    </div>
+                    {sr.lastRunAt && (
+                      <div className="num muted" style={{ fontSize: "9px" }}>
+                        آخرین اجرا: {new Date(sr.lastRunAt).toLocaleString("fa-IR", { calendar: "persian", timeZone: "Asia/Tehran" })}
+                      </div>
+                    )}
+                    <button
+                      className="btn sm outline"
+                      style={{ padding: "2px 4px", fontSize: "10px", color: "var(--crit)", borderColor: "transparent", width: "100%", marginTop: "4px" }}
+                      onClick={() => handleDeleteSchedule(sr)}
+                    >
+                      حذف برنامه
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* کارت ۳: ورود پرسنل از اکسل */}
+          {canImport && (
+            <div className="card" style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+              <div className="card-head">
+                <h2>ورود پرسنل از اکسل</h2>
+              </div>
+              <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <span style={{ fontSize: "11px", color: "var(--ink-soft)" }}>
+                  یک فایل اکسل با سرستون‌های زیر آپلود کنید:
+                  <br />
+                  <b>نام | خانوادگی | نام‌کاربری | همراه۱ | همراه۲ | داخلی | آدرس</b>
+                </span>
+                <input type="file" accept=".xlsx" className="input" onChange={handleExcelImportChange} style={{ fontSize: "12px" }} />
+                {importPreview.length > 0 && (
+                  <div style={{ marginTop: "8px" }}>
+                    <div style={{ fontSize: "11px", color: "var(--good)", marginBottom: "4px" }}>
+                      فایل آماده ایمپورت: {importPreview.length} ردیف
+                    </div>
+                    <button className="btn primary sm" style={{ width: "100%" }} onClick={handleImportSubmit} disabled={isPending}>
+                      شروع درج در دیتابیس
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

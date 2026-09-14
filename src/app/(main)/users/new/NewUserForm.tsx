@@ -4,7 +4,7 @@ import React, { useActionState, useState } from "react";
 import { ORG_POSITIONS } from "@/lib/constants";
 import { useRouter } from "next/navigation";
 import { createUser } from "@/app/actions/user";
-import { Role, OrgPosition, Shift, PersonnelType } from "@/lib/enums";
+import { OrgPosition, Shift, PersonnelType } from "@/lib/enums";
 
 interface LookupItem {
   code: number;
@@ -35,20 +35,12 @@ export default function NewUserForm({
   const [hasAcc, setHasAcc] = useState(false);
   const router = useRouter();
 
-  function getRoleLevel(r: number): number {
-    if (r === 4) return 100; // Super Admin
-    if (r === 1) return 80;  // Admin
-    if (r === 2) return 50;  // Operator
-    if (r === 3) return 30;  // Viewer
-    return 0;                // No Access
-  }
-
-  const actorLevel = getRoleLevel(currentUser?.role ?? 0);
-
   // تولید رنگ رندوم آواتار به عنوان مقدار اولیه
   const [avatarCol, setAvatarCol] = useState(
     () => "hsla(" + Math.floor(Math.random() * 360) + ", 70%, 45%, 0.85)"
   );
+  const [selectedOrgPosition, setSelectedOrgPosition] = useState<number>(4);
+  const [isPartTimeDriver, setIsPartTimeDriver] = useState<boolean>(false);
 
   const isShiftSupervisor = currentUser?.orgPosition === ORG_POSITIONS.RESPONSIBLE;
 
@@ -82,7 +74,19 @@ export default function NewUserForm({
       <div className="grid2">
         <div className="field">
           <label htmlFor="orgPosition">پست سازمانی</label>
-          <select id="orgPosition" name="orgPosition" className="input" defaultValue="4">
+          <select
+            id="orgPosition"
+            name="orgPosition"
+            className="input"
+            value={selectedOrgPosition}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              setSelectedOrgPosition(val);
+              if (val === 1) {
+                setIsPartTimeDriver(false);
+              }
+            }}
+          >
             {orgPositions && orgPositions.length > 0
               ? orgPositions
                   .filter((o) => o.isActive !== false && (!isShiftSupervisor || (o.code !== 2 && o.code !== 3)))
@@ -150,7 +154,30 @@ export default function NewUserForm({
             </select>
           )}
         </div>
-        <div className="field" />
+        <div className="field" style={{ alignSelf: "center", paddingTop: "14px" }}>
+          {selectedOrgPosition === 1 ? (
+            <div style={{ fontSize: "12px", color: "var(--muted)", display: "flex", alignItems: "center", gap: "6px", background: "var(--panel-subtle, rgba(255,255,255,0.03))", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--line)" }}>
+              <span>ℹ️</span>
+              <span>سمت اصلی این کاربر «راهبر» است و به صورت دائم دارای صلاحیت راهبری می‌باشد.</span>
+            </div>
+          ) : (
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", userSelect: "none" }}>
+              <input
+                type="checkbox"
+                name="isPartTimeDriver"
+                checked={isPartTimeDriver}
+                onChange={(e) => setIsPartTimeDriver(e.target.checked)}
+                style={{ width: "18px", height: "18px", marginTop: "2px", cursor: "pointer" }}
+              />
+              <div>
+                <span style={{ fontWeight: 600, fontSize: "14px", color: "var(--text)" }}>راهبر غیردائم</span>
+                <p style={{ margin: "2px 0 0", fontSize: "11px", color: "var(--muted)" }}>
+                  امکان انتخاب کاربر در مانورها بدون تغییر پست سازمانی اصلی
+                </p>
+              </div>
+            </label>
+          )}
+        </div>
       </div>
 
       <h3 style={{ borderBottom: "1px solid var(--line)", paddingBottom: "6px", fontWeight: "700", margin: "20px 0 16px" }}>
@@ -225,29 +252,30 @@ export default function NewUserForm({
               <input id="userName" name="userName" className="input" dir="ltr" required />
             </div>
             <div className="field">
-              <label htmlFor="password">رمز عبور (پیش‌فرض: ۱۲۳۴۵۶)</label>
-              <input id="password" name="password" type="password" className="input" dir="ltr" defaultValue="123456" />
-            </div>
-          </div>
-          <div className="grid2">
-            <div className="field">
-              <label htmlFor="accessRoleId">نقش سفارشی (سیستم دسترسی جدید V3)</label>
-              <select id="accessRoleId" name="accessRoleId" className="input" defaultValue="">
-                <option value="">-- بدون نقش سفارشی (استفاده از نقش سیستمی) --</option>
+              <label htmlFor="accessRoleId">نقش کاربری (سیستم دسترسی V3) *</label>
+              <select
+                id="accessRoleId"
+                name="accessRoleId"
+                className="input"
+                defaultValue={roles.find((r) => r.name === "مشاهده")?.id ?? ""}
+                required
+              >
+                <option value="" disabled>-- انتخاب نقش دسترسی سامانه --</option>
                 {roles.map((r) => (
                   <option key={r.id} value={r.id}>{r.name}</option>
                 ))}
               </select>
             </div>
+          </div>
+          <div className="grid2">
             <div className="field">
-              <label htmlFor="role">نقش سیستمی (پیش‌فرض قدیمی)</label>
-              <select id="role" name="role" className="input" defaultValue="3">
-                {Object.entries(Role)
-                  .filter(([k]) => k !== "0" && getRoleLevel(Number(k)) < actorLevel)
-                  .map(([k, v]) => (
-                    <option key={k} value={k}>{v}</option>
-                  ))}
-              </select>
+              <label htmlFor="password">رمز عبور (پیش‌فرض: ۱۲۳۴۵۶)</label>
+              <input id="password" name="password" type="password" className="input" dir="ltr" defaultValue="123456" />
+            </div>
+            <div className="field" style={{ display: "flex", alignItems: "center", paddingTop: "24px" }}>
+              <span className="muted" style={{ fontSize: "12px", lineHeight: "1.6" }}>
+                دسترسی‌های ورود به سامانه و مجوزهای کاربر بر اساس نقش انتخاب‌شده V3 تعیین می‌شوند.
+              </span>
             </div>
           </div>
         </div>

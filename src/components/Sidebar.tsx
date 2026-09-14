@@ -1,63 +1,94 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logoutAction } from "@/app/actions/auth";
 import { Role } from "@/lib/enums";
 import NotificationBell from "@/components/NotificationBell";
 import { Icons } from "@/lib/icons";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { useTheme } from "@/components/ThemeProvider";
 import { safeAccentColor } from "@/lib/branding";
 import ServerStatusBadge from "@/components/ServerStatusBadge";
 
-const DYNAMIC_NAV = [
-  { grp: "عملیات پایانه" },
-  { href: "/depot", icKey: "Depot", label: "نمای پایانه", perm: "depot.view" },
-  { href: "/dashboard", icKey: "Dashboard", label: "داشبورد و آمار", perm: "dashboard.view" },
-  { href: "/manovrs/approvals", icKey: "Approvals", label: "تأیید و کنترل مانورها", perm: "manovr.confirm" },
-  { href: "/manovrs", icKey: "History", label: "تاریخچه مانورها", perm: "manovr.view" },
-  { href: "/manovrs/new", icKey: "NewManovr", label: "ثبت مانور جدید", perm: "manovr.create" },
-  { grp: "اطلاعات پایه" },
-  { href: "/trains", icKey: "Trains", label: "مدیریت قطارها", perm: "train.view" },
-  { href: "/lines", icKey: "Lines", label: "مدیریت خطوط ریل", perm: "line.view" },
-  { href: "/users", icKey: "Users", label: "کاربران و پرسنل", perm: "user.view" },
-  { href: "/roles", icKey: "Roles", label: "مدیریت نقش‌ها", perm: "role.view" },
-  { href: "/phonebook", icKey: "Phonebook", label: "دفتر تلفن پرسنل", perm: "phonebook.view" },
-  { grp: "تحلیل و تنظیمات" },
-  { href: "/profile", icKey: "Profile", label: "پروفایل من" },
-  { href: "/tickets", icKey: "Tickets", label: "تیکت‌های پشتیبانی", perm: "ticket.create" },
-  { href: "/reports", icKey: "Reports", label: "گزارش‌ساز پویا", perm: "report.build" },
-  { href: "/help", icKey: "Help", label: "راهنما و آموزش" },
-  { href: "/settings", icKey: "Settings", label: "شخصی‌سازی تم" },
-  { href: "/admin/terminals", icKey: "Lookups", label: "مدیریت ترمینال‌ها", perm: "terminal.view" },
-  { href: "/admin/lookups", icKey: "Lookups", label: "مدیریت مقادیر پویا", perm: "lookups.manage" },
-  { href: "/admin/branding", icKey: "Branding", label: "تنظیمات برندینگ", perm: "branding.manage" },
-  { href: "/admin/audit", icKey: "Audit", label: "لاگ وقایع سیستم", perm: "audit.view" },
-  { href: "/admin/backup", icKey: "Backup", label: "پشتیبان‌گیری سیستم", perm: "backup.manage" },
+interface NavItem {
+  href: string;
+  icKey: string;
+  label: string;
+  perm?: string;
+}
+
+interface NavSection {
+  id: string;
+  title: string;
+  isCollapsible?: boolean;
+  items: NavItem[];
+}
+
+const NAV_SECTIONS: NavSection[] = [
+  {
+    id: "operations",
+    title: "عملیات پایانه",
+    items: [
+      { href: "/depot", icKey: "Depot", label: "نمای پایانه", perm: "depot.view" },
+      { href: "/dashboard", icKey: "Dashboard", label: "داشبورد و آمار", perm: "dashboard.view" },
+      { href: "/manovrs/approvals", icKey: "Approvals", label: "تأیید و کنترل مانورها", perm: "manovr.confirm" },
+      { href: "/manovrs", icKey: "History", label: "تاریخچه مانورها", perm: "manovr.view" },
+      { href: "/manovrs/new", icKey: "NewManovr", label: "ثبت مانور جدید", perm: "manovr.create" },
+    ],
+  },
+  {
+    id: "base-info",
+    title: "اطلاعات پایه",
+    items: [
+      { href: "/trains", icKey: "Trains", label: "مدیریت قطارها", perm: "train.view" },
+      { href: "/lines", icKey: "Lines", label: "مدیریت خطوط ریل", perm: "line.view" },
+      { href: "/users", icKey: "Users", label: "کاربران و پرسنل", perm: "user.view" },
+      { href: "/roles", icKey: "Roles", label: "مدیریت نقش‌ها", perm: "role.view" },
+      { href: "/phonebook", icKey: "Phonebook", label: "دفتر تلفن پرسنل", perm: "phonebook.view" },
+    ],
+  },
+  {
+    id: "analysis",
+    title: "تحلیل و تنظیمات",
+    isCollapsible: true,
+    items: [
+      { href: "/profile", icKey: "Profile", label: "پروفایل من" },
+      { href: "/tickets", icKey: "Tickets", label: "تیکت‌های پشتیبانی", perm: "ticket.view" },
+      { href: "/reports", icKey: "Reports", label: "گزارش‌ساز پویا", perm: "report.build" },
+      { href: "/help", icKey: "Help", label: "راهنما و آموزش", perm: "help.view" },
+      { href: "/settings", icKey: "Settings", label: "شخصی‌سازی تم" },
+      { href: "/admin/terminals", icKey: "Lookups", label: "مدیریت ترمینال‌ها", perm: "terminal.view" },
+      { href: "/admin/lookups", icKey: "Lookups", label: "مدیریت مقادیر پویا", perm: "lookups.manage" },
+      { href: "/admin/branding", icKey: "Branding", label: "تنظیمات برندینگ", perm: "branding.manage" },
+      { href: "/admin/audit", icKey: "Audit", label: "لاگ وقایع سیستم", perm: "audit.view" },
+      { href: "/admin/backup", icKey: "Backup", label: "پشتیبان‌گیری سیستم", perm: "backup.manage" },
+    ],
+  },
 ];
 
 export default function Sidebar({
   userId,
   fullName,
   role,
+  roleName,
   perms = [],
 }: {
   userId: number;
   fullName: string;
   role: number;
+  roleName?: string;
   perms?: string[];
 }) {
   const { appearance } = useTheme();
   const navPos = appearance.navPosition || "right";
   const path = usePathname();
-  const [isCollapsed, setIsCollapsed] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("sidebar_collapsed") === "true";
-    }
-    return false;
-  });
+
+  // مقدار اولیه پایدار برای هماهنگی کامل SSR و کلاینت و جلوگیری از خطای هیدریشن
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isAnalysisExpanded, setIsAnalysisExpanded] = useState(true);
+
   const [branding, setBranding] = useState({
     title: "سامانه مدیریت مانور",
     footer: "پایانه فتح‌آباد · v3",
@@ -67,6 +98,18 @@ export default function Sidebar({
   });
 
   useEffect(() => {
+    // بازیابی وضعیت ذخیره‌شده سایدبار در کلاینت پس از هیدریشن موفق
+    try {
+      const storedCollapsed = localStorage.getItem("sidebar_collapsed");
+      if (storedCollapsed !== null) {
+        setIsCollapsed(storedCollapsed === "true");
+      }
+      const storedAnalysis = localStorage.getItem("sidebar_analysis_expanded");
+      if (storedAnalysis !== null) {
+        setIsAnalysisExpanded(storedAnalysis === "true");
+      }
+    } catch {}
+
     // بارگذاری تنظیمات برندینگ
     import("@/app/actions/lookups").then((m) => {
       m.getBrandingSettings().then((res) => {
@@ -120,66 +163,88 @@ export default function Sidebar({
     }
   };
 
-  // فیلتر کردن منوهای ناوبری بر اساس مجوزها
-  const filteredNav = React.useMemo(() => {
-    const checkPermission = (perm?: string) => {
-      if (role === 4) return true; // سوپرادمین به همه جا دسترسی دارد
-      if (!perm) return true;
-      return perms.includes(perm);
-    };
-
-    const allowedItems = DYNAMIC_NAV.filter((n) => {
-      if ("href" in n && n.perm) {
-        return checkPermission(n.perm);
+  const toggleAnalysisAccordion = useCallback(() => {
+    setIsAnalysisExpanded((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("sidebar_analysis_expanded", String(next));
       }
-      return true;
+      return next;
     });
+  }, []);
 
-    const result: (typeof DYNAMIC_NAV[number])[] = [];
-    for (let i = 0; i < allowedItems.length; i++) {
-      const current = allowedItems[i];
-      if ("grp" in current) {
-        let hasChildren = false;
-        for (let j = i + 1; j < allowedItems.length; j++) {
-          const next = allowedItems[j];
-          if ("grp" in next) break;
-          if ("href" in next) {
-            hasChildren = true;
-            break;
-          }
-        }
-        if (hasChildren) {
-          result.push(current);
-        }
-      } else {
-        result.push(current);
-      }
-    }
-    return result;
-  }, [perms, role]);
-
-  const isLinkActive = (href: string) => {
+  const isLinkActive = useCallback((href: string) => {
     if (href === "/manovrs") {
       return path === href;
     }
     return path === href || (path.startsWith(href) && href !== "/dashboard" && href !== "/depot");
-  };
+  }, [path]);
+
+  // فیلتر کردن منوهای ناوبری بر اساس مجوزها
+  const filteredSections = useMemo(() => {
+    const checkPermission = (perm?: string) => {
+      if (role === 4) return true; // سوپرادمین به همه جا دسترسی دارد
+      if (!perm) return true;
+      if (perms.includes(perm)) return true;
+      if (perm === "ticket.view") {
+        return perms.includes("ticket.view") || perms.includes("ticket.create") || perms.includes("ticket.manage");
+      }
+      if (perm === "report.build") {
+        return perms.includes("report.build") || perms.includes("report.schedule");
+      }
+      return false;
+    };
+
+    return NAV_SECTIONS.map((section) => ({
+      ...section,
+      items: section.items.filter((item) => {
+        if (item.perm) {
+          return checkPermission(item.perm);
+        }
+        return true;
+      }),
+    })).filter((section) => section.items.length > 0);
+  }, [perms, role]);
+
+  // باز شدن خودکار آکاردئون در صورت تطابق مسیر جاری با هر یک از زیرمنوهای تحلیل و تنظیمات بر اساس الگوی ری‌اکت ۱۹
+  const isAnyAnalysisActive = useMemo(() => {
+    const analysisSec = filteredSections.find((s) => s.id === "analysis");
+    if (!analysisSec) return false;
+    return analysisSec.items.some((item) => isLinkActive(item.href));
+  }, [filteredSections, isLinkActive]);
+
+  const [prevActivePath, setPrevActivePath] = useState(path);
+  if (prevActivePath !== path) {
+    setPrevActivePath(path);
+    if (isAnyAnalysisActive && !isAnalysisExpanded) {
+      setIsAnalysisExpanded(true);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("sidebar_analysis_expanded", "true");
+      }
+    }
+  }
+
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar select-none" dir="rtl">
       <div className="brand" style={{ display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" }}>
         <div style={{ display: "flex", gap: "10px", alignItems: "center", width: "100%", justifyContent: isCollapsed ? "center" : "flex-start" }}>
-          <div className="logo" style={{
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "20px",
-            width: "32px",
-            height: "32px",
-            borderRadius: "6px",
-            overflow: "hidden"
-          }} onClick={toggleSidebar} title="تغییر وضعیت منو">
+          <div
+            className="logo"
+            style={{
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "20px",
+              width: "32px",
+              height: "32px",
+              borderRadius: "6px",
+              overflow: "hidden",
+            }}
+            onClick={toggleSidebar}
+            title="تغییر وضعیت منو"
+          >
             {branding.logoType === "image" && branding.logoImage ? (
               <img src={branding.logoImage} alt="Logo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
@@ -215,6 +280,7 @@ export default function Sidebar({
           }}
         >
           <button
+            type="button"
             onClick={toggleSidebar}
             style={{
               border: "none",
@@ -230,50 +296,194 @@ export default function Sidebar({
             }}
             title={isCollapsed ? "گسترش منو" : "جمع کردن منو"}
           >
-            {isCollapsed 
-              ? (navPos === "left" ? <Icons.CaretRight size={16} weight="bold" /> : <Icons.CaretLeft size={16} weight="bold" />) 
+            {isCollapsed
+              ? (navPos === "left" ? <Icons.CaretRight size={16} weight="bold" /> : <Icons.CaretLeft size={16} weight="bold" />)
               : (navPos === "left" ? <Icons.CaretLeft size={16} weight="bold" /> : <Icons.CaretRight size={16} weight="bold" />)}
           </button>
         </div>
       </div>
 
-      <nav className="nav">
-        {filteredNav.map((n, i) => {
-          if ("grp" in n) {
-            if (isCollapsed) return null;
+      <nav className="nav space-y-1">
+        {filteredSections.map((section) => {
+          // اگر بخش تاشو باشد (تحلیل و تنظیمات)
+          if (section.isCollapsible) {
+            if (isCollapsed) {
+              // در حالت سایدبار جمع‌شده، دکمه آکاردئون به عنوان تاگل آیکون‌ها عمل می‌کند
+              return (
+                <div key={section.id} className="pt-2 border-t border-slate-200/50 dark:border-slate-800/50">
+                  <button
+                    type="button"
+                    onClick={toggleAnalysisAccordion}
+                    className={`w-11 h-11 mx-auto rounded-full flex items-center justify-center transition-all relative ${
+                      isAnyAnalysisActive
+                        ? "bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 ring-2 ring-amber-500/40"
+                        : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    }`}
+                    title={`${section.title} (${isAnalysisExpanded ? "بستن" : "باز کردن"})`}
+                  >
+                    <Icons.Settings size={20} weight={isAnyAnalysisActive ? "bold" : "regular"} />
+                    {isAnyAnalysisActive && (
+                      <span className="absolute top-1 left-1 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-900" />
+                    )}
+                  </button>
+
+                  {/* نمایش آیکون‌های داخلی در حالت باز بودن آکاردئون در نوار کوچک */}
+                  <AnimatePresence initial={false}>
+                    {isAnalysisExpanded && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="space-y-1 pt-1 overflow-hidden flex flex-col items-center"
+                      >
+                        {section.items.map((n) => {
+                          const IconComponent = Icons[n.icKey as keyof typeof Icons];
+                          const active = isLinkActive(n.href);
+                          return (
+                            <Link
+                              key={n.href}
+                              href={n.href}
+                              className={active ? "active" : ""}
+                              title={n.label}
+                            >
+                              <span className="ic">
+                                {IconComponent && <IconComponent size={18} weight={active ? "bold" : "regular"} />}
+                              </span>
+                            </Link>
+                          );
+                        })}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            }
+
+            // حالت عادی سایدبار باز (Full Expanded Sidebar): آکاردئون انیمیشنی پیشرفته
             return (
-              <div className="grp" key={`grp-${i}`}>
-                {n.grp}
+              <div key={section.id} className="pt-2">
+                {/* هدر تعاملی آکاردئون همراه با آیکون چرخ‌دنده، برچسب، نشان تعداد و چوران چرخشی */}
+                <button
+                  type="button"
+                  onClick={toggleAnalysisAccordion}
+                  aria-expanded={isAnalysisExpanded}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all group ${
+                    isAnyAnalysisActive
+                      ? "text-amber-700 dark:text-amber-300 bg-amber-50/70 dark:bg-amber-950/30"
+                      : "text-slate-600 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-slate-800/60"
+                  }`}
+                  style={{ cursor: "pointer" }}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`transition-transform duration-200 ${isAnalysisExpanded ? "rotate-90 text-amber-600" : "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300"}`}>
+                      <Icons.Settings size={16} weight={isAnyAnalysisActive ? "bold" : "regular"} />
+                    </span>
+                    <span className="truncate tracking-tight font-black">{section.title}</span>
+                    <span className="px-1.5 py-0.5 text-[10px] font-mono rounded-full bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold">
+                      {section.items.length}
+                    </span>
+                    {isAnyAnalysisActive && !isAnalysisExpanded && (
+                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="زیرمنوی فعال" />
+                    )}
+                  </div>
+
+                  <span
+                    className="shrink-0 transition-transform duration-300 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200"
+                    style={{
+                      transform: isAnalysisExpanded ? "rotate(0deg)" : "rotate(180deg)",
+                    }}
+                  >
+                    <Icons.CaretDown size={14} weight="bold" />
+                  </span>
+                </button>
+
+                {/* محتوای دراپ‌داون آکاردئون با انیمیشن روان ارتفاع و فید */}
+                <AnimatePresence initial={false}>
+                  {isAnalysisExpanded && (
+                    <motion.div
+                      key="analysis-accordion-body"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
+                      style={{ overflow: "hidden" }}
+                      className="ps-2 pe-1 pt-1 space-y-0.5 border-s-2 border-slate-200/60 dark:border-slate-800/80 ms-4 mt-1"
+                    >
+                      {section.items.map((n, idx) => {
+                        const IconComponent = Icons[n.icKey as keyof typeof Icons];
+                        const active = isLinkActive(n.href);
+
+                        return (
+                          <motion.div
+                            key={n.href}
+                            initial={{ opacity: 0, x: 8 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.2, delay: idx * 0.015 }}
+                          >
+                            <Link
+                              href={n.href}
+                              className={active ? "active" : ""}
+                              style={{
+                                padding: "8px 12px",
+                                fontSize: "13px",
+                              }}
+                            >
+                              <span className="ic">
+                                {IconComponent && <IconComponent size={16} weight={active ? "bold" : "regular"} />}
+                              </span>
+                              <span>{n.label}</span>
+                            </Link>
+                          </motion.div>
+                        );
+                      })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             );
           }
 
-          const IconComponent = Icons[n.icKey as keyof typeof Icons];
-          const active = isLinkActive(n.href!);
-
+          // بخش‌های غیراکاردئونی (عملیات پایانه و اطلاعات پایه)
           return (
-            <motion.div
-              key={n.href}
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3, delay: i * 0.02, ease: [0.32, 0.72, 0, 1] }}
-            >
-              <Link href={n.href!} className={active ? "active" : ""} title={isCollapsed ? n.label : undefined}>
-                <span className="ic">
-                  {IconComponent && <IconComponent size={18} weight={active ? "bold" : "regular"} />}
-                </span>
-                {!isCollapsed && <span>{n.label}</span>}
-              </Link>
-            </motion.div>
+            <div key={section.id} className="space-y-1">
+              {!isCollapsed && (
+                <div className="grp">
+                  {section.title}
+                </div>
+              )}
+
+              {section.items.map((n, i) => {
+                const IconComponent = Icons[n.icKey as keyof typeof Icons];
+                const active = isLinkActive(n.href);
+
+                return (
+                  <motion.div
+                    key={n.href}
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.25, delay: i * 0.02, ease: [0.32, 0.72, 0, 1] }}
+                  >
+                    <Link href={n.href} className={active ? "active" : ""} title={isCollapsed ? n.label : undefined}>
+                      <span className="ic">
+                        {IconComponent && <IconComponent size={18} weight={active ? "bold" : "regular"} />}
+                      </span>
+                      {!isCollapsed && <span>{n.label}</span>}
+                    </Link>
+                  </motion.div>
+                );
+              })}
+            </div>
           );
         })}
       </nav>
 
       <div className="side-foot">
         {!isCollapsed && <div className="who">{fullName || "کاربر"}</div>}
-        {!isCollapsed && <div className="role">{Role[role] ?? "—"}</div>}
+        {!isCollapsed && <div className="role">{roleName || Role[role] || "—"}</div>}
         <form action={logoutAction} style={{ marginTop: isCollapsed ? 0 : 12 }}>
           <button
+            type="submit"
             className="btn sm primary"
             style={{
               width: isCollapsed ? "40px" : "100%",
@@ -289,21 +499,23 @@ export default function Sidebar({
           </button>
         </form>
 
-        <div style={{
-          marginTop: "16px",
-          borderTop: "1px dashed var(--line-soft)",
-          paddingTop: "10px",
-          textAlign: "center",
-          fontSize: "10px",
-          color: "var(--ink-faint)",
-          direction: "rtl"
-        }}>
+        <div
+          style={{
+            marginTop: "16px",
+            borderTop: "1px dashed var(--line-soft)",
+            paddingTop: "10px",
+            textAlign: "center",
+            fontSize: "10px",
+            color: "var(--ink-faint)",
+            direction: "rtl",
+          }}
+        >
           {isCollapsed ? (
-            <span title="برنامه‌نویسی و توسعه: سید شبیر موسوی">© ش.م.</span>
+            <span title="سامانه مانور نسخه ۰.۱.۱ — توسعه: سید شبیر موسوی">v0.1.1</span>
           ) : (
             <div>
-              حق تکثیر محفوظ است © ۲۰۲۶
-              <div style={{ marginTop: "2px", fontWeight: 500 }}>توسعه توسط سید شبیر موسوی</div>
+              سامانه مانور دپو · نسخه ۰.۱.۱
+              <div style={{ marginTop: "2px", fontWeight: 500 }}>توسعه توسط سید شبیر موسوی © ۲۰۲۶</div>
             </div>
           )}
         </div>

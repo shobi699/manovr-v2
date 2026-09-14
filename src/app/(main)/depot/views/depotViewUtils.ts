@@ -11,6 +11,7 @@ export interface Depot2DViewProps {
   canLayout: boolean;
   isFocusMode: boolean;
   theme?: string;
+  zoom?: number;
   onSelectLine: (line: LineData) => void;
   onSelectTrain: (train: TrainData) => void;
   onDropTrainToLine: (trainId: number, targetLine: LineData, slotIdx?: number) => void;

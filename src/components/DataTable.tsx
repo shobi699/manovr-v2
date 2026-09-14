@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { saveSetting } from "@/app/actions/settings";
 import { Icons } from "@/lib/icons";
 import { PAGE_SIZE_OPTIONS } from "@/lib/list-query";
+import { persianSearchMatch } from "@/lib/persian-text";
 
 export interface Column<T> {
   key: string;
@@ -134,13 +135,15 @@ export default function DataTable<T extends Record<string, any>>({
   const filtered = isServerMode
     ? data
     : data.filter((item) => {
-        // جستجوی سراسری
+        // جستجوی سراسری با نرمال‌سازی کامل حروف فارسی و عربی
         if (search && searchFields.length > 0) {
-          const term = search.toLowerCase();
           const matchesGlobal = searchFields.some((field) => {
-            const val = item[field];
+            let val: any = (item as any)[field];
+            if ((val === undefined || val === null) && typeof field === "string" && field.includes(".")) {
+              val = field.split(".").reduce((acc, part) => (acc != null ? acc[part] : undefined), item as any);
+            }
             if (val === undefined || val === null) return false;
-            return String(val).toLowerCase().includes(term);
+            return persianSearchMatch(String(val), search);
           });
           if (!matchesGlobal) return false;
         }
@@ -496,7 +499,7 @@ export default function DataTable<T extends Record<string, any>>({
                                   <div style={{ maxHeight: "150px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "6px", marginBottom: "8px" }}>
                                     {(() => {
                                       const allVals = Array.from(new Set(data.map(item => col.getValue ? col.getValue(item) : item[col.key])));
-                                      const filteredVals = allVals.filter(v => v !== undefined && v !== null && String(v).toLowerCase().includes(colSearchTerm.toLowerCase()));
+                                      const filteredVals = allVals.filter(v => v !== undefined && v !== null && persianSearchMatch(String(v), colSearchTerm));
                                       const activeSet = columnFilters[col.key] || new Set();
                                       
                                       return filteredVals.map((v, i) => (

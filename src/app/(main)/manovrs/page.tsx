@@ -3,8 +3,10 @@ import PageHeader from "@/components/PageHeader";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { hasPerm } from "@/lib/perms";
+import { isAdmin } from "@/lib/enums";
 import { getCachedLookup } from "@/lib/lookups";
 import { parseListParams, toPrismaPage } from "@/lib/list-query";
+import { generateSearchVariants } from "@/lib/persian-text";
 import ManovrsTableClient from "./ManovrsTableClient";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +31,8 @@ export default async function ManovrsPage({
   const canEdit = session ? await hasPerm(session, "manovr.edit") : false;
   const canConfirm = session ? await hasPerm(session, "manovr.confirm") : false;
   const canDelete = session ? await hasPerm(session, "manovr.delete") : false;
+  const isManager = session ? isAdmin(session.role) : false;
+
 
   const resolvedParams = (await searchParams) || {};
   const params = parseListParams(resolvedParams, ALLOWED_SORT);
@@ -48,16 +52,19 @@ export default async function ManovrsPage({
   const andConditions: any[] = [];
 
   if (trainCode) {
-    andConditions.push({ train: { code: { contains: trainCode } } });
+    const variants = generateSearchVariants(trainCode);
+    andConditions.push({ OR: variants.map((v) => ({ train: { code: { contains: v } } })) });
   }
   if (typeFilter !== "") {
     andConditions.push({ type: Number(typeFilter) });
   }
   if (srcLine) {
-    andConditions.push({ sourceLine: { name: { contains: srcLine } } });
+    const variants = generateSearchVariants(srcLine);
+    andConditions.push({ OR: variants.map((v) => ({ sourceLine: { name: { contains: v } } })) });
   }
   if (destLine) {
-    andConditions.push({ destinationLine: { name: { contains: destLine } } });
+    const variants = generateSearchVariants(destLine);
+    andConditions.push({ OR: variants.map((v) => ({ destinationLine: { name: { contains: v } } })) });
   }
   if (statusFilter !== "") {
     andConditions.push({ status: Number(statusFilter) });
@@ -66,28 +73,31 @@ export default async function ManovrsPage({
     andConditions.push({ confirmationStatus: Number(confFilter) });
   }
   if (rahbarFilter) {
+    const variants = generateSearchVariants(rahbarFilter);
     andConditions.push({
-      OR: [
-        { rahbar1: { firstName: { contains: rahbarFilter } } },
-        { rahbar1: { lastName: { contains: rahbarFilter } } },
-      ],
+      OR: variants.flatMap((v) => [
+        { rahbar1: { firstName: { contains: v } } },
+        { rahbar1: { lastName: { contains: v } } },
+      ]),
     });
   }
   if (creatorFilter) {
+    const variants = generateSearchVariants(creatorFilter);
     andConditions.push({
-      OR: [
-        { creator: { firstName: { contains: creatorFilter } } },
-        { creator: { lastName: { contains: creatorFilter } } },
-      ],
+      OR: variants.flatMap((v) => [
+        { creator: { firstName: { contains: v } } },
+        { creator: { lastName: { contains: v } } },
+      ]),
     });
   }
 
   if (params.search) {
+    const variants = generateSearchVariants(params.search);
     andConditions.push({
-      OR: [
-        { train: { code: { contains: params.search } } },
-        { description: { contains: params.search } }
-      ],
+      OR: variants.flatMap((v) => [
+        { train: { code: { contains: v } } },
+        { description: { contains: v } },
+      ]),
     });
   }
 
@@ -99,26 +109,54 @@ export default async function ManovrsPage({
     ? { [params.sortField]: params.sortDir }
     : { createdAt: "desc" as const };
 
-  const [manovrs, totalRows, manovrTypeLookup, manovrStatusLookup, confirmationStatusLookup] =
-    await Promise.all([
-      prisma.manovr.findMany({
-        where,
-        orderBy,
-        skip,
-        take,
-        include: {
-          sourceLine: true,
-          destinationLine: true,
-          train: true,
-          rahbar1: true,
-          creator: true,
-        },
-      }),
-      prisma.manovr.count({ where }),
-      getCachedLookup("manovr_type"),
-      getCachedLookup("manovr_status"),
-      getCachedLookup("confirmation_status"),
-    ]);
+  const [
+    manovrs,
+    totalRows,
+    manovrTypeLookup,
+    manovrStatusLookup,
+    confirmationStatusLookup,
+    shiftLookup,
+    drivers,
+  ] = await Promise.all([
+    prisma.manovr.findMany({
+      where,
+      orderBy,
+      skip,
+      take,
+      include: {
+        sourceLine: true,
+        destinationLine: true,
+        train: true,
+        rahbar1: true,
+        rahbar2: true,
+        creator: true,
+      },
+    }),
+    prisma.manovr.count({ where }),
+    getCachedLookup("manovr_type"),
+    getCachedLookup("manovr_status"),
+    getCachedLookup("confirmation_status"),
+    getCachedLookup("shift"),
+    prisma.personnel.findMany({
+      where: {
+        OR: [
+          { orgPosition: 1 },
+          { isPartTimeDriver: true },
+          { manovrsAsRahbar1: { some: {} } },
+        ],
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        personnelCode: true,
+        shift: true,
+        isPartTimeDriver: true,
+        orgPosition: true,
+      },
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    }),
+  ]);
 
   return (
     <>
@@ -144,8 +182,12 @@ export default async function ManovrsPage({
           manovrTypes={manovrTypeLookup?.values || []}
           manovrStatuses={manovrStatusLookup?.values || []}
           confirmationStatuses={confirmationStatusLookup?.values || []}
+          shifts={shiftLookup?.values || []}
+          drivers={drivers}
+          isAdmin={isManager}
         />
       </div>
     </>
   );
 }
+

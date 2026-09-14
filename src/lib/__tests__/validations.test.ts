@@ -54,6 +54,51 @@ describe("Validation Schemas (Zod)", () => {
       }
     });
 
+    it("succeeds createUser and updateUser with accessRoleId and without legacy role", () => {
+      const createParsed = createUserSchema.safeParse({
+        firstName: "مهدی",
+        lastName: "فردوسی",
+        hasAccount: "1",
+        userName: "m_ferdowsi",
+        password: "password123",
+        accessRoleId: "2",
+      });
+      expect(createParsed.success).toBe(true);
+      if (createParsed.success) {
+        expect(createParsed.data.accessRoleId).toBe(2);
+        expect(createParsed.data.role).toBe(0);
+      }
+
+      const updateParsed = updateUserSchema.safeParse({
+        id: 12,
+        firstName: "مهدی",
+        lastName: "فردوسی",
+        accessRoleId: "3",
+      });
+      expect(updateParsed.success).toBe(true);
+      if (updateParsed.success) {
+        expect(updateParsed.data.accessRoleId).toBe(3);
+        expect(updateParsed.data.role).toBe(0);
+      }
+    });
+
+    it("allows dynamic lookup codes >= 5 for orgPosition and shift without rejection", () => {
+      const parsed = updateUserSchema.safeParse({
+        id: 10,
+        firstName: "مهندس",
+        lastName: "صادقی",
+        orgPosition: "15",
+        shift: "5",
+        personnelType: "2",
+      });
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.orgPosition).toBe(15);
+        expect(parsed.data.shift).toBe(5);
+        expect(parsed.data.personnelType).toBe(2);
+      }
+    });
+
     it("succeeds createUser with valid data", () => {
       const parsed = createUserSchema.safeParse({
         firstName: "علی",

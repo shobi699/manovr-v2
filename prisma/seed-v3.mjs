@@ -3,18 +3,19 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 export const ALL_PERMS = [
-  "manovr.view", "manovr.create", "manovr.edit", "manovr.confirm", "manovr.delete",
-  "train.view", "train.create", "train.edit", "train.delete",
+  "manovr.view", "manovr.create", "manovr.edit", "manovr.confirm", "manovr.delete", "manovr.report",
+  "train.view", "train.create", "train.edit", "train.delete", "train.export",
   "train.status.kafshak", "train.status.atp", "train.status.rotary", "train.status.license",
   "line.view", "line.create", "line.edit", "line.delete",
   "terminal.view", "terminal.create", "terminal.edit", "terminal.delete",
   "user.view", "user.create", "user.edit", "user.delete",
   "role.view", "role.create", "role.edit", "role.delete",
   "phonebook.view", "phonebook.edit",
-  "report.build", "report.export", "report.import",
-  "ticket.create", "ticket.manage",
-  "lookups.manage", "branding.manage", "audit.view", "backup.manage", "settings.global",
-  "depot.layout", "depot.view", "dashboard.view"
+  "report.build", "report.export", "report.import", "report.schedule",
+  "ticket.view", "ticket.create", "ticket.manage", "ticket.broadcast",
+  "depot.view", "depot.layout", "dashboard.view",
+  "help.view",
+  "lookups.manage", "branding.manage", "audit.view", "audit.export", "backup.manage", "settings.global", "updater.manage"
 ];
 
 const SYSTEM_ROLES = [
@@ -22,17 +23,26 @@ const SYSTEM_ROLES = [
   {
     name: "مسئول",
     permissions: [
-      "manovr.view", "manovr.create", "manovr.edit", "manovr.confirm", "manovr.delete",
-      "train.view", "train.create", "train.edit", "train.delete",
+      "manovr.view", "manovr.create", "manovr.edit", "manovr.confirm", "manovr.delete", "manovr.report",
+      "train.view", "train.create", "train.edit", "train.delete", "train.export",
+      "train.status.kafshak", "train.status.atp", "train.status.rotary", "train.status.license",
       "line.view", "line.create", "line.edit", "line.delete",
       "terminal.view", "terminal.create", "terminal.edit", "terminal.delete",
       "user.view", "user.create", "user.edit", "user.delete",
-      "phonebook.view", "report.build", "report.export", "ticket.create", "ticket.manage",
-      "depot.view", "dashboard.view", "settings.global"
+      "phonebook.view", "phonebook.edit", "report.build", "report.export", "report.schedule",
+      "ticket.view", "ticket.create", "ticket.manage",
+      "depot.view", "dashboard.view", "help.view", "settings.global"
     ],
     isSystem: true, legacy: 2,
   },
-  { name: "مشاهده", permissions: ["manovr.view", "phonebook.view", "report.build", "report.export", "depot.view", "dashboard.view"], isSystem: true, legacy: 3 },
+  {
+    name: "مشاهده",
+    permissions: [
+      "manovr.view", "manovr.report", "train.view", "line.view", "terminal.view",
+      "phonebook.view", "report.export", "ticket.view", "depot.view", "dashboard.view", "help.view"
+    ],
+    isSystem: true, legacy: 3
+  },
   { name: "بدون دسترسی", permissions: [], isSystem: true, legacy: 0 },
 ];
 
@@ -288,8 +298,9 @@ const LOOKUPS = {
   train_type: {
     label: "نوع ناوگان",
     values: [
-      { code: 0, label: "AC (مترویی)", color: "#3b82f6" },
-      { code: 1, label: "DC (دیزلی)", color: "#10b981" },
+      { code: 0, label: "AC (برقی - نسل جدید)", color: "#3b82f6" },
+      { code: 1, label: "DC (برقی - نسل قدیم)", color: "#10b981" },
+      { code: 2, label: "دیزل (لوکوموتیو)", color: "#f59e0b" },
     ]
   },
   shift: {

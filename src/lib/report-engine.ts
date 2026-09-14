@@ -27,6 +27,7 @@ export const PERSONNEL_SAFE_FIELDS = [
   "role",
   "shift",
   "orgPosition",
+  "isPartTimeDriver",
   "workPlace",
   "personnelType",
   "personnelCode",
@@ -75,7 +76,23 @@ export function buildPrismaWhere(entity: string, filters: ReportFilter[]) {
     let val: any = f.value;
 
     // کست کردن تایپ‌ها بر اساس فیلدها
-    if (f.field === "id" || f.field === "capacity" || f.field === "terminal" || f.field === "type" || f.field === "status" || f.field === "role" || f.field === "shift" || f.field === "orgPosition" || f.field === "trainId" || f.field === "sourceLineId" || f.field === "destinationLineId" || f.field === "rahbar1Id" || f.field === "confirmationStatus") {
+    if (
+      f.field === "id" ||
+      f.field === "capacity" ||
+      f.field === "terminal" ||
+      f.field === "type" ||
+      f.field === "status" ||
+      f.field === "role" ||
+      f.field === "shift" ||
+      f.field === "orgPosition" ||
+      f.field === "trainId" ||
+      f.field === "sourceLineId" ||
+      f.field === "destinationLineId" ||
+      f.field === "rahbar1Id" ||
+      f.field === "rahbar2Id" ||
+      f.field === "slotIndex" ||
+      f.field === "confirmationStatus"
+    ) {
       val = f.value ? Number(f.value) : undefined;
     } else if (f.field === "isDynamic" || f.field === "isDisposed" || f.field === "hasAccount") {
       val = f.value === "true" || f.value === "1";
@@ -126,6 +143,14 @@ export function buildPrismaWhere(entity: string, filters: ReportFilter[]) {
         };
         continue;
       }
+      if (f.field === "isSolo" || f.field === "crewType") {
+        if (f.value === "solo" || f.value === "true" || f.value === "1") {
+          where.rahbar2Id = null;
+        } else if (f.value === "assisted" || f.value === "false" || f.value === "2") {
+          where.rahbar2Id = { not: null };
+        }
+        continue;
+      }
     }
 
     if (entity === "train") {
@@ -172,14 +197,35 @@ export function buildPrismaWhere(entity: string, filters: ReportFilter[]) {
   return where;
 }
 
+// فیلدهای مجاز برای مرتب‌سازی امن در هر مدل
+const ALLOWED_SORT_FIELDS: Record<string, string[]> = {
+  manovr: [
+    "id", "type", "status", "confirmationStatus", "createdAt", "finishedAt",
+    "executionTime", "trainId", "sourceLineId", "destinationLineId", "rahbar1Id", "rahbar2Id"
+  ],
+  train: [
+    "id", "code", "type", "isDisposed", "lineId", "slotIndex", "status",
+    "hasKafshak", "noAtp", "movadDavvar", "noLicense"
+  ],
+  line: [
+    "id", "name", "tag", "capacity", "terminal", "isDynamic", "isActive",
+    "posX", "posY", "rotation", "length", "sortIdx"
+  ],
+  personnel: [
+    "id", "firstName", "lastName", "userName", "role", "shift",
+    "orgPosition", "workPlace", "personnelType", "personnelCode", "hasAccount", "createdAt"
+  ],
+};
+
 // اجرای مستقیم کوئری بدون بررسی مجوزهای نشست (کاربرد در زمان‌بند یا گزارش‌های داخلی)
 export async function executeReportQuery(config: ReportConfig) {
   const where = buildPrismaWhere(config.entity, config.filters);
 
   let orderBy: any = undefined;
-  if (config.sortField) {
-    const dir = config.sortDirection || "asc";
-    const sf = config.sortField;
+  if (config.sortField && config.sortField.trim() !== "") {
+    const dir = config.sortDirection === "desc" ? "desc" : "asc";
+    const sf = config.sortField.trim();
+
     if (config.entity === "manovr") {
       if (sf === "sourceLine") {
         orderBy = { sourceLine: { name: dir } };
@@ -193,19 +239,39 @@ export async function executeReportQuery(config: ReportConfig) {
         orderBy = { rahbar2: { lastName: dir } };
       } else if (sf === "creator") {
         orderBy = { creator: { lastName: dir } };
-      } else {
+      } else if (ALLOWED_SORT_FIELDS.manovr.includes(sf)) {
         orderBy = { [sf]: dir };
+      } else {
+        orderBy = { id: dir };
       }
     } else if (config.entity === "train") {
       if (sf === "line") {
         orderBy = { line: { name: dir } };
-      } else {
+      } else if (ALLOWED_SORT_FIELDS.train.includes(sf)) {
         orderBy = { [sf]: dir };
+      } else {
+        orderBy = { code: dir };
+      }
+    } else if (config.entity === "line") {
+      if (ALLOWED_SORT_FIELDS.line.includes(sf)) {
+        orderBy = { [sf]: dir };
+      } else {
+        orderBy = { id: dir };
+      }
+    } else if (config.entity === "personnel") {
+      if (ALLOWED_SORT_FIELDS.personnel.includes(sf)) {
+        orderBy = { [sf]: dir };
+      } else {
+        orderBy = { lastName: dir };
       }
     } else {
-      orderBy = { [sf]: dir };
+      orderBy = { id: dir };
     }
+  } else {
+    // مرتب‌سازی پیش‌فرض امن
+    orderBy = config.entity === "manovr" ? { id: "desc" } : { id: "asc" };
   }
+
 
   let records: any[] = [];
 

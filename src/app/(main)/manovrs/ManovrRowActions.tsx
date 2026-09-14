@@ -13,6 +13,7 @@ export default function ManovrRowActions({
   canEdit = false,
   canConfirm = false,
   canDelete = false,
+  isAdmin = false,
 }: {
   id: number;
   status: number;
@@ -20,11 +21,14 @@ export default function ManovrRowActions({
   canEdit?: boolean;
   canConfirm?: boolean;
   canDelete?: boolean;
+  isAdmin?: boolean;
 }) {
   const [pending, start] = useTransition();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+
+  const isCompleted = status === 2;
 
   const handleFinish = () => {
     start(async () => {
@@ -51,6 +55,11 @@ export default function ManovrRowActions({
   };
 
   const handleDelete = () => {
+    if (isCompleted && !isAdmin) {
+      toast.error("این مانور به پایان رسیده است. حذف مانورهای خاتمه‌یافته منحصراً در اختیارات مدیر سیستم می‌باشد.");
+      return;
+    }
+
     start(async () => {
       const res = await deleteManovr(id);
       if (res?.error) {
@@ -65,7 +74,7 @@ export default function ManovrRowActions({
 
   return (
     <>
-      <div style={{ display: "flex", gap: 6 }}>
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
         {status === 1 && canEdit && (
           <button
             className="btn sm"
@@ -87,22 +96,38 @@ export default function ManovrRowActions({
           </button>
         )}
         {status !== 3 && canDelete && (
-          <button
-            className="btn sm"
-            disabled={pending}
-            onClick={() => setShowDeleteConfirm(true)}
-            title="حذف"
-            style={{ color: "var(--crit)" }}
-          >
-            حذف
-          </button>
+          isCompleted && !isAdmin ? (
+            <button
+              type="button"
+              disabled
+              className="btn sm outline"
+              title="این مانور به پایان رسیده است؛ حذف سوابق خاتمه‌یافته منحصراً توسط مدیر سیستم مجاز است."
+              style={{ opacity: 0.45, cursor: "not-allowed", fontSize: "11px" }}
+            >
+              🔒 حذف (فقط مدیر)
+            </button>
+          ) : (
+            <button
+              className="btn sm"
+              disabled={pending}
+              onClick={() => setShowDeleteConfirm(true)}
+              title={isCompleted ? "حذف مانور خاتمه‌یافته با اختیارات مدیر" : "حذف"}
+              style={{ color: "var(--crit)" }}
+            >
+              حذف
+            </button>
+          )
         )}
       </div>
 
       <ConfirmModal
         isOpen={showDeleteConfirm}
-        title="حذف مانور"
-        message="آیا از حذف این مانور اطمینان دارید؟"
+        title={isCompleted ? "حذف مانور خاتمه‌یافته (توسط مدیر)" : "حذف مانور"}
+        message={
+          isCompleted
+            ? "⚠️ توجه: این مانور به پایان رسیده است. آیا به عنوان مدیر سیستم از حذف آن اطمینان دارید؟"
+            : "آیا از حذف این مانور اطمینان دارید؟"
+        }
         confirmText="حذف مانور"
         cancelText="انصراف"
         variant="danger"
@@ -113,3 +138,4 @@ export default function ManovrRowActions({
     </>
   );
 }
+

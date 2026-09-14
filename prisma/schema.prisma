@@ -18,6 +18,7 @@ model Personnel {
   role         Int      @default(0) // 0 بدون‌دسترسی، 1 ادمین، 2 مسئول، 3 مشاهده
   shift        Int      @default(1) // 1=A 2=B 3=C
   orgPosition  Int      @default(1) // 1 راهبر، 2 مسئول، 3 ادمین، 4 سایر
+  isPartTimeDriver Boolean @default(false) // راهبر غیردائم برای کاربران غیرراهبر
   workPlace    Int      @default(1)
   personnelType Int      @default(1) // 1 = مانور (Maneuver)، 2 = پایانه (Terminal)
   personnelCode String?  @unique // کد پرسنلی منحصر‌به‌فرد
@@ -48,6 +49,7 @@ model Personnel {
 
   @@index([role])
   @@index([shift])
+  @@index([isPartTimeDriver])
 }
 
 // AccessRole — نقش سفارشی با مجوزهای ریز
@@ -117,7 +119,7 @@ model Line {
 model Train {
   id          Int     @id @default(autoincrement())
   code        String
-  type        Int     @default(0) // 0=AC مترویی، 1=DC دیزلی
+  type        Int     @default(0) // 0=AC (برقی نسل جدید)، 1=DC (برقی نسل قدیم)، 2=دیزل (لوکوموتیو)
   isDisposed  Boolean @default(false)
   lineTag     String?
   lineId      Int?
@@ -133,6 +135,8 @@ model Train {
 
   manovrs Manovr[]
 
+  @@index([code])
+  @@index([lineId])
   @@index([type])
   @@index([isDisposed])
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { saveSetting } from "@/app/actions/settings";
 import { useTheme } from "@/components/ThemeProvider";
 import type { Appearance, DepotPrefs } from "@/lib/settings";
@@ -21,6 +22,7 @@ export default function SettingsFormClient({
   initialAppearance: Appearance;
   initialDepot: DepotPrefs;
 }) {
+  const router = useRouter();
   const { setAppearance } = useTheme();
   const [appearance, setAppearanceLocal] = useState<Appearance>(initialAppearance);
   const [depot, setDepotLocal] = useState<DepotPrefs>(initialDepot);
@@ -47,6 +49,7 @@ export default function SettingsFormClient({
       // اعمال تغییرات به تم زنده
       setAppearance(appearance);
       setMessage({ text: "تنظیمات شما با موفقیت ذخیره شد.", type: "success" });
+      router.refresh();
     });
   };
 

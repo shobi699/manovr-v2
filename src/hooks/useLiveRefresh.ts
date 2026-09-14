@@ -11,25 +11,28 @@ export function useLiveRefresh(channels: string[]) {
 
   // آخرین لیست کانال‌ها بدون ایجاد وابستگی در افکت
   const channelsRef = useRef(channels);
-  const lastRefreshRef = useRef<number>(0);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastRefreshTimeRef = useRef<number>(0);
 
   useEffect(() => {
     channelsRef.current = channels;
   });
 
   useEffect(() => {
-    // مقداردهی اولیه زمان آخرین رفرش در افکت
-    if (lastRefreshRef.current === 0) {
-      lastRefreshRef.current = Date.now();
-    }
-
-    // تابع کنترل‌شده برای رفرش با تراتل حداقل ۸ ثانیه‌ای
-    const throttledRefresh = () => {
-      const now = Date.now();
-      if (now - lastRefreshRef.current >= 8000) {
-        lastRefreshRef.current = now;
-        router.refresh();
+    // تابع رفرش کنترل‌شده با دی‌بانس هوشمند برای تجمیع رویدادهای هم‌زمان
+    const triggerControlledRefresh = () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
       }
+
+      debounceTimerRef.current = setTimeout(() => {
+        const now = Date.now();
+        // حصول اطمینان از حداقل فاصله ۳ ثانیه‌ای بین رفرش‌های صفحه
+        if (now - lastRefreshTimeRef.current >= 3000) {
+          lastRefreshTimeRef.current = now;
+          router.refresh();
+        }
+      }, 750);
     };
 
     let eventSource: EventSource | null = null;
@@ -40,8 +43,7 @@ export function useLiveRefresh(channels: string[]) {
         try {
           const payload = JSON.parse(event.data);
           if (payload && payload.channel && channelsRef.current.includes(payload.channel)) {
-            lastRefreshRef.current = Date.now();
-            router.refresh();
+            triggerControlledRefresh();
 
             if (typeof document !== "undefined" && document.hidden) {
               showDesktopNotification("بروزرسانی زنده سامانه مانور", "تغییرات جدید در مانورها یا ناوگان ثبت گردید.");
@@ -58,12 +60,16 @@ export function useLiveRefresh(channels: string[]) {
     // همگام‌سازی هنگام بازگشت کاربر به پنجره برنامه (تنها در صورتی که حداقل ۸ ثانیه گذشته باشد)
     const handleVisibilityChange = () => {
       if (typeof document !== "undefined" && !document.hidden) {
-        throttledRefresh();
+        const now = Date.now();
+        if (now - lastRefreshTimeRef.current >= 8000) {
+          lastRefreshTimeRef.current = now;
+          router.refresh();
+        }
       }
     };
 
     const handleFocus = () => {
-      throttledRefresh();
+      handleVisibilityChange();
     };
 
     if (typeof window !== "undefined") {
@@ -71,14 +77,21 @@ export function useLiveRefresh(channels: string[]) {
       document.addEventListener("visibilitychange", handleVisibilityChange);
     }
 
-    // پولینگ هدفمند فالبک (هر ۶۰ ثانیه به جای ۱۵ ثانیه) صرفاً در صورتی که پنجره فعال باشد
+    // پولینگ هدفمند فالبک (هر ۴۵ ثانیه) صرفاً در صورتی که پنجره فعال باشد
     const intervalId = setInterval(() => {
       if (typeof document !== "undefined" && !document.hidden) {
-        throttledRefresh();
+        const now = Date.now();
+        if (now - lastRefreshTimeRef.current >= 45000) {
+          lastRefreshTimeRef.current = now;
+          router.refresh();
+        }
       }
-    }, 30000);
+    }, 45000);
 
     return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
       if (eventSource) {
         eventSource.close();
       }
@@ -90,4 +103,3 @@ export function useLiveRefresh(channels: string[]) {
     };
   }, [channelKey, router]);
 }
-

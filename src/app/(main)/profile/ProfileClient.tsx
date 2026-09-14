@@ -106,6 +106,7 @@ export default function ProfileClient({
         toast.error(res.error);
       } else {
         toast.success("اطلاعات عمومی پروفایل با موفقیت بروزرسانی شد.");
+        router.refresh();
       }
     });
   };
@@ -134,6 +135,7 @@ export default function ProfileClient({
           newPassword: "",
           confirmPassword: "",
         });
+        router.refresh();
       }
     });
   };

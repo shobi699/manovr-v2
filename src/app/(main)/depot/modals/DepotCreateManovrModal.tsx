@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { TrainType, ManovrType } from "@/lib/enums";
 import SearchableSelect from "@/components/SearchableSelect";
 import JalaliDateTimePicker from "@/components/JalaliDateTimePicker";
@@ -45,10 +45,28 @@ export default function DepotCreateManovrModal({
   quickRahbar2,
   setQuickRahbar2,
 }: DepotCreateManovrModalProps) {
+  const [manualDestLineId, setManualDestLineId] = useState<string>(destLineId ? String(destLineId) : "");
+
+  useEffect(() => {
+    if (destLineId) {
+      setManualDestLineId(String(destLineId));
+    }
+  }, [destLineId]);
+
+  // ریست خودکار فیلدهای راهبر مسئول برای هر مانور جدید تا خطای انسانی رخ ندهد
+  useEffect(() => {
+    if (isOpen) {
+      setQuickRahbar1("");
+      setQuickRahbar2("");
+    }
+  }, [isOpen, setQuickRahbar1, setQuickRahbar2]);
+
   if (!isOpen) return null;
 
-  const sourceLine = lines.find((l) => l.id === sourceLineId);
-  const destLine = lines.find((l) => l.id === destLineId);
+  const selectedTrainObj = trains.find((t) => t.id === Number(preSelectedTrainId));
+  const effectiveSourceLine = lines.find((l) => l.id === sourceLineId) ||
+    (selectedTrainObj?.lineId ? lines.find((l) => l.id === selectedTrainObj.lineId) : null);
+  const effectiveDestLine = lines.find((l) => l.id === (destLineId || Number(manualDestLineId)));
 
   // گزینه‌های انواع مانور بر اساس لوکاپ و مقادیر پیش‌فرض
   const manovrTypeOptions = (() => {
@@ -72,12 +90,20 @@ export default function DepotCreateManovrModal({
       }));
   })();
 
+  // گزینه‌های قطار: در صورت مشخص بودن خط مبدأ، قطارهای آن خط؛ در غیر این صورت تمامی قطارهای فعال پایانه
   const trainOptions = trains
-    .filter((t) => t.lineId === sourceLineId)
-    .map((t) => ({
-      value: String(t.id),
-      label: `قطار ${t.code} (${TrainType[t.type] || "نامشخص"})`,
-    }));
+    .filter((t) => {
+      if (sourceLineId) return t.lineId === sourceLineId;
+      return !t.isDisposed;
+    })
+    .map((t) => {
+      const curLine = lines.find((l) => l.id === t.lineId);
+      const lineSuffix = curLine ? ` (مستقر در ${curLine.name})` : " (بدون ریل)";
+      return {
+        value: String(t.id),
+        label: `قطار ${t.code} (${TrainType[t.type] || "نامشخص"})${sourceLineId ? "" : lineSuffix}`,
+      };
+    });
 
   return (
     <div
@@ -112,17 +138,46 @@ export default function DepotCreateManovrModal({
                   type="text"
                   className="input"
                   disabled
-                  value={sourceLine?.name ?? "نامشخص"}
+                  value={effectiveSourceLine?.name ?? "انتخاب با قطار"}
                 />
+                {effectiveSourceLine && (
+                  <input type="hidden" name="sourceLineId" value={effectiveSourceLine.id} />
+                )}
               </div>
               <div className="field">
-                <label>مقصد مانور</label>
-                <input
-                  type="text"
-                  className="input"
-                  disabled
-                  value={destLine?.name ?? "نامشخص"}
-                />
+                <label>مقصد مانور *</label>
+                {destLineId && effectiveDestLine ? (
+                  <>
+                    <input
+                      type="text"
+                      className="input"
+                      disabled
+                      value={`${effectiveDestLine.name} (ظرفیت: ${trains.filter((t) => t.lineId === effectiveDestLine.id && t.id !== Number(preSelectedTrainId)).length}/${effectiveDestLine.capacity})`}
+                    />
+                    <input type="hidden" name="destinationLineId" value={effectiveDestLine.id} />
+                  </>
+                ) : (
+                  <SearchableSelect
+                    name="destinationLineId"
+                    value={manualDestLineId}
+                    onChange={(val) => setManualDestLineId(String(val))}
+                    options={lines
+                      .filter((l) => (l as any).isActive !== false)
+                      .map((l) => {
+                        const currentTrainsOnLine = trains.filter(
+                          (t) => t.lineId === l.id && t.id !== Number(preSelectedTrainId)
+                        );
+                        const capacityLeft = l.capacity - currentTrainsOnLine.length;
+                        return {
+                          value: String(l.id),
+                          label: `${l.name} (ظرفیت خالی: ${capacityLeft} قطار)`,
+                          disabled: capacityLeft <= 0,
+                        };
+                      })}
+                    placeholder="انتخاب خط مقصد..."
+                    required
+                  />
+                )}
               </div>
             </div>
 
@@ -130,7 +185,7 @@ export default function DepotCreateManovrModal({
               <label htmlFor="trainId">قطار انتخابی جهت مانور *</label>
               <SearchableSelect
                 name="trainId"
-                value={preSelectedTrainId || ""}
+                value={preSelectedTrainId ? String(preSelectedTrainId) : ""}
                 onChange={(val) => setPreSelectedTrainId(val ? Number(val) : "")}
                 options={trainOptions}
                 placeholder="جستجو و انتخاب قطار..."
@@ -139,11 +194,11 @@ export default function DepotCreateManovrModal({
             </div>
 
             <div className="field">
-              <label htmlFor="type">نوع مانور *</label>
+              <label htmlFor="type">نوع مانور عملیاتی *</label>
               <SearchableSelect
                 name="type"
-                value={quickType}
-                onChange={(val) => setQuickType(String(val))}
+                value={quickType || "2"}
+                onChange={(val) => setQuickType(String(val || "2"))}
                 options={manovrTypeOptions}
                 placeholder="جستجوی نوع مانور..."
                 required

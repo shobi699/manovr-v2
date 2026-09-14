@@ -1,0 +1,165 @@
+name: E2E Skills CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  e2e-skills-ci:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Hosted runners expose Node from a versioned toolcache path. The raw-ARIA
+      # launcher deliberately ignores PATH and accepts only fixed system paths,
+      # so bind the runner-provided executable into that trusted boundary.
+      - name: Bind hosted Node to the generator's trusted path
+        shell: /bin/bash --noprofile --norc -p -e -o pipefail {0}
+        run: |
+          hosted_node="$(command -v node)"
+          hosted_node="$(realpath "$hosted_node")"
+          case "$hosted_node" in
+            "$GITHUB_WORKSPACE"|"$GITHUB_WORKSPACE"/*)
+              echo "Refusing a project-local Node executable: $hosted_node" >&2
+              exit 1
+              ;;
+          esac
+          test -f "$hosted_node" && test -x "$hosted_node"
+          if [[ "$hosted_node" != /usr/local/bin/node ]]; then
+            sudo ln -sfn -- "$hosted_node" /usr/local/bin/node
+          fi
+          sudo chmod go-w -- "$hosted_node"
+          /usr/local/bin/node -e '
+          const fs = require("node:fs");
+          const metadata = fs.statSync(process.execPath);
+          if (!metadata.isFile() || (metadata.mode & 0o022) !== 0) process.exit(1);
+          '
+
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - name: Install ast-grep
+        run: npm i -g '@ast-grep/cli@0.39.7'
+
+      # scan.sh binds ast-grep only from a fixed absolute candidate list, on
+      # purpose: PATH is attacker-controllable for a tool that runs over a
+      # reviewed repository. npm -g installs outside that list on hosted
+      # runners, so point the documented override at the binary we just pinned
+      # rather than widening the search.
+      - name: Export the pinned ast-grep path
+        run: echo "E2E_SMELL_AST_GREP_BIN=$(command -v ast-grep)" >> "$GITHUB_ENV"
+
+      - name: Run convention and security checks
+        shell: /bin/bash --noprofile --norc -p -e -o pipefail {0}
+        run: |
+          # Keep generated output outside the checkout so the disposable
+          # parity proof sees a stable publishable source snapshot.
+          /bin/bash -p scripts/ci/ci-local.sh | tee "$RUNNER_TEMP/ci-local-report.txt"
+
+      - name: Upload CI report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-local-report
+          path: ${{ runner.temp }}/ci-local-report.txt
+
+      - name: Add job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## E2E Skills CI'
+            echo
+            if [ -f "$RUNNER_TEMP/ci-local-report.txt" ]; then
+              echo 'The complete plain-text report is also available as the `ci-local-report` artifact.'
+              echo
+              echo '<details>'
+              echo '<summary>Sanitized CI output</summary>'
+              echo
+              # Indented Markdown is literal code. Prefix every physical line
+              # after removing terminal controls so source-controlled backticks,
+              # HTML tags, or ANSI escapes cannot break out of the summary block.
+              LC_ALL=C tr '\000-\010\013\014\016-\037\177' '?' \
+                < "$RUNNER_TEMP/ci-local-report.txt" | sed 's/^/    /'
+              echo
+              echo '</details>'
+            else
+              echo 'CI report was not generated because an earlier step failed.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  portable-contracts:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install ripgrep on Ubuntu
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - name: Install ripgrep on macOS
+        if: runner.os == 'macOS'
+        run: brew install ripgrep
+
+      - name: Verify archived fixture evidence without node_modules
+        run: python3 scripts/ci/test-fixture-faults.py
+
+      - name: Verify scanner no-follow preflight
+        # This job deliberately does not exercise ambient ast-grep binaries.
+        # Hosted images may contain an unpinned binary even though this job does
+        # not install one, so disable Tier 2 explicitly rather than relying on
+        # the download switch alone.
+        env:
+          E2E_SMELL_DISABLE_AST_GREP: "1"
+          E2E_SMELL_NO_AST_GREP_DOWNLOAD: "1"
+        run: python3 scripts/ci/test-reviewer-scanner.py --preflight-only
+
+  live-fixture-reproduction:
+    # Run the real browser matrix for every published main snapshot while
+    # keeping pull-request feedback deterministic and fast. Manual dispatch
+    # remains available for an explicit rerun.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install pinned fixture dependencies
+        run: npm ci --prefix scripts/evals/fixtures
+
+      - name: Install Chromium and Linux browser dependencies
+        run: scripts/evals/fixtures/node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Reproduce the executable fault matrix
+        run: |
+          python3 scripts/evals/run-fixture-faults.py \
+            --output "$RUNNER_TEMP/fixture-faults-live.json"
+
+      - name: Upload live reproduction
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fixture-faults-live
+          path: ${{ runner.temp }}/fixture-faults-live.json
+
+  security:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Pre-push security gate
+        shell: /bin/bash --noprofile --norc -p -e -o pipefail {0}
+        run: /bin/bash -p scripts/ci/pre-push-security.sh

@@ -55,10 +55,20 @@ export default function TrainModel3D({
 
   const rotationY = line ? (line.rotation * Math.PI) / 180 : 0;
 
-  // تم رنگی بدنه قطار بر اساس نوع ناوگان (AC = مترویی نقره‌ای/آبی، DC = لوکوموتیو دیزلی زرد/تیره)
-  const isMetro = train.type === 0;
-  const baseColor = isMetro ? "#cbd5e1" : "#334155";
-  const stripeColor = isMetro ? "#1d4ed8" : "#eab308";
+  // تم رنگی بدنه قطار بر اساس نوع ناوگان:
+  // AC (نوع ۰) = برقی نسل جدید نقره‌ای با نوار آبی
+  // DC (نوع ۱) = برقی نسل قدیم خاکستری روشن با نوار سبز
+  // دیزل (نوع ۲) = لوکوموتیو دیزلی خاکستری تیره با نوار زرد
+  let baseColor = "#cbd5e1";
+  let stripeColor = "#1d4ed8";
+  if (train.type === 1) {
+    baseColor = "#e2e8f0";
+    stripeColor = "#10b981";
+  } else if (train.type === 2) {
+    baseColor = "#334155";
+    stripeColor = "#eab308";
+  }
+  const isMetro = train.type !== 2;
   
   // دریافت مشخصات وضعیت برای چراغ‌های emissive
   const statusConfig = STATUS_STYLE[train.status] || STATUS_STYLE[1];

@@ -29,7 +29,7 @@ export async function createScheduledReport(
   outputDir: string
 ) {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "report.build"))) {
+  if (!session || (!(await hasPerm(session, "report.schedule")) && !(await hasPerm(session, "report.build")))) {
     return { error: "دسترسی ندارید." };
   }
 
@@ -124,7 +124,7 @@ export async function getScheduledReports() {
 
 export async function toggleScheduledReport(id: number, isActive: boolean) {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "report.build"))) {
+  if (!session || (!(await hasPerm(session, "report.schedule")) && !(await hasPerm(session, "report.build")))) {
     return { error: "دسترسی ندارید." };
   }
 
@@ -159,7 +159,7 @@ export async function toggleScheduledReport(id: number, isActive: boolean) {
 
 export async function deleteScheduledReport(id: number) {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "report.build"))) {
+  if (!session || (!(await hasPerm(session, "report.schedule")) && !(await hasPerm(session, "report.build")))) {
     return { error: "دسترسی ندارید." };
   }
 

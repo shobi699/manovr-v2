@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useEffect, useMemo, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   createPhonebookContact,
   updatePersonnelPhoneInfo,
@@ -10,6 +11,20 @@ import {
 import type { ListParams } from "@/lib/list-query";
 import { useToast } from "@/components/ui/Toast";
 import ConfirmModal from "@/components/ui/ConfirmModal";
+import {
+  preValidatePersonnelImport,
+  executePersonnelImportBatch,
+} from "@/app/actions/excel-import";
+import ExcelConflictModal from "@/components/ExcelConflictModal";
+import ExcelImportSummaryModal from "@/components/ExcelImportSummaryModal";
+import PersonnelDetailModal from "@/components/PersonnelDetailModal";
+import { persianSearchMatch } from "@/lib/persian-text";
+import type {
+  ImportConflictItem,
+  ImportPersonnelRow,
+  BatchImportPayload,
+  ImportSummaryReport,
+} from "@/lib/excel-import-types";
 
 interface PersonnelItem {
   id: number;
@@ -40,12 +55,23 @@ export default function PhonebookClient({
   shifts: Record<number, string>;
   positions: Record<number, string>;
 }) {
+  const router = useRouter();
   const [list, setList] = useState(initialPersonnel);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [shiftFilter, setShiftFilter] = useState("all");
   const [posFilter, setPosFilter] = useState("all");
   const [deletePersonTarget, setDeletePersonTarget] = useState<PersonnelItem | null>(null);
+  const [detailPerson, setDetailPerson] = useState<PersonnelItem | null>(null);
   const { toast } = useToast();
+
+  // دیبانس کردن ورودی جستجو جهت عملکرد فوق‌سریع و جلوگیری از لگ رابط کاربری
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // افزودن مخاطب جدید
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -72,6 +98,14 @@ export default function PhonebookClient({
   const [editInternalTel, setEditInternalTel] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [editAvatarColor, setEditAvatarColor] = useState("");
+
+  // استیت‌های مدال تعارضات اکسل و گزارش آماری
+  const [conflictModalOpen, setConflictModalOpen] = useState(false);
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
+  const [isSubmittingImport, setIsSubmittingImport] = useState(false);
+  const [conflictsList, setConflictsList] = useState<ImportConflictItem[]>([]);
+  const [nonConflictingList, setNonConflictingList] = useState<ImportPersonnelRow[]>([]);
+  const [importSummary, setImportSummary] = useState<ImportSummaryReport | null>(null);
 
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -183,7 +217,7 @@ export default function PhonebookClient({
         await workbook.xlsx.load(arrayBuffer);
         const worksheet = workbook.worksheets[0];
 
-        const rows: any[] = [];
+        const rows: ImportPersonnelRow[] = [];
         worksheet.eachRow((row, rowNumber) => {
           if (rowNumber === 1) return;
           const vals = Array.isArray(row.values) ? row.values : [];
@@ -202,6 +236,7 @@ export default function PhonebookClient({
           const orgPosition = vals[10] ? Number(vals[10]) : undefined;
 
           rows.push({
+            rowIndex: rowNumber,
             firstName,
             lastName,
             personnelCode,
@@ -220,19 +255,57 @@ export default function PhonebookClient({
           return;
         }
 
-        const res = await importPersonnelFromExcel(rows);
-        if (res.error) {
-          toast.error(res.error);
+        const valResult = await preValidatePersonnelImport(rows);
+        if (!valResult.ok) {
+          toast.error(valResult.error || "خطا در بررسی اولیه داده‌های فایل اکسل.");
+          return;
+        }
+
+        if (valResult.conflicts.length > 0) {
+          setConflictsList(valResult.conflicts);
+          setNonConflictingList(valResult.nonConflicting);
+          setConflictModalOpen(true);
         } else {
-          toast.success(`تعداد ${res.count} مخاطب جدید با موفقیت درج شدند.`);
-          window.location.reload();
+          const res = await executePersonnelImportBatch({
+            newRecords: valResult.nonConflicting,
+            resolutions: [],
+          });
+          if (!res.ok) {
+            toast.error(res.error || "خطا در ثبت مخاطبین در دیتابیس.");
+          } else {
+            setImportSummary(res);
+            setSummaryModalOpen(true);
+            router.refresh();
+          }
         }
       } catch (err) {
         console.error(err);
         toast.error("فرمت فایل اکسل معتبر نیست یا خطا در خواندن رخ داد.");
+      } finally {
+        e.target.value = "";
       }
     };
     reader.readAsArrayBuffer(file);
+  };
+
+  const handleConfirmConflictResolution = async (payload: BatchImportPayload) => {
+    setIsSubmittingImport(true);
+    try {
+      const res = await executePersonnelImportBatch(payload);
+      setConflictModalOpen(false);
+      if (!res.ok) {
+        toast.error(res.error || "خطا در اعمال تغییرات دسته‌ای.");
+      } else {
+        setImportSummary(res);
+        setSummaryModalOpen(true);
+        router.refresh();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("خطای غیرمنتظره در ثبت اطلاعات.");
+    } finally {
+      setIsSubmittingImport(false);
+    }
   };
 
   // ایجاد مخاطب جدید
@@ -282,6 +355,7 @@ export default function PhonebookClient({
         setAddPhone2("");
         setAddInternalTel("");
         setAddAddress("");
+        router.refresh();
       }
     });
   };
@@ -347,6 +421,7 @@ export default function PhonebookClient({
         );
         toast.success("اطلاعات مخاطب با موفقیت به‌روزرسانی شد.");
         setEditingPerson(null);
+        router.refresh();
       }
     });
   };
@@ -368,6 +443,7 @@ export default function PhonebookClient({
         setList((prev) => prev.filter((item) => item.id !== p.id));
         toast.success("مخاطب با موفقیت حذف شد.");
         setDeletePersonTarget(null);
+        router.refresh();
       }
     });
   };
@@ -378,34 +454,76 @@ export default function PhonebookClient({
     toast.success(`${label} در حافظه کپی شد: ${text}`);
   };
 
-  const filtered = list.filter((p) => {
-    const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
-    const code = p.personnelCode ? p.personnelCode.toLowerCase() : "";
-    const matchesSearch =
-      fullName.includes(search.toLowerCase()) ||
-      code.includes(search.toLowerCase()) ||
-      p.phone1.includes(search) ||
-      p.phone2.includes(search) ||
-      p.internalTel.includes(search);
+  const filtered = useMemo(() => {
+    return list.filter((p) => {
+      const matchesSearch =
+        !debouncedSearch.trim() ||
+        persianSearchMatch(`${p.firstName} ${p.lastName}`, debouncedSearch) ||
+        persianSearchMatch(p.firstName, debouncedSearch) ||
+        persianSearchMatch(p.lastName, debouncedSearch) ||
+        persianSearchMatch(p.personnelCode, debouncedSearch) ||
+        persianSearchMatch(p.phone1, debouncedSearch) ||
+        persianSearchMatch(p.phone2, debouncedSearch) ||
+        persianSearchMatch(p.internalTel, debouncedSearch) ||
+        persianSearchMatch(p.address, debouncedSearch) ||
+        persianSearchMatch(positions[p.orgPosition], debouncedSearch) ||
+        persianSearchMatch(shifts[p.shift], debouncedSearch);
 
-    const matchesShift = shiftFilter === "all" || String(p.shift) === shiftFilter;
-    const matchesPos = posFilter === "all" || String(p.orgPosition) === posFilter;
+      const matchesShift = shiftFilter === "all" || String(p.shift) === shiftFilter;
+      const matchesPos = posFilter === "all" || String(p.orgPosition) === posFilter;
 
-    return matchesSearch && matchesShift && matchesPos;
-  });
+      return matchesSearch && matchesShift && matchesPos;
+    });
+  }, [list, debouncedSearch, shiftFilter, posFilter, positions, shifts]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-      {/* بخش جستجو و فیلتر */}
-      <div className="toolbar" style={{ backgroundColor: "var(--panel)", padding: "16px", borderRadius: "var(--radius)", border: "1px solid var(--line)" }}>
-        <input
-          type="text"
-          placeholder="جستجو بر اساس نام، کد پرسنلی، شماره تلفن، داخلی..."
-          className="input search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ maxWidth: "400px" }}
-        />
+      {/* بخش جستجو و فیلتر با پشتیبانی از حروف فارسی و دیبانس لحظه‌ای */}
+      <div
+        className="toolbar"
+        style={{
+          backgroundColor: "var(--panel)",
+          padding: "16px",
+          borderRadius: "var(--radius)",
+          border: "1px solid var(--line)",
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "12px",
+          alignItems: "center",
+        }}
+      >
+        <div style={{ position: "relative", flex: "1 1 320px", maxWidth: "420px" }}>
+          <input
+            type="text"
+            placeholder="جستجو (نام، کد پرسنلی، شماره تلفن، داخلی، سمت...)"
+            className="input search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ width: "100%", paddingInlineEnd: search ? "32px" : "12px" }}
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              style={{
+                position: "absolute",
+                left: "10px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                background: "none",
+                border: "none",
+                color: "var(--ink-faint)",
+                cursor: "pointer",
+                fontSize: "14px",
+                padding: "4px",
+              }}
+              title="پاک‌کردن جستجو"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
         <select
           className="input"
           value={shiftFilter}
@@ -419,6 +537,7 @@ export default function PhonebookClient({
             </option>
           ))}
         </select>
+
         <select
           className="input"
           value={posFilter}
@@ -432,8 +551,24 @@ export default function PhonebookClient({
             </option>
           ))}
         </select>
+
+        {(search || shiftFilter !== "all" || posFilter !== "all") && (
+          <button
+            type="button"
+            className="btn sm"
+            onClick={() => {
+              setSearch("");
+              setShiftFilter("all");
+              setPosFilter("all");
+            }}
+            style={{ fontSize: "12px" }}
+          >
+            حذف فیلترها
+          </button>
+        )}
+
         <span className="spacer" />
-        <div className="muted" style={{ fontSize: 13, fontWeight: 650 }}>
+        <div className="muted" style={{ fontSize: "13px", fontWeight: 650 }}>
           یافت شد: {filtered.length} نفر
         </div>
       </div>
@@ -480,72 +615,116 @@ export default function PhonebookClient({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-            gap: "16px",
+            gridTemplateColumns: "repeat(auto-fill, minmax(310px, 1fr))",
+            gap: "18px",
           }}
         >
           {filtered.map((p) => (
-            <div className="card" key={p.id} style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <div className="card-body" style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
+            <div
+              key={p.id}
+              className="group card"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                padding: 0,
+                borderRadius: "16px",
+                overflow: "hidden",
+                border: "1px solid var(--line)",
+                backgroundColor: "var(--panel)",
+                boxShadow: "var(--sh-1)",
+                transition: "all 0.25s ease",
+              }}
+            >
+              {/* سربرگ کارت: آواتار و اطلاعات هویتی */}
+              <div style={{ padding: "16px 18px", display: "flex", gap: "14px", alignItems: "flex-start" }}>
                 {/* آواتار */}
                 <div
                   style={{
-                    width: "48px",
-                    height: "48px",
-                    borderRadius: "50%",
+                    width: "52px",
+                    height: "52px",
+                    borderRadius: "14px",
                     backgroundColor: p.avatarColor || "#2563eb",
                     color: "#fff",
                     display: "grid",
                     placeItems: "center",
-                    fontSize: "18px",
-                    fontWeight: "bold",
+                    fontSize: "20px",
+                    fontWeight: 900,
                     flexShrink: 0,
+                    boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
                   }}
                 >
                   {p.firstName[0]}
                 </div>
-                {/* اطلاعات کلی */}
+
+                {/* نام و بج‌ها */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <h3 style={{ fontSize: "15px", fontWeight: "bold", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <h3
+                    style={{
+                      fontSize: "16px",
+                      fontWeight: 800,
+                      margin: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      color: "var(--ink)",
+                    }}
+                  >
                     {p.firstName} {p.lastName}
                   </h3>
-                  <div style={{ display: "flex", gap: "6px", marginTop: "4px", flexWrap: "wrap" }}>
+
+                  <div style={{ display: "flex", gap: "6px", marginTop: "6px", flexWrap: "wrap" }}>
                     {p.personnelCode && (
-                      <span className="pill p-mut" style={{ fontSize: "10px" }}>
+                      <span
+                        className="pill p-mut"
+                        style={{ fontSize: "11px", fontFamily: "var(--mono)", fontWeight: 700 }}
+                      >
                         کد: {p.personnelCode}
                       </span>
                     )}
-                    <span className="pill p-rail" style={{ fontSize: "10px" }}>
+                    <span className="pill p-rail" style={{ fontSize: "11px", fontWeight: 600 }}>
                       {positions[p.orgPosition] || "سایر"}
                     </span>
-                    <span className="pill p-mut" style={{ fontSize: "10px" }}>
+                    <span className="pill p-mut" style={{ fontSize: "11px" }}>
                       شیفت {shifts[p.shift] || "—"}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* بخش شماره تلفن‌ها */}
+              {/* بدنه کارت: شماره تلفن‌ها و داخلی پایانه */}
               <div
                 style={{
                   borderTop: "1px solid var(--line-soft)",
-                  padding: "12px 18px",
+                  padding: "14px 18px",
                   display: "flex",
                   flexDirection: "column",
-                  gap: "8px",
+                  gap: "10px",
                   fontSize: "13px",
                   backgroundColor: "var(--panel-2)",
                 }}
               >
+                {/* شماره تلفن همراه اول */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span className="muted">تلفن همراه ۱:</span>
+                  <span className="muted" style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                    <span>📱</span> همراه ۱:
+                  </span>
                   {p.phone1 ? (
                     <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                      <span className="num">{p.phone1}</span>
+                      <a
+                        href={`tel:${p.phone1}`}
+                        className="num"
+                        style={{ fontWeight: 700, color: "var(--ink)", textDecoration: "none" }}
+                        title="تماس مستقیم"
+                      >
+                        {p.phone1}
+                      </a>
                       <button
+                        type="button"
                         className="btn sm"
-                        style={{ padding: "1px 6px", fontSize: "10px" }}
+                        style={{ padding: "2px 6px", fontSize: "10px" }}
                         onClick={() => handleCopy(p.phone1, "تلفن همراه ۱")}
+                        title="کپی شماره"
                       >
                         کپی
                       </button>
@@ -555,66 +734,164 @@ export default function PhonebookClient({
                   )}
                 </div>
 
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span className="muted">تلفن همراه ۲:</span>
-                  {p.phone2 ? (
+                {/* شماره تلفن همراه دوم */}
+                {p.phone2 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span className="muted" style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                      <span>📱</span> همراه ۲:
+                    </span>
                     <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                      <span className="num">{p.phone2}</span>
+                      <a
+                        href={`tel:${p.phone2}`}
+                        className="num"
+                        style={{ fontWeight: 700, color: "var(--ink)", textDecoration: "none" }}
+                        title="تماس مستقیم"
+                      >
+                        {p.phone2}
+                      </a>
                       <button
+                        type="button"
                         className="btn sm"
-                        style={{ padding: "1px 6px", fontSize: "10px" }}
+                        style={{ padding: "2px 6px", fontSize: "10px" }}
                         onClick={() => handleCopy(p.phone2, "تلفن همراه ۲")}
+                        title="کپی شماره"
                       >
                         کپی
                       </button>
                     </div>
-                  ) : (
-                    <span className="muted">—</span>
-                  )}
-                </div>
+                  </div>
+                )}
 
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span className="muted">تلفن داخلی:</span>
+                {/* تلفن داخلی پایانه (طراحی ویژه و برجسته) */}
+                <div
+                  style={{
+                    backgroundColor: "var(--panel)",
+                    border: "1px solid var(--line)",
+                    borderRadius: "10px",
+                    padding: "8px 12px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--ink-soft)", display: "flex", alignItems: "center", gap: "4px" }}>
+                    <span>☎️</span> تلفن داخلی:
+                  </span>
                   {p.internalTel ? (
                     <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                      <span className="num" style={{ fontWeight: "bold", color: "var(--accent-ink)" }}>
+                      <span
+                        className="num"
+                        style={{
+                          fontWeight: 900,
+                          fontSize: "15px",
+                          color: "var(--accent-ink)",
+                          letterSpacing: "0.5px",
+                        }}
+                      >
                         {p.internalTel}
                       </span>
                       <button
+                        type="button"
                         className="btn sm"
-                        style={{ padding: "1px 6px", fontSize: "10px" }}
+                        style={{ padding: "2px 6px", fontSize: "10px" }}
                         onClick={() => handleCopy(p.internalTel, "تلفن داخلی")}
+                        title="کپی داخلی"
                       >
                         کپی
                       </button>
                     </div>
                   ) : (
-                    <span className="muted">—</span>
+                    <span className="muted" style={{ fontSize: "12px" }}>—</span>
                   )}
                 </div>
 
                 {p.address && (
-                  <div style={{ fontSize: "11.5px", marginTop: "4px", borderTop: "1px dashed var(--line)", paddingTop: "4px" }}>
-                    <span className="muted">آدرس:</span> {p.address}
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      color: "var(--ink-soft)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                    title={p.address}
+                  >
+                    <span className="muted">🏠 نشانی:</span> {p.address}
                   </div>
                 )}
               </div>
 
-              {canEdit && (
-                <div style={{ padding: "8px 18px", borderTop: "1px solid var(--line-soft)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <button
-                    className="btn sm"
-                    style={{ fontSize: "11px", color: "#ef4444", border: "1px solid var(--line)" }}
-                    onClick={() => handleDeleteClick(p)}
-                    disabled={isPending}
-                  >
-                    حذف
-                  </button>
-                  <button className="btn sm" onClick={() => handleEditClick(p)}>
-                    ویرایش کامل
-                  </button>
-                </div>
-              )}
+              {/* فوتر اکشن‌های کارت: دکمه مشاهده جزئیات و کنترل‌های ویرایش/حذف */}
+              <div
+                style={{
+                  padding: "10px 16px",
+                  borderTop: "1px solid var(--line-soft)",
+                  display: "flex",
+                  gap: "8px",
+                  alignItems: "center",
+                  backgroundColor: "var(--panel)",
+                }}
+              >
+                {/* دکمه اختصاصی مشاهده کامل جزئیات (برای همه کاربران) */}
+                <button
+                  type="button"
+                  onClick={() => setDetailPerson(p)}
+                  className="btn sm"
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    fontWeight: 700,
+                    fontSize: "12px",
+                    padding: "7px 12px",
+                    backgroundColor: "var(--panel-2)",
+                    border: "1px solid var(--line)",
+                    borderRadius: "8px",
+                  }}
+                >
+                  <span>👁️</span> مشاهده جزئیات
+                </button>
+
+                {canEdit && (
+                  <>
+                    <button
+                      type="button"
+                      className="btn sm"
+                      onClick={() => handleEditClick(p)}
+                      style={{
+                        padding: "7px 10px",
+                        fontSize: "12px",
+                        color: "var(--rail)",
+                        backgroundColor: "var(--rail-soft)",
+                        border: "1px solid var(--line)",
+                        borderRadius: "8px",
+                      }}
+                      title="ویرایش مخاطب"
+                    >
+                      ویرایش
+                    </button>
+                    <button
+                      type="button"
+                      className="btn sm"
+                      style={{
+                        padding: "7px 10px",
+                        fontSize: "12px",
+                        color: "var(--crit)",
+                        backgroundColor: "var(--crit-bg)",
+                        border: "1px solid var(--line)",
+                        borderRadius: "8px",
+                      }}
+                      onClick={() => handleDeleteClick(p)}
+                      disabled={isPending}
+                      title="حذف مخاطب"
+                    >
+                      حذف
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -973,6 +1250,34 @@ export default function PhonebookClient({
         isLoading={isPending}
         onConfirm={handleConfirmDelete}
         onCancel={() => setDeletePersonTarget(null)}
+      />
+
+      {/* مدال تعاملی مدیریت تعارضات و موارد تکراری اکسل */}
+      <ExcelConflictModal
+        isOpen={conflictModalOpen}
+        conflicts={conflictsList}
+        nonConflicting={nonConflictingList}
+        isSubmitting={isSubmittingImport}
+        onConfirm={handleConfirmConflictResolution}
+        onCancel={() => setConflictModalOpen(false)}
+      />
+
+      {/* مدال گزارش آماری پس از درون‌ریزی اکسل */}
+      <ExcelImportSummaryModal
+        isOpen={summaryModalOpen}
+        summary={importSummary}
+        onClose={() => setSummaryModalOpen(false)}
+      />
+
+      {/* مدال اختصاصی شناسنامه جامع پرسنل با فونت درشت و خوانا */}
+      <PersonnelDetailModal
+        isOpen={Boolean(detailPerson)}
+        personnel={detailPerson}
+        onClose={() => setDetailPerson(null)}
+        shifts={shifts}
+        positions={positions}
+        canEdit={canEdit}
+        onEdit={(p) => handleEditClick(p)}
       />
     </div>
   );

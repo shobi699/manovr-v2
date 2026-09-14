@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { hasPerm } from "@/lib/perms";
 import { getCachedLookup } from "@/lib/lookups";
 import { parseListParams, toPrismaPage } from "@/lib/list-query";
+import { generateSearchVariants } from "@/lib/persian-text";
 import Link from "next/link";
 import TrainsTableClient from "./TrainsTableClient";
 
@@ -61,12 +62,17 @@ export default async function TrainsPage({
   }
 
   if (params.search) {
-    andConditions.push({
-      OR: [
-        { code: { contains: params.search } },
-        { lineTag: { contains: params.search } },
-      ],
-    });
+    const variants = generateSearchVariants(params.search);
+    const searchOrConditions: any[] = [];
+    for (const v of variants) {
+      searchOrConditions.push(
+        { code: { contains: v } },
+        { lineTag: { contains: v } }
+      );
+    }
+    if (searchOrConditions.length > 0) {
+      andConditions.push({ OR: searchOrConditions });
+    }
   }
 
   if (andConditions.length > 0) {

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import Link from "next/link";
 import {
   BookOpen,
   ArrowsLeftRight,
@@ -18,14 +19,22 @@ import {
   Train,
   Check,
   Copy,
+  CaretDown,
+  CaretUp,
+  FolderSimple,
+  Sparkle,
 } from "@phosphor-icons/react";
+import { persianSearchMatch } from "@/lib/persian-text";
+import { MENU_GUIDES, type MenuGuide } from "@/lib/help-menu-guides";
 
 interface HelpClientProps {
   userRole: number;
 }
 
 export default function HelpClient({ userRole }: HelpClientProps) {
-  const [activeTab, setActiveTab] = useState<"workflows" | "encyclopedia" | "shortcuts" | "faq">("workflows");
+  const [activeTab, setActiveTab] = useState<"menuGuides" | "workflows" | "encyclopedia" | "shortcuts" | "faq">("menuGuides");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [expandedGuideId, setExpandedGuideId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
@@ -126,14 +135,19 @@ export default function HelpClient({ userRole }: HelpClientProps) {
   // دانشنامه اصطلاحات تخصصی پایانه
   const encyclopedia = [
     {
-      term: "قطار AC (برق متناوب)",
+      term: "قطار AC (برقی - نسل جدید)",
       category: "ناوگان",
-      desc: "قطارهای نسل جدید متروی تهران که با برق متناوب کار کرده و مجهز به تجهیزات پیشرفته کنترلی VVVF هستند. در نقشه با نشان آبی و برچسب AC مشخص می‌شوند.",
+      desc: "قطارهای نسل جدید برقی متروی تهران که با سیستم رانش پیشرفته VVVF و تغذیه ریل سوم کار می‌کنند. در سامانه با نشان AC مشخص می‌شوند.",
     },
     {
-      term: "قطار DC (برق مستقیم)",
+      term: "قطار DC (برقی - نسل قدیم)",
       category: "ناوگان",
-      desc: "قطارهای سنتی و دیزلی/برقی مستقیم پایانه که عموماً برای مانورهای سنگین یا خطوط قدیمی استفاده می‌شوند. در سامانه با نشان DC تفکیک می‌گردند.",
+      desc: "قطارهای برقی نسل قدیم متروی تهران که دارای موتورهای الکتریکی DC با مقاومت‌های راه‌انداز بوده و کاملاً برقی هستند (دیزلی نیستند). در سامانه با نشان DC تفکیک می‌گردند.",
+    },
+    {
+      term: "قطار و لوکوموتیو دیزل (Diesel)",
+      category: "ناوگان",
+      desc: "قطارها و لوکوموتیوهای مجهز به موتور احتراق دیزلی که بدون نیاز به برق ریل سوم، برای مانورهای سنگین کارگاهی، جابجایی قطارهای خاموش و امدادرسانی ریلی در پایانه استفاده می‌شوند.",
     },
     {
       term: "سیستم ATP (حفاظت خودکار قطار)",
@@ -201,32 +215,63 @@ export default function HelpClient({ userRole }: HelpClientProps) {
     },
   ];
 
-  // فیلتر کردن بر اساس جستجو
+  // فیلتر کردن آموزش ۲۰ منوی سامانه بر مبنای جستجو و دسته‌بندی
+  const filteredMenuGuides = useMemo(() => {
+    return MENU_GUIDES.filter((guide) => {
+      const matchesCat =
+        selectedCategory === "all" ||
+        guide.categoryTitle === selectedCategory ||
+        guide.category === selectedCategory;
+      if (!matchesCat) return false;
+      if (!searchQuery.trim()) return true;
+      return (
+        persianSearchMatch(guide.title, searchQuery) ||
+        persianSearchMatch(guide.route, searchQuery) ||
+        persianSearchMatch(guide.summary, searchQuery) ||
+        persianSearchMatch(guide.categoryTitle, searchQuery) ||
+        guide.sections.some(
+          (s) =>
+            persianSearchMatch(s.title, searchQuery) ||
+            persianSearchMatch(s.content, searchQuery)
+        ) ||
+        guide.workflows.some(
+          (w) =>
+            persianSearchMatch(w.title, searchQuery) ||
+            persianSearchMatch(w.description, searchQuery)
+        ) ||
+        guide.tips.some((t) => persianSearchMatch(t, searchQuery)) ||
+        persianSearchMatch(guide.fullGuideText, searchQuery)
+      );
+    });
+  }, [searchQuery, selectedCategory]);
+
+  // فیلتر کردن بر اساس جستجو با نرمال‌سازی کامل حروف فارسی و عربی
   const filteredWorkflows = useMemo(() => {
     if (!searchQuery.trim()) return workflows;
-    const q = searchQuery.toLowerCase();
     return workflows.filter(
       (w) =>
-        w.title.toLowerCase().includes(q) ||
-        w.steps.some((s) => s.title.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q))
+        persianSearchMatch(w.title, searchQuery) ||
+        w.steps.some((s) => persianSearchMatch(s.title, searchQuery) || persianSearchMatch(s.desc, searchQuery))
     );
   }, [searchQuery]);
 
   const filteredEncyclopedia = useMemo(() => {
     if (!searchQuery.trim()) return encyclopedia;
-    const q = searchQuery.toLowerCase();
     return encyclopedia.filter(
       (e) =>
-        e.term.toLowerCase().includes(q) ||
-        e.category.toLowerCase().includes(q) ||
-        e.desc.toLowerCase().includes(q)
+        persianSearchMatch(e.term, searchQuery) ||
+        persianSearchMatch(e.category, searchQuery) ||
+        persianSearchMatch(e.desc, searchQuery)
     );
   }, [searchQuery]);
 
   const filteredFaqs = useMemo(() => {
     if (!searchQuery.trim()) return faqs;
-    const q = searchQuery.toLowerCase();
-    return faqs.filter((f) => f.q.toLowerCase().includes(q) || f.a.toLowerCase().includes(q));
+    return faqs.filter(
+      (f) =>
+        persianSearchMatch(f.q, searchQuery) ||
+        persianSearchMatch(f.a, searchQuery)
+    );
   }, [searchQuery]);
 
   return (
@@ -284,6 +329,14 @@ export default function HelpClient({ userRole }: HelpClientProps) {
         }}
       >
         <button
+          onClick={() => setActiveTab("menuGuides")}
+          className={`btn ${activeTab === "menuGuides" ? "btn-primary" : "btn-ghost"}`}
+          style={{ display: "flex", alignItems: "center", gap: "8px", borderRadius: "8px", fontWeight: 700 }}
+        >
+          <BookOpen size={18} weight="bold" />
+          آموزش تفصیلی ۲۰ منو
+        </button>
+        <button
           onClick={() => setActiveTab("workflows")}
           className={`btn ${activeTab === "workflows" ? "btn-primary" : "btn-ghost"}`}
           style={{ display: "flex", alignItems: "center", gap: "8px", borderRadius: "8px" }}
@@ -316,6 +369,388 @@ export default function HelpClient({ userRole }: HelpClientProps) {
           پرسش‌های متداول (FAQ)
         </button>
       </div>
+
+      {/* تب ویژه: آموزش تفصیلی ۲۰ منوی سامانه (بیش از ۱۰۰۰ کاراکتر برای هر منو) */}
+      {activeTab === "menuGuides" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          {/* بنر خلاصه و فیلتر دسته‌بندی منوها */}
+          <div
+            style={{
+              background: "var(--panel)",
+              borderRadius: "var(--radius)",
+              border: "1px solid var(--line)",
+              padding: "16px 20px",
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "14px",
+              boxShadow: "var(--sh-1)",
+            }}
+          >
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                <Sparkle size={20} color="var(--accent)" weight="fill" />
+                <h2 style={{ fontSize: "1.05rem", fontWeight: 700, margin: 0, color: "var(--ink)" }}>
+                  راهنمای جامع، استانداردها و آموزش تخصصی ۲۰ منوی سامانه
+                </h2>
+              </div>
+              <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--ink-soft)" }}>
+                مستندات گام‌به‌گام عملیاتی، فنی و امنیتی برای تمام بخش‌های سامانه مانور و پایانه فتح‌آباد (حداقل ۱۰۰۰ کاراکتر برای هر منو)
+              </p>
+            </div>
+
+            {/* فیلتر دسته‌ها */}
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              <button
+                onClick={() => setSelectedCategory("all")}
+                className={`btn ${selectedCategory === "all" ? "btn-primary" : "btn-ghost"}`}
+                style={{ padding: "5px 12px", fontSize: "0.8rem", borderRadius: "6px" }}
+              >
+                همه منوها ({MENU_GUIDES.length})
+              </button>
+              <button
+                onClick={() => setSelectedCategory("عملیات پایانه")}
+                className={`btn ${selectedCategory === "عملیات پایانه" ? "btn-primary" : "btn-ghost"}`}
+                style={{ padding: "5px 12px", fontSize: "0.8rem", borderRadius: "6px" }}
+              >
+                عملیات پایانه (۵)
+              </button>
+              <button
+                onClick={() => setSelectedCategory("اطلاعات پایه")}
+                className={`btn ${selectedCategory === "اطلاعات پایه" ? "btn-primary" : "btn-ghost"}`}
+                style={{ padding: "5px 12px", fontSize: "0.8rem", borderRadius: "6px" }}
+              >
+                اطلاعات پایه (۵)
+              </button>
+              <button
+                onClick={() => setSelectedCategory("تحلیل و تنظیمات")}
+                className={`btn ${selectedCategory === "تحلیل و تنظیمات" ? "btn-primary" : "btn-ghost"}`}
+                style={{ padding: "5px 12px", fontSize: "0.8rem", borderRadius: "6px" }}
+              >
+                تحلیل و تنظیمات (۱۰)
+              </button>
+            </div>
+          </div>
+
+          {/* لیست کارت‌های آموزشی منوها */}
+          {filteredMenuGuides.length === 0 ? (
+            <div
+              style={{
+                background: "var(--panel)",
+                borderRadius: "var(--radius)",
+                border: "1px solid var(--line)",
+                padding: "36px",
+                textAlign: "center",
+                color: "var(--ink-soft)",
+              }}
+            >
+              منویی با عبارت جستجو شده پیدا نشد.
+            </div>
+          ) : (
+            filteredMenuGuides.map((guide) => {
+              const isExpanded = expandedGuideId === guide.id;
+              const charCount = guide.fullGuideText.length;
+
+              return (
+                <div
+                  key={guide.id}
+                  style={{
+                    background: "var(--panel)",
+                    borderRadius: "var(--radius)",
+                    border: "1px solid var(--line)",
+                    padding: "20px",
+                    boxShadow: "var(--sh-1)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "14px",
+                  }}
+                >
+                  {/* ردیف سربرگ کارت */}
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      gap: "12px",
+                      borderBottom: "1px solid var(--line)",
+                      paddingBottom: "14px",
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                        <h3 style={{ fontSize: "1.05rem", fontWeight: 700, margin: 0, color: "var(--ink)" }}>
+                          {guide.title}
+                        </h3>
+                        <span
+                          style={{
+                            background: "var(--panel-2)",
+                            color: "var(--accent)",
+                            border: "1px solid var(--line)",
+                            padding: "2px 8px",
+                            borderRadius: "6px",
+                            fontSize: "0.75rem",
+                            fontFamily: "var(--mono)",
+                            direction: "ltr",
+                          }}
+                        >
+                          {guide.route}
+                        </span>
+                        <span
+                          style={{
+                            background: "var(--accent-soft)",
+                            color: "var(--accent)",
+                            padding: "2px 8px",
+                            borderRadius: "6px",
+                            fontSize: "0.75rem",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {guide.categoryTitle}
+                        </span>
+                        <span
+                          style={{
+                            background: "rgba(16, 185, 129, 0.1)",
+                            color: "var(--good)",
+                            border: "1px solid rgba(16, 185, 129, 0.25)",
+                            padding: "2px 8px",
+                            borderRadius: "6px",
+                            fontSize: "0.75rem",
+                            fontWeight: 600,
+                          }}
+                        >
+                          ✨ {charCount.toLocaleString("fa-IR")} کاراکتر آموزش کامل
+                        </span>
+                      </div>
+                      <p
+                        style={{
+                          margin: "6px 0 0",
+                          fontSize: "0.85rem",
+                          color: "var(--ink-soft)",
+                          lineHeight: 1.6,
+                        }}
+                      >
+                        {guide.summary}
+                      </p>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                      <button
+                        onClick={() => setExpandedGuideId(isExpanded ? null : guide.id)}
+                        className="btn btn-ghost"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          fontSize: "0.82rem",
+                          padding: "6px 12px",
+                          borderRadius: "6px",
+                          border: "1px solid var(--line)",
+                        }}
+                      >
+                        {isExpanded ? "بستن متن تفصیلی" : "مشاهده متن تفصیلی"}
+                        {isExpanded ? <CaretUp size={14} /> : <CaretDown size={14} />}
+                      </button>
+                      <Link
+                        href={guide.route}
+                        className="btn btn-primary"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          fontSize: "0.82rem",
+                          padding: "6px 14px",
+                          borderRadius: "6px",
+                        }}
+                      >
+                        ورود به منو
+                      </Link>
+                    </div>
+                  </div>
+
+                  {/* شبکه سه ستونه: سرفصل‌های تخصصی، گردش‌کار گام‌به‌گام و نکات کلیدی */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                      gap: "14px",
+                    }}
+                  >
+                    {/* ستون ۱: سرفصل‌ها و محورهای تخصصی */}
+                    <div
+                      style={{
+                        background: "var(--panel-2)",
+                        borderRadius: "10px",
+                        padding: "14px",
+                        border: "1px solid var(--line)",
+                      }}
+                    >
+                      <strong
+                        style={{
+                          fontSize: "0.85rem",
+                          color: "var(--ink)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          marginBottom: "10px",
+                        }}
+                      >
+                        <CheckCircle size={16} color="var(--good)" weight="bold" />
+                        محورهای تخصصی و قابلیت‌ها:
+                      </strong>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "8px",
+                        }}
+                      >
+                        {guide.sections.map((sec, secIdx) => (
+                          <div key={secIdx} style={{ fontSize: "0.8rem", color: "var(--ink-soft)", lineHeight: 1.6 }}>
+                            <strong style={{ color: "var(--ink)", display: "block" }}>{sec.title}</strong>
+                            <span>{sec.content.slice(0, 110)}...</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* ستون ۲: مراحل و گردش‌کار اجرایی */}
+                    <div
+                      style={{
+                        background: "var(--panel-2)",
+                        borderRadius: "10px",
+                        padding: "14px",
+                        border: "1px solid var(--line)",
+                      }}
+                    >
+                      <strong
+                        style={{
+                          fontSize: "0.85rem",
+                          color: "var(--ink)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          marginBottom: "10px",
+                        }}
+                      >
+                        <Lightning size={16} color="var(--accent)" weight="bold" />
+                        گردش‌کار و مراحل گام‌به‌گام:
+                      </strong>
+                      <ol
+                        style={{
+                          margin: 0,
+                          paddingInlineStart: "18px",
+                          fontSize: "0.8rem",
+                          color: "var(--ink-soft)",
+                          lineHeight: 1.7,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "4px",
+                        }}
+                      >
+                        {guide.workflows.map((wf, wIdx) => (
+                          <li key={wIdx}>
+                            <strong style={{ color: "var(--ink)" }}>{wf.title}: </strong>
+                            {wf.description}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+
+                    {/* ستون ۳: نکات کلیدی و الزامات سیستمی */}
+                    <div
+                      style={{
+                        background: "var(--panel-2)",
+                        borderRadius: "10px",
+                        padding: "14px",
+                        border: "1px solid var(--line)",
+                      }}
+                    >
+                      <strong
+                        style={{
+                          fontSize: "0.85rem",
+                          color: "var(--ink)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          marginBottom: "10px",
+                        }}
+                      >
+                        <ShieldCheck size={16} color="var(--warn)" weight="bold" />
+                        نکات ایمنی و الزامات سیستمی:
+                      </strong>
+                      <ul
+                        style={{
+                          margin: 0,
+                          paddingInlineStart: "18px",
+                          fontSize: "0.8rem",
+                          color: "var(--ink-soft)",
+                          lineHeight: 1.7,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "4px",
+                        }}
+                      >
+                        {guide.tips.map((tip, tIdx) => (
+                          <li key={tIdx}>{tip}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* بخش بازشونده متن تفصیلی بیش از ۱۰۰۰ کاراکتر */}
+                  {isExpanded && (
+                    <div
+                      style={{
+                        background: "var(--panel-2)",
+                        borderRadius: "10px",
+                        border: "1px solid var(--line)",
+                        padding: "18px 20px",
+                        marginTop: "4px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: "12px",
+                          borderBottom: "1px dashed var(--line)",
+                          paddingBottom: "8px",
+                        }}
+                      >
+                        <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--ink)" }}>
+                          📖 مستند تفصیلی و دستورالعمل رسمی {guide.title}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "0.75rem",
+                            color: "var(--ink-soft)",
+                            fontFamily: "var(--mono)",
+                          }}
+                        >
+                          تعداد کل کاراکترها: {charCount.toLocaleString("fa-IR")}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          whiteSpace: "pre-line",
+                          fontSize: "0.84rem",
+                          lineHeight: 1.85,
+                          color: "var(--ink)",
+                        }}
+                      >
+                        {guide.fullGuideText}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
 
       {/* تب ۱: گردش کارهای عملیاتی */}
       {activeTab === "workflows" && (

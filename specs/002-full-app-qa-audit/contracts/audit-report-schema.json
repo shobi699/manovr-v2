@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ComprehensiveAuditReportSchema",
+  "description": "Schema for the comprehensive full-system quality assurance and menu evaluation audit report",
+  "type": "object",
+  "required": [
+    "reportId",
+    "reportDateJalali",
+    "auditorRole",
+    "summary",
+    "menuDetails",
+    "layerDetails",
+    "finalVerdict"
+  ],
+  "properties": {
+    "reportId": {
+      "type": "string",
+      "pattern": "^QA-[0-9]{8}-[0-9]{3}$"
+    },
+    "reportDateJalali": {
+      "type": "string"
+    },
+    "auditorRole": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "totalMenusAudited",
+        "passedMenus",
+        "warningMenus",
+        "failedMenus",
+        "averageLoadTimeMs",
+        "systemLightnessRating"
+      ],
+      "properties": {
+        "totalMenusAudited": { "type": "integer", "minimum": 20 },
+        "passedMenus": { "type": "integer", "minimum": 0 },
+        "warningMenus": { "type": "integer", "minimum": 0 },
+        "failedMenus": { "type": "integer", "minimum": 0 },
+        "averageLoadTimeMs": { "type": "number" },
+        "systemLightnessRating": { "type": "string", "enum": ["EXCELLENT", "GOOD", "ACCEPTABLE", "POOR"] }
+      }
+    },
+    "menuDetails": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "route",
+          "overallStatus",
+          "uiAudit",
+          "backendAudit",
+          "dbAudit",
+          "performanceAudit"
+        ]
+      }
+    },
+    "layerDetails": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["layerName", "status", "findings"]
+      }
+    },
+    "diagnosticObservations": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "recommendations": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "finalVerdict": {
+      "type": "string",
+      "enum": ["SYSTEM_APPROVED", "ACTION_REQUIRED", "CRITICAL_DEFECTS"]
+    }
+  }
+}

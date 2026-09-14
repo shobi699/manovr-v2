@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getRoleLevel, isRoleAllowedToManage, permsInclude } from "@/lib/perms";
+import { getRoleLevel, isRoleAllowedToManage, permsInclude, mapAccessRoleToLegacyRole } from "@/lib/perms";
 
 describe("getRoleLevel", () => {
   it("returns 100 for super admin (role 4)", () => {
@@ -54,3 +54,34 @@ describe("permsInclude", () => {
     expect(permsInclude([], "manovr.view")).toBe(false);
   });
 });
+
+describe("mapAccessRoleToLegacyRole", () => {
+  it("maps admin roles correctly to 1", () => {
+    expect(mapAccessRoleToLegacyRole("ادمین")).toBe(1);
+    expect(mapAccessRoleToLegacyRole("مدیر سامانه")).toBe(1);
+    expect(mapAccessRoleToLegacyRole("Admin")).toBe(1);
+  });
+
+  it("maps responsible/operator roles to 2", () => {
+    expect(mapAccessRoleToLegacyRole("مسئول")).toBe(2);
+    expect(mapAccessRoleToLegacyRole("مسئول شیفت")).toBe(2);
+    expect(mapAccessRoleToLegacyRole("Operator")).toBe(2);
+  });
+
+  it("maps viewer roles to 3", () => {
+    expect(mapAccessRoleToLegacyRole("مشاهده")).toBe(3);
+    expect(mapAccessRoleToLegacyRole("کاربر بیننده")).toBe(3);
+  });
+
+  it("maps no access roles to 0", () => {
+    expect(mapAccessRoleToLegacyRole("بدون دسترسی")).toBe(0);
+    expect(mapAccessRoleToLegacyRole(null)).toBe(0);
+    expect(mapAccessRoleToLegacyRole("")).toBe(0);
+  });
+
+  it("maps technician or superadmin roles to 4", () => {
+    expect(mapAccessRoleToLegacyRole("تکنسین")).toBe(4);
+    expect(mapAccessRoleToLegacyRole("سوپرادمین")).toBe(4);
+  });
+});
+

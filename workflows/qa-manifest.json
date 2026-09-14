@@ -1,0 +1,289 @@
+{
+  "version": 1,
+  "created": "2026-09-11T10:25:00Z",
+  "app_name": "Manovr V3 (سیستم مدیریت یکپارچه مانور و ناوگان ریلی)",
+  "framework": "nextjs-app-router",
+  "base_url": "http://localhost:3000",
+  "screens": [
+    {
+      "url": "/",
+      "name": "Landing / Root Redirect",
+      "auth_required": false,
+      "source_file": "src/app/page.tsx",
+      "discovered_from": ["codebase"],
+      "workflow_refs": [],
+      "params": {},
+      "example_url": "/"
+    },
+    {
+      "url": "/login",
+      "name": "صفحه ورود به سیستم",
+      "auth_required": false,
+      "source_file": "src/app/login/page.tsx",
+      "discovered_from": ["codebase", "workflow"],
+      "workflow_refs": ["WF01-Step1"],
+      "params": {},
+      "example_url": "/login"
+    },
+    {
+      "url": "/dashboard",
+      "name": "داشبورد مرکزی عملیات",
+      "auth_required": true,
+      "source_file": "src/app/(main)/dashboard/page.tsx",
+      "discovered_from": ["codebase", "workflow"],
+      "workflow_refs": ["WF01-Step3"],
+      "params": {},
+      "example_url": "/dashboard"
+    },
+    {
+      "url": "/depot",
+      "name": "نمای دپو و ایستگاه (۳D / ۲D)",
+      "auth_required": true,
+      "source_file": "src/app/(main)/depot/page.tsx",
+      "discovered_from": ["codebase", "workflow"],
+      "workflow_refs": ["WF03-Step1"],
+      "params": {},
+      "example_url": "/depot"
+    },
+    {
+      "url": "/users",
+      "name": "مدیریت پرسنل و کاربران",
+      "auth_required": true,
+      "source_file": "src/app/(main)/users/page.tsx",
+      "discovered_from": ["codebase", "workflow"],
+      "workflow_refs": ["WF02-Step1"],
+      "params": {},
+      "example_url": "/users"
+    },
+    {
+      "url": "/users/new",
+      "name": "ایجاد کاربر جدید",
+      "auth_required": true,
+      "source_file": "src/app/(main)/users/new/page.tsx",
+      "discovered_from": ["codebase", "workflow"],
+      "workflow_refs": ["WF02-Step2"],
+      "params": {},
+      "example_url": "/users/new"
+    },
+    {
+      "url": "/users/[id]/edit",
+      "name": "ویرایش کاربر",
+      "auth_required": true,
+      "source_file": "src/app/(main)/users/[id]/edit/page.tsx",
+      "discovered_from": ["codebase", "workflow"],
+      "workflow_refs": ["WF02-Step4"],
+      "params": { "id": "1" },
+      "example_url": "/users/1/edit"
+    },
+    {
+      "url": "/roles",
+      "name": "مدیریت نقش‌ها و دسترسی‌ها (RBAC)",
+      "auth_required": true,
+      "source_file": "src/app/(main)/roles/page.tsx",
+      "discovered_from": ["codebase", "workflow"],
+      "workflow_refs": ["WF02-Step5"],
+      "params": {},
+      "example_url": "/roles"
+    },
+    {
+      "url": "/trains",
+      "name": "مدیریت قطارها و لکوموتیوها",
+      "auth_required": true,
+      "source_file": "src/app/(main)/trains/page.tsx",
+      "discovered_from": ["codebase", "workflow"],
+      "workflow_refs": ["WF04-Step1"],
+      "params": {},
+      "example_url": "/trains"
+    },
+    {
+      "url": "/trains/new",
+      "name": "تعریف قطار جدید",
+      "auth_required": true,
+      "source_file": "src/app/(main)/trains/new/page.tsx",
+      "discovered_from": ["codebase", "workflow"],
+      "workflow_refs": ["WF04-Step2"],
+      "params": {},
+      "example_url": "/trains/new"
+    },
+    {
+      "url": "/trains/[id]/edit",
+      "name": "ویرایش قطار",
+      "auth_required": true,
+      "source_file": "src/app/(main)/trains/[id]/edit/page.tsx",
+      "discovered_from": ["codebase"],
+      "workflow_refs": [],
+      "params": { "id": "1" },
+      "example_url": "/trains/1/edit"
+    },
+    {
+      "url": "/lines",
+      "name": "مدیریت خطوط و ایستگاه‌های ریلی",
+      "auth_required": true,
+      "source_file": "src/app/(main)/lines/page.tsx",
+      "discovered_from": ["codebase", "workflow"],
+      "workflow_refs": ["WF05-Step1"],
+      "params": {},
+      "example_url": "/lines"
+    },
+    {
+      "url": "/lines/new",
+      "name": "ایجاد خط ریلی جدید",
+      "auth_required": true,
+      "source_file": "src/app/(main)/lines/new/page.tsx",
+      "discovered_from": ["codebase", "workflow"],
+      "workflow_refs": ["WF05-Step2"],
+      "params": {},
+      "example_url": "/lines/new"
+    },
+    {
+      "url": "/lines/[id]/edit",
+      "name": "ویرایش خط ریلی",
+      "auth_required": true,
+      "source_file": "src/app/(main)/lines/[id]/edit/page.tsx",
+      "discovered_from": ["codebase"],
+      "workflow_refs": [],
+      "params": { "id": "1" },
+      "example_url": "/lines/1/edit"
+    },
+    {
+      "url": "/manovrs",
+      "name": "لیست دستورات مانور",
+      "auth_required": true,
+      "source_file": "src/app/(main)/manovrs/page.tsx",
+      "discovered_from": ["codebase", "workflow"],
+      "workflow_refs": ["WF06-Step1"],
+      "params": {},
+      "example_url": "/manovrs"
+    },
+    {
+      "url": "/manovrs/new",
+      "name": "ثبت عملیات مانور جدید",
+      "auth_required": true,
+      "source_file": "src/app/(main)/manovrs/new/page.tsx",
+      "discovered_from": ["codebase", "workflow"],
+      "workflow_refs": ["WF06-Step2"],
+      "params": {},
+      "example_url": "/manovrs/new"
+    },
+    {
+      "url": "/manovrs/approvals",
+      "name": "کارتابل تاییدات مانور",
+      "auth_required": true,
+      "source_file": "src/app/(main)/manovrs/approvals/page.tsx",
+      "discovered_from": ["codebase", "workflow"],
+      "workflow_refs": ["WF06-Step3"],
+      "params": {},
+      "example_url": "/manovrs/approvals"
+    },
+    {
+      "url": "/tickets",
+      "name": "کارت‌های سیر و تیکت‌های عملیاتی",
+      "auth_required": true,
+      "source_file": "src/app/(main)/tickets/page.tsx",
+      "discovered_from": ["codebase", "workflow"],
+      "workflow_refs": ["WF06-Step4"],
+      "params": {},
+      "example_url": "/tickets"
+    },
+    {
+      "url": "/reports",
+      "name": "سامانه جامع گزارش‌ساز و صدور خروجی",
+      "auth_required": true,
+      "source_file": "src/app/(main)/reports/page.tsx",
+      "discovered_from": ["codebase", "workflow"],
+      "workflow_refs": ["WF08-Step1"],
+      "params": {},
+      "example_url": "/reports"
+    },
+    {
+      "url": "/admin/audit",
+      "name": "دفتر ثبت وقایع و لاگ‌های امنیتی (Audit Log)",
+      "auth_required": true,
+      "source_file": "src/app/(main)/admin/audit/page.tsx",
+      "discovered_from": ["codebase", "workflow"],
+      "workflow_refs": ["WF07-Step1"],
+      "params": {},
+      "example_url": "/admin/audit"
+    },
+    {
+      "url": "/admin/backup",
+      "name": "پشتیبان‌گیری و بازیابی داده‌ها",
+      "auth_required": true,
+      "source_file": "src/app/(main)/admin/backup/page.tsx",
+      "discovered_from": ["codebase"],
+      "workflow_refs": [],
+      "params": {},
+      "example_url": "/admin/backup"
+    },
+    {
+      "url": "/admin/branding",
+      "name": "تنظیمات برندینگ و تم گرافیکی",
+      "auth_required": true,
+      "source_file": "src/app/(main)/admin/branding/page.tsx",
+      "discovered_from": ["codebase"],
+      "workflow_refs": [],
+      "params": {},
+      "example_url": "/admin/branding"
+    },
+    {
+      "url": "/admin/lookups",
+      "name": "جداول پایه و کدهای سیستمی",
+      "auth_required": true,
+      "source_file": "src/app/(main)/admin/lookups/page.tsx",
+      "discovered_from": ["codebase"],
+      "workflow_refs": [],
+      "params": {},
+      "example_url": "/admin/lookups"
+    },
+    {
+      "url": "/admin/terminals",
+      "name": "پیکربندی پایانه‌ها و کلاینت‌ها",
+      "auth_required": true,
+      "source_file": "src/app/(main)/admin/terminals/page.tsx",
+      "discovered_from": ["codebase"],
+      "workflow_refs": [],
+      "params": {},
+      "example_url": "/admin/terminals"
+    },
+    {
+      "url": "/profile",
+      "name": "پروفایل کاربر جاری",
+      "auth_required": true,
+      "source_file": "src/app/(main)/profile/page.tsx",
+      "discovered_from": ["codebase"],
+      "workflow_refs": [],
+      "params": {},
+      "example_url": "/profile"
+    },
+    {
+      "url": "/phonebook",
+      "name": "دفترچه تلفن و مخاطبین ایستگاه",
+      "auth_required": true,
+      "source_file": "src/app/(main)/phonebook/page.tsx",
+      "discovered_from": ["codebase"],
+      "workflow_refs": [],
+      "params": {},
+      "example_url": "/phonebook"
+    },
+    {
+      "url": "/settings",
+      "name": "تنظیمات سامانه",
+      "auth_required": true,
+      "source_file": "src/app/(main)/settings/page.tsx",
+      "discovered_from": ["codebase"],
+      "workflow_refs": [],
+      "params": {},
+      "example_url": "/settings"
+    },
+    {
+      "url": "/help",
+      "name": "راهنما و مستندات سامانه مانور",
+      "auth_required": true,
+      "source_file": "src/app/(main)/help/page.tsx",
+      "discovered_from": ["codebase"],
+      "workflow_refs": [],
+      "params": {},
+      "example_url": "/help"
+    }
+  ]
+}

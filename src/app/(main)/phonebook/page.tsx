@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { hasPerm } from "@/lib/perms";
 import { Shift, OrgPosition } from "@/lib/enums";
 import { parseListParams, toPrismaPage } from "@/lib/list-query";
+import { generateSearchVariants } from "@/lib/persian-text";
 import PhonebookClient from "./PhonebookClient";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,10 @@ export default async function PhonebookPage({
 
   const resolvedParams = (await searchParams) || {};
   const params = parseListParams(resolvedParams, ALLOWED_SORT);
-  const { skip, take } = toPrismaPage(params);
+  // در صورتی که کاربر سایز مشخص نکرده باشد، برای دسترسی سریع به کلیه مخاطبان تا ۳۰۰ مخاطب لود می‌شود
+  const defaultPageSize = resolvedParams.pageSize ? params.pageSize : 300;
+  const skip = (params.page - 1) * defaultPageSize;
+  const take = defaultPageSize;
 
   const shiftFilter = typeof resolvedParams.shift === "string" ? resolvedParams.shift : "all";
   const posFilter = typeof resolvedParams.pos === "string" ? resolvedParams.pos : "all";
@@ -35,15 +39,23 @@ export default async function PhonebookPage({
   }
 
   if (params.search) {
-    andConditions.push({
-      OR: [
-        { firstName: { contains: params.search } },
-        { lastName: { contains: params.search } },
-        { personnelCode: { contains: params.search } },
-        { phone1: { contains: params.search } },
-        { internalTel: { contains: params.search } },
-      ],
-    });
+    const variants = generateSearchVariants(params.search);
+    const searchOrConditions: any[] = [];
+
+    for (const v of variants) {
+      searchOrConditions.push(
+        { firstName: { contains: v } },
+        { lastName: { contains: v } },
+        { personnelCode: { contains: v } },
+        { phone1: { contains: v } },
+        { phone2: { contains: v } },
+        { internalTel: { contains: v } }
+      );
+    }
+
+    if (searchOrConditions.length > 0) {
+      andConditions.push({ OR: searchOrConditions });
+    }
   }
 
   if (andConditions.length > 0) {

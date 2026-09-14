@@ -9,6 +9,7 @@ import {
   getActivePersonnel,
 } from "@/app/actions/tickets";
 import { useToast } from "@/components/ui/Toast";
+import { persianSearchMatch } from "@/lib/persian-text";
 
 interface TicketReply {
   id: number;
@@ -121,12 +122,14 @@ export default function TicketsClient({
     });
   };
 
-  // فیلتر کردن لیست تیکت‌ها بر اساس تب و متن جستجو
+  // فیلتر کردن لیست تیکت‌ها بر اساس تب و متن جستجو با پشتیبانی کامل از حروف فارسی و عربی
   const filteredTickets = tickets.filter((t) => {
     const matchesSearch =
-      t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.id.toString() === searchQuery ||
-      `${t.creator.firstName} ${t.creator.lastName}`.toLowerCase().includes(searchQuery.toLowerCase());
+      !searchQuery.trim() ||
+      persianSearchMatch(t.title, searchQuery) ||
+      persianSearchMatch(String(t.id), searchQuery) ||
+      persianSearchMatch(`${t.creator.firstName} ${t.creator.lastName}`, searchQuery) ||
+      (t.assignee && persianSearchMatch(`${t.assignee.firstName} ${t.assignee.lastName}`, searchQuery));
 
     if (activeTab === "all") return matchesSearch;
     return t.status === activeTab && matchesSearch;

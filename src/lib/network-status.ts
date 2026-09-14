@@ -18,6 +18,23 @@ export interface NetworkStatusResult {
 }
 
 /**
+ * بررسی دسترسی ناهمگام و ایمن به مسیر با سقف زمان پاسخگویی (Timeout Guard)
+ * جهت ممانعت مطلق از بلاک شدن نخ اصلی Node.js روی مسیرهای شبکه ویندوز
+ */
+async function checkPathAccessibleAsync(targetPath: string, timeoutMs = 1200): Promise<boolean> {
+  try {
+    const checkPromise = fs.promises.access(targetPath, fs.constants.R_OK);
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("SMB Network Timeout")), timeoutMs)
+    );
+    await Promise.race([checkPromise, timeoutPromise]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * دریافت مسیر اشتراکی پیکربندی‌شده از manovr-config.json یا متغیرهای محیطی
  */
 export function getTargetSharedPath(): string {
@@ -31,21 +48,21 @@ export function getTargetSharedPath(): string {
   ];
 
   for (const p of candidatePaths) {
-    if (fs.existsSync(p)) {
-      try {
+    try {
+      if (fs.existsSync(p)) {
         const parsed = JSON.parse(fs.readFileSync(p, "utf8"));
         if (parsed && typeof parsed.sharedDataPath === "string") {
           return parsed.sharedDataPath.trim();
         }
-      } catch {}
-    }
+      }
+    } catch {}
   }
 
   return "\\\\srvdfs01\\Line1\\Depo\\data";
 }
 
 /**
- * بررسی وضعیت ارتباط با پایگاه داده و پوشه اشتراکی شبکه
+ * بررسی وضعیت ارتباط با پایگاه داده و پوشه اشتراکی شبکه به صورت کاملاً غیرمسدودکننده
  */
 export async function getNetworkStatus(): Promise<NetworkStatusResult> {
   const targetSharedPath = getTargetSharedPath();
@@ -60,31 +77,25 @@ export async function getNetworkStatus(): Promise<NetworkStatusResult> {
     activeDatabasePath = rawFilePath.replace(/\//g, "\\");
   }
 
-  // بررسی دسترسی به پوشه اشتراکی شبکه در فایل‌سیستم
-  let sharedPathAccessible = false;
-  try {
-    if (fs.existsSync(targetSharedPath)) {
-      sharedPathAccessible = true;
-    } else {
-      // بررسی روت پوشه شبکه در صورت دسترسی نداشتن به ساب‌فولدر
-      const rootDfs = "\\\\srvdfs01\\Line1\\Depo";
-      if (fs.existsSync(rootDfs)) {
-        sharedPathAccessible = true;
-      }
-    }
-  } catch {
-    sharedPathAccessible = false;
+  // بررسی کاملاً ناهمگام با تایم‌اوت محافظ برای جلوگیری از فریز سرور
+  let sharedPathAccessible = await checkPathAccessibleAsync(targetSharedPath);
+  if (!sharedPathAccessible) {
+    const rootDfs = "\\\\srvdfs01\\Line1\\Depo";
+    sharedPathAccessible = await checkPathAccessibleAsync(rootDfs);
   }
 
   // تشخیص اینکه آیا دیتابیس جاری روی پوشه شبکه قرار دارد یا محلی است
   const normalizedActive = activeDatabasePath.toLowerCase().replace(/\//g, "\\");
   const normalizedTarget = targetSharedPath.toLowerCase().replace(/\//g, "\\");
   const isShared =
-    Boolean(normalizedActive && (
-      normalizedActive.includes("srvdfs01") ||
-      normalizedActive.startsWith("\\\\") ||
-      (normalizedTarget && normalizedActive.includes(normalizedTarget))
-    )) || (storageSourceEnv.toLowerCase().includes("dfs") || storageSourceEnv.toLowerCase().includes("shared"));
+    Boolean(
+      normalizedActive &&
+        (normalizedActive.includes("srvdfs01") ||
+          normalizedActive.startsWith("\\\\") ||
+          (normalizedTarget && normalizedActive.includes(normalizedTarget)))
+    ) ||
+    storageSourceEnv.toLowerCase().includes("dfs") ||
+    storageSourceEnv.toLowerCase().includes("shared");
 
   // تست سلامت و زمان پاسخگویی پایگاه داده با یک کوئری فوق‌سریع
   let isDatabaseReady = false;
@@ -95,7 +106,7 @@ export async function getNetworkStatus(): Promise<NetworkStatusResult> {
     pingMs = Math.max(1, Math.round(performance.now() - start));
     isDatabaseReady = true;
   } catch (dbErr) {
-    console.error("[NetworkStatus] Database query failed:", dbErr);
+    console.error("[NetworkStatus] خطای ارتباط با پایگاه داده:", dbErr);
     isDatabaseReady = false;
     pingMs = -1;
   }

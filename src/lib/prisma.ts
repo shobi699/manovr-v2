@@ -3,23 +3,43 @@ import { PrismaClient } from "@prisma/client";
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function createPrismaClient(): PrismaClient {
-  const baseClient = new PrismaClient();
+  const baseClient = new PrismaClient({
+    log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
+  });
 
-  // اعمال خودکار PRAGMA busy_timeout برای صف انتظار ۳۰ ثانیه‌ای
   let pragmasConfigured = false;
+  let configuringPragmasPromise: Promise<void> | null = null;
+
   const ensurePragmas = async () => {
     if (pragmasConfigured) return;
-    try {
-      await baseClient.$queryRawUnsafe("PRAGMA busy_timeout = 60000;");
-      await baseClient.$queryRawUnsafe("PRAGMA journal_mode = DELETE;");
-      await baseClient.$queryRawUnsafe("PRAGMA synchronous = NORMAL;");
-      await baseClient.$queryRawUnsafe("PRAGMA temp_store = MEMORY;");
-      await baseClient.$queryRawUnsafe("PRAGMA cache_size = -16000;");
-      await baseClient.$queryRawUnsafe("PRAGMA locking_mode = NORMAL;");
-      pragmasConfigured = true;
-    } catch {
-      // در صورت بروز هرگونه خطای موقت، مانع از اجرای کوئری نشود
-    }
+    if (configuringPragmasPromise) return configuringPragmasPromise;
+
+    configuringPragmasPromise = (async () => {
+      try {
+        const rawDbUrl = process.env.DATABASE_URL || "";
+        const isNetworkPath =
+          rawDbUrl.includes("srvdfs01") ||
+          rawDbUrl.startsWith("file:////") ||
+          rawDbUrl.includes("\\\\");
+
+        await baseClient.$queryRawUnsafe("PRAGMA busy_timeout = 60000;");
+        // برای مسیر شبکه از TRUNCATE استفاده می‌شود تا فایل دائماً ساخته و پاک نشود؛
+        // برای دیسک محلی از WAL جهت نهایت پایداری و خواندن/نوشتن هم‌زمان بهره‌گیری می‌شود.
+        const journalMode = isNetworkPath ? "TRUNCATE" : "WAL";
+        await baseClient.$queryRawUnsafe(`PRAGMA journal_mode = ${journalMode};`);
+        await baseClient.$queryRawUnsafe("PRAGMA synchronous = NORMAL;");
+        await baseClient.$queryRawUnsafe("PRAGMA temp_store = MEMORY;");
+        await baseClient.$queryRawUnsafe("PRAGMA cache_size = -32000;"); // ۳۲ مگابایت کش حافظه
+        await baseClient.$queryRawUnsafe("PRAGMA locking_mode = NORMAL;");
+        pragmasConfigured = true;
+      } catch {
+        // در صورت بروز خطای موقت، مانع اجرای کوئری نشود
+      } finally {
+        configuringPragmasPromise = null;
+      }
+    })();
+
+    return configuringPragmasPromise;
   };
 
   // اکستنشن نوبت‌دهی هوشمند و بازتلاش تا ۶۰ ثانیه در صورت قفل بودن دیتابیس در شبکه
@@ -42,11 +62,15 @@ function createPrismaClient(): PrismaClient {
               const isLocked =
                 errorMessage.includes("database is locked") ||
                 errorMessage.includes("sqlite_busy") ||
-                errorCode === "P2034";
+                errorMessage.includes("database table is locked") ||
+                errorMessage.includes("xdelete of a vfs object") ||
+                errorMessage.includes("error code 2570") ||
+                errorCode === "P2034" ||
+                errorCode === "P2028";
 
               if (isLocked && Date.now() - startTime < maxWaitMs) {
                 attempt++;
-                // استفاده از تاخیر همراه با Jitter تصادفی تا کلاینت‌های مختلف در یک میلی‌ثانیه هم‌زمان تلاش مجدد نکنند
+                // استفاده از تاخیر همراه با Jitter تصادفی تا کلاینت‌های مختلف هم‌زمان تلاش نکنند
                 const jitter = Math.floor(Math.random() * 150);
                 const delay = Math.min(80 + jitter + attempt * 120, 1500);
                 console.warn(
@@ -74,4 +98,3 @@ function createPrismaClient(): PrismaClient {
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
-

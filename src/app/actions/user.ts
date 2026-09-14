@@ -5,7 +5,7 @@ import { ORG_POSITIONS } from "@/lib/constants";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { hasPerm, isRoleAllowedToManage, invalidatePermsCache } from "@/lib/perms";
+import { hasPerm, isRoleAllowedToManage, invalidatePermsCache, mapAccessRoleToLegacyRole } from "@/lib/perms";
 import bcrypt from "bcryptjs";
 import { audit } from "@/lib/audit";
 import {
@@ -52,13 +52,14 @@ export async function createUser(
     lastName,
     userName,
     password,
-    role,
+    role: initialRole,
     shift: defaultShift,
     orgPosition: defaultOrgPosition,
+    isPartTimeDriver: initialIsPartTimeDriver,
     personnelType: defaultPersonnelType,
     personnelCode,
     hasAccount,
-    accessRoleId,
+    accessRoleId: initialAccessRoleId,
     phone1,
     phone2,
     internalTel,
@@ -68,10 +69,36 @@ export async function createUser(
 
   let shift = defaultShift;
   let orgPosition = defaultOrgPosition;
+  let isPartTimeDriver = orgPosition === 1 ? false : Boolean(initialIsPartTimeDriver);
   let personnelType = defaultPersonnelType;
+  let accessRoleId = initialAccessRoleId;
+  let computedRole = initialRole ?? 0;
 
-  if (!isRoleAllowedToManage(session.role, role)) {
-    return { error: "شما مجاز به تعیین این نقش برای کاربر جدید نیستید (هم‌سطح یا بالاتر از شما)." };
+  if (hasAccount) {
+    let targetAccessRole = accessRoleId
+      ? await prisma.accessRole.findUnique({ where: { id: accessRoleId } })
+      : null;
+
+    // در صورت مشخص نبودن نقش سفارشی، نقش پیش‌فرض مشاهده یا اولین نقش سیستم را انتصاب می‌دهیم
+    if (!targetAccessRole) {
+      targetAccessRole = await prisma.accessRole.findFirst({
+        where: { name: "مشاهده" },
+      }) || await prisma.accessRole.findFirst({ orderBy: { id: "asc" } });
+      if (targetAccessRole) {
+        accessRoleId = targetAccessRole.id;
+      }
+    }
+
+    computedRole = targetAccessRole
+      ? mapAccessRoleToLegacyRole(targetAccessRole.name)
+      : (initialRole ?? 3);
+
+    if (!isRoleAllowedToManage(session.role, computedRole)) {
+      return { error: "شما مجاز به تعیین این نقش برای کاربر جدید نیستید (هم‌سطح یا بالاتر از شما)." };
+    }
+  } else {
+    accessRoleId = null;
+    computedRole = 0;
   }
 
   if (isShiftSupervisor && currentUser) {
@@ -80,6 +107,8 @@ export async function createUser(
     if (orgPosition === ORG_POSITIONS.RESPONSIBLE || orgPosition === ORG_POSITIONS.ADMIN) {
       return { error: "شما مجاز به تعیین سمت مسئول شیفت یا ادمین نیستید." };
     }
+    computedRole = 0;
+    accessRoleId = null;
   }
 
   if (hasAccount && userName) {
@@ -103,13 +132,14 @@ export async function createUser(
       lastName,
       userName: hasAccount ? userName : null,
       passwordHash,
-      role: isShiftSupervisor ? 0 : role,
+      role: computedRole,
       shift,
       orgPosition,
+      isPartTimeDriver,
       personnelType,
       personnelCode,
       hasAccount,
-      accessRoleId: isShiftSupervisor ? null : accessRoleId,
+      accessRoleId,
       phone1,
       phone2,
       internalTel,
@@ -130,6 +160,8 @@ export async function createUser(
 
   invalidatePermsCache();
   revalidatePath("/users");
+  revalidatePath("/manovrs/new");
+  revalidatePath("/depot");
   revalidatePath("/phonebook");
   redirect("/users");
 }
@@ -165,6 +197,7 @@ export async function updateUser(
     role: initialRole,
     shift: initialShift,
     orgPosition: initialOrgPosition,
+    isPartTimeDriver: initialIsPartTimeDriver,
     personnelType: initialPersonnelType,
     personnelCode,
     hasAccount,
@@ -176,23 +209,59 @@ export async function updateUser(
     avatarColor,
   } = parsed.data;
 
-  let role = initialRole;
   let shift = initialShift;
   let orgPosition = initialOrgPosition;
+  let isPartTimeDriver = orgPosition === 1 ? false : Boolean(initialIsPartTimeDriver);
   let personnelType = initialPersonnelType;
   let accessRoleId = initialAccessRoleId;
 
-  const targetUser = await prisma.personnel.findUnique({ where: { id } });
+  const targetUser = await prisma.personnel.findUnique({
+    where: { id },
+    include: { accessRole: true },
+  });
   if (!targetUser) return { error: "کاربر مورد نظر یافت نشد." };
 
-  if (!isRoleAllowedToManage(session.role, targetUser.role)) {
+  if (id !== session.id && !isRoleAllowedToManage(session.role, targetUser.role)) {
     return { error: "شما مجاز به ویرایش این کاربر نیستید (هم‌سطح یا بالاتر از شما)." };
   }
-  if (!isRoleAllowedToManage(session.role, role)) {
-    return { error: "شما مجاز به تغییر نقش کاربر به سطح برابر یا بالاتر از خود نیستید." };
-  }
-  if (id === session.id && role !== targetUser.role) {
-    return { error: "شما مجاز به تغییر نقش کاربری خود نیستید." };
+
+  let role = targetUser.role;
+
+  if (hasAccount) {
+    let targetAccessRole = accessRoleId
+      ? await prisma.accessRole.findUnique({ where: { id: accessRoleId } })
+      : null;
+
+    if (!targetAccessRole && targetUser.accessRoleId) {
+      targetAccessRole = targetUser.accessRole;
+      accessRoleId = targetUser.accessRoleId;
+    }
+
+    if (!targetAccessRole) {
+      targetAccessRole = await prisma.accessRole.findFirst({
+        where: { name: "مشاهده" },
+      }) || await prisma.accessRole.findFirst({ orderBy: { id: "asc" } });
+      if (targetAccessRole) {
+        accessRoleId = targetAccessRole.id;
+      }
+    }
+
+    const computedRole = targetAccessRole
+      ? mapAccessRoleToLegacyRole(targetAccessRole.name)
+      : (initialRole ?? targetUser.role);
+
+    if (!isRoleAllowedToManage(session.role, computedRole)) {
+      return { error: "شما مجاز به تغییر نقش کاربر به سطح برابر یا بالاتر از خود نیستید." };
+    }
+
+    if (id === session.id && accessRoleId !== targetUser.accessRoleId) {
+      return { error: "شما مجاز به تغییر نقش کاربری خود نیستید." };
+    }
+
+    role = computedRole;
+  } else {
+    accessRoleId = null;
+    role = 0;
   }
 
   if (isShiftSupervisor && currentUser) {
@@ -240,6 +309,7 @@ export async function updateUser(
       role,
       shift,
       orgPosition,
+      isPartTimeDriver,
       personnelType,
       personnelCode,
       hasAccount,
@@ -264,6 +334,9 @@ export async function updateUser(
 
   invalidatePermsCache();
   revalidatePath("/users");
+  revalidatePath(`/users/${id}/edit`);
+  revalidatePath("/manovrs/new");
+  revalidatePath("/depot");
   revalidatePath("/phonebook");
   redirect("/users");
 }

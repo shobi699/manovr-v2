@@ -100,7 +100,10 @@ function copyAssets() {
 
     // ۵. پاکسازی فایل‌ها و پوشه‌های اضافی از standalone جهت بهینه‌سازی حداکثری حجم بیلد
     console.log('Cleaning unneeded directories and files from standalone...');
-    const dirsToRemove = ['export', 'backups', 'data', 'seed', 'plans', '.agents', '.claude', 'graphify-out'];
+    const dirsToRemove = [
+      'export', 'backups', 'data', 'seed', 'plans', '.agents', '.claude', 'graphify-out',
+      'e2e', 'e2e-skills-1.16.0', 'qa-skills-1.13.3', 'workflows', 'docs', 'test-results', '.playwright'
+    ];
     dirsToRemove.forEach(d => {
       const p = path.join(standaloneDir, d);
       if (fs.existsSync(p)) {

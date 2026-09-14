@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { saveBrandingSettings } from "@/app/actions/lookups";
 import { saveOfflinePolicyAction } from "@/app/actions/settings";
 import { useToast } from "@/components/ui/Toast";
@@ -40,6 +41,7 @@ export default function BrandingClient({
   initialSettings,
   initialOfflinePolicy = "auto_sync",
 }: BrandingClientProps) {
+  const router = useRouter();
   const [offlinePolicy, setOfflinePolicyState] = useState<"auto_sync" | "read_only">(
     initialOfflinePolicy
   );
@@ -82,6 +84,7 @@ export default function BrandingClient({
       const policyRes = await saveOfflinePolicyAction(offlinePolicy);
       if (res.ok && policyRes.ok) {
         toast.success("تغییرات برندینگ و سیاست‌های شبکه با موفقیت ذخیره شد و به صورت زنده اعمال گردید! 🎉");
+        router.refresh();
       } else if (!res.ok) {
         toast.error(res.error || "خطا در ذخیره‌سازی برندینگ");
       } else {

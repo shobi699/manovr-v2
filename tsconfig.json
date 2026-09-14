@@ -30,5 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "e2e-skills-1.16.0", "qa-skills-1.13.3", ".agents"]
 }

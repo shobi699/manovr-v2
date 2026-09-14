@@ -97,15 +97,22 @@ async function handleAutoNotifications(
 ) {
   // سناریو ۱: ثبت مانور جدید -> اعلان به تمام دارندگان مجوز تایید مانور (مسئولین شیفت و ادمین‌ها)
   if (entity === "manovr" && action === "CREATE") {
-    // یافتن تمام پرسنلی که دسترسی تایید مانور دارند
+    // یافتن تمام پرسنلی که دسترسی تایید مانور دارند (نقش‌های ادمین و مسئول یا دارای مجوز سفارشی)
     const users = await prisma.personnel.findMany({
       where: {
-        accessRole: {
-          permissions: {
-            contains: "manovr.confirm",
+        hasAccount: true,
+        OR: [
+          { role: { in: [1, 2, 4] } },
+          {
+            accessRole: {
+              permissions: {
+                contains: "manovr.confirm",
+              },
+            },
           },
-        },
+        ],
       },
+      select: { id: true },
     });
 
     const notifsData = users.map((u) => ({

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import { STATUS_STYLE } from "@/lib/depot-visuals";
 import { BorderRotate } from "@/components/ui/animated-gradient-border";
 import { LineData } from "../types";
@@ -18,12 +18,26 @@ export default function DepotStructured2DView({
   onDropTrainToLine,
   onSelectEmptySlot,
 }: Depot2DViewProps) {
+  // گروه‌بندی کش‌شده قطارها بر اساس خط برای حذف محاسبات تکراری در هر چرخه رندر
+  const trainsByLine = useMemo(() => {
+    const map = new Map<number, typeof trains>();
+    for (const t of trains) {
+      if (t.lineId && !t.isDisposed) {
+        const list = map.get(t.lineId) || [];
+        list.push(t);
+        map.set(t.lineId, list);
+      }
+    }
+    for (const [_, list] of map) {
+      list.sort((a, b) => a.slotIndex - b.slotIndex);
+    }
+    return map;
+  }, [trains]);
+
   // تابع کمکی برای رندر خانه‌های ریل در نمای بنتو
   const renderBentoSlot = (line: LineData) => {
     const label = getPersianLineTitle(line);
-    const lineTrains = trains
-      .filter((t) => t.lineId === line.id && !t.isDisposed)
-      .sort((a, b) => a.slotIndex - b.slotIndex);
+    const lineTrains = trainsByLine.get(line.id) || [];
     const hasTrain = lineTrains.length > 0;
     const train = lineTrains[0];
     const style = hasTrain ? STATUS_STYLE[train.status] || STATUS_STYLE[1] : null;
@@ -34,6 +48,11 @@ export default function DepotStructured2DView({
         <div
           key={line.id}
           onClick={() => {
+            if (canManageLines) {
+              onSelectLine(line);
+            }
+          }}
+          onContextMenu={() => {
             if (canManageLines) {
               onSelectLine(line);
             }
@@ -67,7 +86,12 @@ export default function DepotStructured2DView({
       <div
         key={line.id}
         onClick={() => onSelectLine(line)}
+        onContextMenu={() => {
+          onSelectLine(line);
+          if (hasTrain) onSelectTrain(train);
+        }}
         draggable={hasTrain && canCreateManovr}
+
         onDragStart={(e) => {
           if (hasTrain && canCreateManovr) {
             e.dataTransfer.setData("trainId", String(train.id));
@@ -373,11 +397,23 @@ export default function DepotStructured2DView({
     );
   };
 
-  const mainLines = lines.filter((l) => l.terminal === 3);
+  const mainLines = lines.filter(
+    (l) =>
+      l.name === "خط اصلی" ||
+      l.tag === "S_OriginalLine" ||
+      l.tag === "MAIN" ||
+      (l.terminal === 3 && !l.name.includes("سوله") && !l.tag?.includes("aliabad") && !l.tag?.includes("slole"))
+  );
   const otherLines = lines.filter((l) => l.terminal === 8);
-  const aliabadLines = lines.filter((l) => l.terminal === 9 || l.name.includes("علی‌آباد") || l.name.includes("علی اباد"));
+  const aliabadLines = lines.filter(
+    (l) =>
+      l.terminal === 9 ||
+      l.name.includes("علی‌آباد") ||
+      l.name.includes("علی اباد") ||
+      l.tag?.includes("aliabad")
+  );
   const sub1Lines = lines.filter((l) => l.terminal === 6);
-  const sub2Lines = lines.filter((l) => l.terminal === 7);
+  const sub2Lines = lines.filter((l) => l.terminal === 7 || l.tag?.startsWith("slole-") || l.name.includes("سوله"));
   const wagonLines = lines.filter((l) => l.terminal === 2);
   const dieselLines = lines.filter((l) => l.terminal === 1);
 

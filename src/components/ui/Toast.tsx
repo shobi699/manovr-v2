@@ -90,17 +90,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={contextValue}>
       {children}
-      {/* Toast Container */}
+      {/* Toast Container - z-index بالاتر از تمامی مودال‌ها (100000) و تقویم (100050) */}
       <div
         style={{
           position: "fixed",
           bottom: "24px",
           left: "24px",
-          zIndex: 99999,
+          zIndex: 9999999,
           display: "flex",
           flexDirection: "column",
           gap: "10px",
-          maxWidth: "420px",
+          maxWidth: "440px",
           width: "calc(100vw - 48px)",
           pointerEvents: "none",
         }}

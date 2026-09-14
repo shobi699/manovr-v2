@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { useRouter } from "next/navigation";
 import { updateTrain } from "@/app/actions/train";
-import { TrainType } from "@/lib/enums";
+import { TrainType, TrainTypeFull } from "@/lib/enums";
 
 type LineOpt = { id: number; name: string };
 type Train = {
@@ -57,7 +57,7 @@ export default function EditTrainForm({
                   .map((t) => (
                     <option key={t.code} value={t.code}>{t.label}</option>
                   ))
-              : Object.entries(TrainType).map(([k, v]) => (
+              : Object.entries(TrainTypeFull).map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
                 ))
             }

@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { hasPerm, PERM_LABELS, ALL_PERMS } from "@/lib/perms";
+import { hasPerm, PERM_LABELS, ALL_PERMS, PERM_GROUPS } from "@/lib/perms";
 import { redirect } from "next/navigation";
 import RolesFormClient from "./RolesFormClient";
+import RoleCardItem from "./RoleCardItem";
 
 export const dynamic = "force-dynamic";
 
@@ -30,73 +31,47 @@ export default async function RolesPage() {
       <div className="topbar">
         <h1>مدیریت نقش‌ها و سطوح دسترسی</h1>
       </div>
-      <div className="content" style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: "20px" }}>
+      <div className="content" style={{ display: "grid", gridTemplateColumns: "1fr 420px", gap: "24px", alignItems: "start" }}>
+        {/* ستون کارت‌های نقش موجود */}
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          {roles.map((role) => {
-            let permsList: string[] = [];
-            try {
-              permsList = JSON.parse(role.permissions);
-            } catch {
-              permsList = [];
-            }
-            return (
-              <div className="card" key={role.id}>
-                <div className="card-head">
-                  <h2>
-                    {role.name}
-                    {role.isSystem && (
-                      <span className="pill p-rail" style={{ marginRight: 8, fontSize: 10 }}>
-                        سیستمی
-                      </span>
-                    )}
-                  </h2>
-                  <span className="spacer" />
-                  <span className="muted" style={{ fontSize: 12 }}>
-                    تعداد کاربران: {role._count.personnel}
-                  </span>
-                </div>
-                <div className="card-body">
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}>
-                    {permsList.length === 0 ? (
-                      <span className="muted">بدون دسترسی</span>
-                    ) : (
-                      permsList.map((p) => (
-                        <span className="pill p-mut" key={p}>
-                          {(PERM_LABELS as any)[p] || p}
-                        </span>
-                      ))
-                    )}
-                  </div>
-                  <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                    <RolesFormClient
-                      mode="edit"
-                      roleId={role.id}
-                      roleName={role.name}
-                      activePerms={permsList}
-                      allPerms={ALL_PERMS}
-                      permLabels={PERM_LABELS}
-                      isSystem={role.isSystem}
-                      canEdit={canEdit}
-                      canDelete={canDelete}
-                    />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h2 style={{ fontSize: "15px", fontWeight: 700, color: "var(--ink)" }}>
+              نقش‌های تعریف‌شده در سامانه ({roles.length})
+            </h2>
+            <span className="muted" style={{ fontSize: "12px" }}>
+              مجموع اختیارات سیستمی: {ALL_PERMS.length} مجوز در {Object.keys(PERM_GROUPS).length} دسته
+            </span>
+          </div>
+
+          {roles.map((role) => (
+            <RoleCardItem
+              key={role.id}
+              role={role}
+              allPerms={ALL_PERMS}
+              permLabels={PERM_LABELS}
+              permGroups={PERM_GROUPS}
+              canEdit={canEdit}
+              canDelete={canDelete}
+            />
+          ))}
         </div>
 
+        {/* ستون فرم ایجاد نقش جدید */}
         {canCreate && (
           <div>
-            <div className="card" style={{ position: "sticky", top: "80px" }}>
-              <div className="card-head">
-                <h2>ایجاد نقش جدید</h2>
+            <div className="card" style={{ position: "sticky", top: "80px", border: "1px solid var(--line)", borderRadius: "10px" }}>
+              <div className="card-head" style={{ borderBottom: "1px solid var(--line)", padding: "14px 18px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "18px" }}>✨</span>
+                  <h2 style={{ fontSize: "15px", fontWeight: 700, margin: 0 }}>ایجاد نقش جدید</h2>
+                </div>
               </div>
-              <div className="card-body">
+              <div className="card-body" style={{ padding: "18px" }}>
                 <RolesFormClient
                   mode="create"
                   allPerms={ALL_PERMS}
                   permLabels={PERM_LABELS}
+                  permGroups={PERM_GROUPS}
                 />
               </div>
             </div>

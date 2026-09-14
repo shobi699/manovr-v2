@@ -177,6 +177,25 @@ export async function relocateTrainDirectly(
   }
 
   try {
+    if (lineId !== null) {
+      const targetLine = await prisma.line.findUnique({ where: { id: lineId } });
+      if (!targetLine) return { error: "خط مقصد یافت نشد." };
+      if (slotIndex < 0 || slotIndex >= targetLine.capacity) {
+        return { error: `جایگاه انتخابی خارج از ظرفیت خط مقصد (${targetLine.capacity} جایگاه) است.` };
+      }
+      const existingInSlot = await prisma.train.findFirst({
+        where: {
+          lineId,
+          slotIndex,
+          isDisposed: false,
+          id: { not: trainId },
+        },
+      });
+      if (existingInSlot) {
+        return { error: `جایگاه ${slotIndex + 1} در خط ${targetLine.name} در حال حاضر توسط قطار ${existingInSlot.code} اشغال است.` };
+      }
+    }
+
     const before = await prisma.train.findUnique({ where: { id: trainId } });
     const after = await prisma.train.update({
       where: { id: trainId },

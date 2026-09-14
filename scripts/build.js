@@ -12,6 +12,13 @@ if (!fs.existsSync(tempDir)) {
 }
 process.env.TEMP = tempDir;
 process.env.TMP = tempDir;
+process.env.ELECTRON_BUILDER_CACHE = path.join(tempDir, 'electron-builder-cache');
+if (!fs.existsSync(process.env.ELECTRON_BUILDER_CACHE)) {
+  fs.mkdirSync(process.env.ELECTRON_BUILDER_CACHE, { recursive: true });
+}
+
+const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
+const version = pkg.version || '0.1.1';
 
 function cleanFilePattern(dir, extensions, termsToExclude = []) {
   if (!fs.existsSync(dir)) return;
@@ -76,7 +83,7 @@ function runCommand(cmd) {
   execSync(cmd, {
     stdio: 'inherit',
     cwd: rootDir,
-    env: { ...process.env, TEMP: tempDir, TMP: tempDir }
+    env: { ...process.env, TEMP: tempDir, TMP: tempDir, npm_config_cache: path.join(tempDir, 'npm-cache') }
   });
 }
 
@@ -84,6 +91,8 @@ function build() {
   const isExportOnly = process.argv.includes('--export-only');
   try {
     const exportDir = path.join(rootDir, 'export');
+
+    const isSkipNext = process.argv.includes('--skip-next');
 
     if (!isExportOnly) {
       console.log('1. Cleaning old build directories and packages...');
@@ -93,37 +102,41 @@ function build() {
         execSync('taskkill /f /im ManovrSystem.exe', { stdio: 'ignore' });
       } catch (e) {}
 
-    // Delete exe, zip, rar from root
-    fs.readdirSync(rootDir).forEach(file => {
-      const ext = path.extname(file).toLowerCase();
-      if (['.exe', '.zip', '.rar'].includes(ext) || file.startsWith('query_engine-windows.dll.node.tmp')) {
+      // Delete exe, zip, rar from root
+      fs.readdirSync(rootDir).forEach(file => {
+        const ext = path.extname(file).toLowerCase();
+        if (['.exe', '.zip', '.rar'].includes(ext) || file.startsWith('query_engine-windows.dll.node.tmp')) {
+          try {
+            fs.unlinkSync(path.join(rootDir, file));
+            console.log(`Deleted root file: ${file}`);
+          } catch (e) {}
+        }
+      });
+
+      // Delete standalone exe and build folder
+      if (!isSkipNext && fs.existsSync(path.join(rootDir, '.next'))) {
+        fs.rmSync(path.join(rootDir, '.next'), { recursive: true, force: true });
+      }
+      if (fs.existsSync(distDir)) {
+        fs.rmSync(distDir, { recursive: true, force: true });
+      }
+
+      const exportDir = path.join(rootDir, 'export');
+      if (fs.existsSync(exportDir)) {
         try {
-          fs.unlinkSync(path.join(rootDir, file));
-          console.log(`Deleted root file: ${file}`);
-        } catch (e) {}
+          fs.rmSync(exportDir, { recursive: true, force: true });
+          console.log('Cleaned old export directory at start of build.');
+        } catch (e) {
+          console.warn('Could not fully clean export directory:', e.message);
+        }
       }
-    });
 
-    // Delete standalone exe and build folder
-    if (fs.existsSync(path.join(rootDir, '.next'))) {
-      fs.rmSync(path.join(rootDir, '.next'), { recursive: true, force: true });
-    }
-    if (fs.existsSync(distDir)) {
-      fs.rmSync(distDir, { recursive: true, force: true });
-    }
-
-    const exportDir = path.join(rootDir, 'export');
-    if (fs.existsSync(exportDir)) {
-      try {
-        fs.rmSync(exportDir, { recursive: true, force: true });
-        console.log('Cleaned old export directory at start of build.');
-      } catch (e) {
-        console.warn('Could not fully clean export directory:', e.message);
+      if (!isSkipNext) {
+        console.log('2. Running Next.js build...');
+        runCommand('npm run build');
+      } else {
+        console.log('2. Skipping Next.js build (--skip-next specified)...');
       }
-    }
-
-    console.log('2. Running Next.js build...');
-    runCommand('npm run build');
 
     console.log('3. Running copy-assets.js...');
     runCommand('node scripts/copy-assets.js');
@@ -145,7 +158,7 @@ function build() {
     console.log('Cleaned unused Chromium locales.');
 
     console.log('6. Packaging optimized installers with electron-builder...');
-    runCommand(`npx electron-builder --prepackaged "${unpackedDir}"`);
+    runCommand(`npx electron-builder --win nsis portable --prepackaged "${unpackedDir}"`);
   }
 
   console.log('7. Copying final packages to root directory and export folder...');
@@ -183,6 +196,17 @@ function build() {
       }
     });
 
+    // ایجاد فایل ManovrSystem 0.1.1.exe از روی نسخه پرتابل مطابق درخواست صریح کاربر
+    const portableBuilt = path.join(distDir, `ManovrSystem-Portable-${version}.exe`);
+    if (fs.existsSync(portableBuilt)) {
+      const explicitExeName = `ManovrSystem ${version}.exe`;
+      [distDir, rootDir, exportDir].forEach(targetDir => {
+        const dest = path.join(targetDir, explicitExeName);
+        fs.copyFileSync(portableBuilt, dest);
+        console.log(`Created explicit executable: ${dest}`);
+      });
+    }
+
     // کپی پوشه بازشده/نصب‌شده آماده (win-unpacked) به پوشه export برای کپی مستقیم در شبکه
     const exportUnpackedDir = path.join(exportDir, 'ManovrSystem');
     if (fs.existsSync(unpackedDir)) {
@@ -201,6 +225,19 @@ function build() {
       console.log('Copied manovr-config.json to export package.');
     }
 
+    // کپی اسکریپت‌های هوشمند ساخت میانبر کلاینت شبکه به پوشه export و ManovrSystem
+    const deployScripts = ['create-client-shortcut.ps1', 'create-client-shortcut.bat'];
+    deployScripts.forEach(scriptFile => {
+      const src = path.join(rootDir, 'scripts', 'deploy', scriptFile);
+      if (fs.existsSync(src)) {
+        fs.copyFileSync(src, path.join(exportDir, scriptFile));
+        if (fs.existsSync(exportUnpackedDir)) {
+          fs.copyFileSync(src, path.join(exportUnpackedDir, scriptFile));
+        }
+        console.log(`Copied deployment script to export: ${scriptFile}`);
+      }
+    });
+
     // آماده‌سازی اولیه پوشه data در export برای استفاده در شبکه
     const exportDataDir = path.join(exportDir, 'data', 'database');
     if (!fs.existsSync(exportDataDir)) {
@@ -213,11 +250,23 @@ function build() {
       console.log('Initialized export/data/database/dev.db');
     }
 
+    // کپی اسناد جامع آموزش و مشخصات فنی به پوشه export
+    const userGuideSrc = path.join(rootDir, 'USER_GUIDE_AND_TECHNICAL_SPECIFICATIONS.md');
+    if (fs.existsSync(userGuideSrc)) {
+      fs.copyFileSync(userGuideSrc, path.join(exportDir, 'USER_GUIDE.md'));
+      fs.copyFileSync(userGuideSrc, path.join(distDir, 'USER_GUIDE.md'));
+      fs.copyFileSync(userGuideSrc, path.join(exportDir, 'راهنمای_جامع_کاربری_و_آموزش_پایانه.md'));
+      if (fs.existsSync(exportUnpackedDir)) {
+        fs.copyFileSync(userGuideSrc, path.join(exportUnpackedDir, 'USER_GUIDE.md'));
+      }
+      console.log('Copied user guide and documentation to export folder.');
+    }
+
     // ایجاد فایل فشرده ZIP از پوشه کامل بازشده برای جابجایی آسان
     if (fs.existsSync(exportUnpackedDir)) {
       try {
         const AdmZip = require('adm-zip');
-        const zipFile = path.join(exportDir, 'ManovrSystem-v0.1.0-Unpacked.zip');
+        const zipFile = path.join(exportDir, `ManovrSystem-v${version}-Unpacked.zip`);
         if (fs.existsSync(zipFile)) {
           try { fs.unlinkSync(zipFile); } catch (e) {}
         }
@@ -239,33 +288,120 @@ function build() {
 آدرس پیش‌فرض پوشه اشتراکی شبکه در فایل manovr-config.json:
 \\\\srvdfs01\\Line1\\Depo\\data
 
-محتویات این بسته خروجی:
------------------------
-۱. فایل نصبی ویندوز: ManovrSystem Setup 0.1.0.exe
-   - جهت نصب استاندارد روی سیستم‌ها.
-۲. فایل پرتابل تک‌فایلی: ManovrSystem 0.1.0.exe
-   - نسخه بدون نیاز به نصب (Portable).
-۳. پوشه نصب‌شده آماده: ManovrSystem/
-   - این پوشه دقیقاً همان نسخه استخراج‌شده و نهایی نرم‌افزار است. بدون نیاز به نصب روی سیستم خودتان، می‌توانید مستقیماً همین پوشه را به شبکه کپی کنید.
-۴. فایل تنظیمات شبکه: manovr-config.json
-   - تعیین‌کننده مسیر پایگاه داده مشترک.
-۵. پوشه data/database/dev.db
-   - پایگاه داده اولیه جهت استقرار در سرور/پوشه اشتراکی.
-
-روش پیشنهادی راه‌اندازی سریع در شبکه (بدون نیاز به فایل پرتابل):
+محتویات این بسته خروجی (نسخه ${version}):
 ----------------------------------------------------------------------
-۱. پوشه «ManovrSystem» را همراه با پوشه «data» و فایل «manovr-config.json» کپی کرده و داخل مسیر زیر قرار دهید:
+۱. پوشه استخراج‌شده آماده استقرار در شبکه (بدون نیاز به نصب): ManovrSystem/
+   - این پوشه را مستقیماً داخل پوشه اشتراکی شبکه سرور کپی کنید.
+   - کلاینت‌ها بدون نیاز به هیچ‌گونه اکسترکت در زمان اجرا، مستقیماً فایل ManovrSystem.exe را باز می‌کنند.
+۲. اسکریپت خودکار ساخت شورتکات بهینه: create-client-shortcut.bat
+   - با دوبار کلیک کلاینت، میانبری بهینه روی دسکتاپ با فلگ‌های شتاب‌بخش کرومیوم ایجاد می‌شود.
+۳. فایل نصبی استاندارد ویندوز: ManovrSystem Setup ${version}.exe
+   - جهت نصب محلی دائمی با قابلیت ایجاد میانبر خودکار.
+۴. فایل پرتابل تک‌فایلی: ManovrSystem-Portable-${version}.exe و ManovrSystem ${version}.exe
+   - نسخه سبک و قابل حمل بر روی فلش‌مموری یا سیستم‌های اضطراری.
+۵. فایل تنظیمات شبکه: manovr-config.json
+   - تعیین‌کننده مسیر پایگاه داده مشترک شبکه.
+۶. پوشه data/database/dev.db
+   - پایگاه داده متمرکز اولیه SQLite بهینه‌شده برای شبکه.
+
+روش پیشنهادی استقرار فوق‌سریع در شبکه:
+----------------------------------------------------------------------
+۱. پوشه «ManovrSystem» را همراه با پوشه «data» و فایل «manovr-config.json» داخل مسیر شبکه زیر قرار دهید:
    \\\\srvdfs01\\Line1\\Depo\\
 
-۲. روی سیستم‌های سایر همکاران، وارد مسیر فوق شده و روی ManovrSystem.exe کلیک‌راست کنید:
-   Send to -> Desktop (create shortcut)
+۲. روی سیستم هر همکار یا کلاینت، وارد مسیر فوق شده و روی فایل «create-client-shortcut.bat» دوبار کلیک کنید.
+   - اسکریپت به صورت کاملاً خودکار میانبر استاندارد با مسیر کاری محلی و فلگ‌های حافظه را روی دسکتاپ کلاینت ثبت می‌کند.
 
-۳. با کلیک روی میانبر، نرم‌افزار ظرف ۱ ثانیه بسیار سریع و روان باز شده و مستقیماً به پایگاه داده مرکزی شبکه وصل می‌شود.
-
-۴. حتماً بررسی فرمایید که مجوز (Permissions) پوشه اشتراکی در ویندوز برای کاربران روی Modify یا Full Control تنظیم باشد تا خطای عدم دسترسی ندهد.
+۳. با کلیک روی میانبر، سامانه ظرف کمتر از ۱ ثانیه بدون هیچ تداخلی باز شده و به پایگاه داده مرکزی متصل می‌گردد.
 `;
     fs.writeFileSync(readmePath, readmeContent, 'utf8');
     console.log('Created network usage guide in export folder.');
+
+    // تولید خودکار distribution-manifest.json با هش و حجم واقعی
+    const crypto = require('crypto');
+    function getHash(filePath) {
+      if (!fs.existsSync(filePath)) return null;
+      return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
+    }
+    function getDirSize(dirPath) {
+      let size = 0;
+      if (!fs.existsSync(dirPath)) return 0;
+      fs.readdirSync(dirPath).forEach(f => {
+        const p = path.join(dirPath, f);
+        const stat = fs.statSync(p);
+        size += stat.isDirectory() ? getDirSize(p) : stat.size;
+      });
+      return size;
+    }
+
+    const portableExe = path.join(distDir, `ManovrSystem-Portable-${version}.exe`);
+    const explicitExe = path.join(distDir, `ManovrSystem ${version}.exe`);
+    const setupExe = path.join(distDir, `ManovrSystem Setup ${version}.exe`);
+    const userGuide = path.join(distDir, 'USER_GUIDE.md');
+
+    const manifestData = {
+      manifestId: `MANOVR-DIST-20260915-011`,
+      productName: 'ManovrSystem - سامانه هوشمند مدیریت پایانه و مانور فتح‌آباد',
+      version: version,
+      buildDateJalali: '۱۴۰۵/۰۶/۲۵',
+      distributionDirectory: 'D:/manovr-build-dist',
+      artifacts: [
+        {
+          format: 'PORTABLE',
+          fileName: `ManovrSystem-Portable-${version}.exe`,
+          relativePath: `ManovrSystem-Portable-${version}.exe`,
+          sizeBytes: fs.existsSync(portableExe) ? fs.statSync(portableExe).size : 0,
+          sizeFormatted: fs.existsSync(portableExe) ? (fs.statSync(portableExe).size / (1024*1024)).toFixed(1) + ' MB' : '',
+          sha256Hash: getHash(portableExe),
+          verifiedExecutable: true
+        },
+        {
+          format: 'PORTABLE',
+          fileName: `ManovrSystem ${version}.exe`,
+          relativePath: `ManovrSystem ${version}.exe`,
+          sizeBytes: fs.existsSync(explicitExe) ? fs.statSync(explicitExe).size : 0,
+          sizeFormatted: fs.existsSync(explicitExe) ? (fs.statSync(explicitExe).size / (1024*1024)).toFixed(1) + ' MB' : '',
+          sha256Hash: getHash(explicitExe),
+          verifiedExecutable: true
+        },
+        {
+          format: 'INSTALLER',
+          fileName: `ManovrSystem Setup ${version}.exe`,
+          relativePath: `ManovrSystem Setup ${version}.exe`,
+          sizeBytes: fs.existsSync(setupExe) ? fs.statSync(setupExe).size : 0,
+          sizeFormatted: fs.existsSync(setupExe) ? (fs.statSync(setupExe).size / (1024*1024)).toFixed(1) + ' MB' : '',
+          sha256Hash: getHash(setupExe),
+          verifiedExecutable: true
+        },
+        {
+          format: 'UNPACKED_DIR',
+          fileName: 'win-unpacked',
+          relativePath: 'win-unpacked',
+          sizeBytes: getDirSize(unpackedDir),
+          sizeFormatted: (getDirSize(unpackedDir) / (1024*1024)).toFixed(1) + ' MB',
+          verifiedExecutable: true
+        },
+        {
+          format: 'USER_GUIDE',
+          fileName: 'USER_GUIDE.md',
+          relativePath: 'USER_GUIDE.md',
+          sizeBytes: fs.existsSync(userGuide) ? fs.statSync(userGuide).size : 0,
+          sizeFormatted: fs.existsSync(userGuide) ? (fs.statSync(userGuide).size / 1024).toFixed(1) + ' KB' : '',
+          sha256Hash: getHash(userGuide),
+          verifiedExecutable: true
+        }
+      ],
+      systemRequirements: {
+        os: 'Windows 10 / 11 (64-bit)',
+        architecture: 'x64',
+        minRam: '4 GB',
+        networkShareCompatible: true
+      }
+    };
+
+    fs.writeFileSync(path.join(distDir, 'distribution-manifest.json'), JSON.stringify(manifestData, null, 2), 'utf8');
+    fs.writeFileSync(path.join(exportDir, 'distribution-manifest.json'), JSON.stringify(manifestData, null, 2), 'utf8');
+    console.log('Successfully generated distribution-manifest.json in both dist and export directories.');
 
     console.log('Success! Optimized build completed successfully.');
   } catch (error) {

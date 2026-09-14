@@ -2,6 +2,8 @@ import { getSession } from "@/lib/auth";
 import { getUserSetting, DEFAULT_APPEARANCE, DEFAULT_DEPOT } from "@/lib/settings";
 import SettingsFormClient from "./SettingsFormClient";
 import { Terminal } from "@/lib/enums";
+import UpdateSettingsCard from "@/components/auto-update/UpdateSettingsCard";
+import { getCurrentAppVersion } from "@/lib/auto-updater/version-checker";
 
 export const dynamic = "force-dynamic";
 
@@ -15,10 +17,12 @@ export default async function SettingsPage() {
     ? await getUserSetting(session.id, "depot", DEFAULT_DEPOT)
     : DEFAULT_DEPOT;
 
+  const appVersion = getCurrentAppVersion();
+
   return (
     <>
       <div className="topbar">
-        <h1>تنظیمات شخصی‌سازی و تم</h1>
+        <h1>تنظیمات شخصی‌سازی و نگهداری سامانه</h1>
       </div>
       <div className="content" style={{ maxWidth: 800 }}>
         <div className="card">
@@ -29,7 +33,11 @@ export default async function SettingsPage() {
             <SettingsFormClient initialAppearance={appearance} initialDepot={depotPrefs} />
           </div>
         </div>
+
+        {/* کارت هوشمند مدیریت به‌روزرسانی بدون اینستالر */}
+        <UpdateSettingsCard currentAppVersion={appVersion} />
       </div>
     </>
   );
 }
+

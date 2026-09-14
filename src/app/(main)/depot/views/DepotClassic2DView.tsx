@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import { STATUS_STYLE, ZONE_CONFIG } from "@/lib/depot-visuals";
 import { BorderRotate } from "@/components/ui/animated-gradient-border";
 import { LineData, TrainData } from "../types";
@@ -18,9 +18,34 @@ export default function DepotClassic2DView({
   onSelectTrain,
   onDropTrainToLine,
 }: Depot2DViewProps) {
+  // ایندکس سریع خطوط بر اساس نام برای جستجوی O(1) به جای lines.find تکراری
+  const linesByName = useMemo(() => {
+    const map = new Map<string, LineData>();
+    for (const l of lines) {
+      map.set(l.name, l);
+    }
+    return map;
+  }, [lines]);
+
+  // گروه‌بندی کش‌شده قطارها بر اساس خط برای جستجوی O(1)
+  const trainsByLine = useMemo(() => {
+    const map = new Map<number, typeof trains>();
+    for (const t of trains) {
+      if (t.lineId && !t.isDisposed) {
+        const list = map.get(t.lineId) || [];
+        list.push(t);
+        map.set(t.lineId, list);
+      }
+    }
+    for (const [_, list] of map) {
+      list.sort((a, b) => a.slotIndex - b.slotIndex);
+    }
+    return map;
+  }, [trains]);
+
   // تابع کمکی برای رندر خانه‌های ریل به صورت ۲بعدی تعاملی
   const renderSlot = (lineName: string, label: string) => {
-    const line = lines.find((l) => l.name === lineName);
+    const line = linesByName.get(lineName);
     if (!line) {
       return (
         <div
@@ -45,9 +70,7 @@ export default function DepotClassic2DView({
       );
     }
 
-    const lineTrains = trains
-      .filter((t) => t.lineId === line.id && !t.isDisposed)
-      .sort((a, b) => a.slotIndex - b.slotIndex);
+    const lineTrains = trainsByLine.get(line.id) || [];
     const hasTrain = lineTrains.length > 0;
     const train = lineTrains[0];
     const style = hasTrain ? STATUS_STYLE[train.status] || STATUS_STYLE[1] : null;
@@ -58,6 +81,11 @@ export default function DepotClassic2DView({
         <div
           key={lineName}
           onClick={() => {
+            if (canManageLines) {
+              onSelectLine(line);
+            }
+          }}
+          onContextMenu={() => {
             if (canManageLines) {
               onSelectLine(line);
             }
@@ -89,7 +117,12 @@ export default function DepotClassic2DView({
       <div
         key={lineName}
         onClick={() => onSelectLine(line)}
+        onContextMenu={() => {
+          onSelectLine(line);
+          if (hasTrain) onSelectTrain(train);
+        }}
         draggable={hasTrain && canCreateManovr}
+
         onDragStart={(e) => {
           if (hasTrain && canCreateManovr) {
             e.dataTransfer.setData("trainId", String(train.id));
@@ -435,9 +468,11 @@ export default function DepotClassic2DView({
                 );
               }
               if (term.code === 3) {
-                const mainLineObj = lines.find((l) => l.name === "خط اصلی");
+                const mainLineObj = lines.find(
+                  (l) => l.name === "خط اصلی" || l.tag === "S_OriginalLine" || l.tag === "MAIN"
+                );
                 const mainLineTrains = mainLineObj
-                  ? trains.filter((t) => t.lineId === mainLineObj.id && !t.isDisposed)
+                  ? trains.filter((t) => t.lineId === mainLineObj.id && !t.isDisposed).sort((a, b) => a.slotIndex - b.slotIndex)
                   : [];
                 return (
                   <BorderRotate
@@ -551,7 +586,7 @@ export default function DepotClassic2DView({
                                           {tr.noLicense && <span title="بدون مجوز حرکت" style={{ fontSize: "10px" }}>🛑</span>}
                                         </div>
                                       </td>
-                                      <td style={{ padding: "8px", textAlign: "center" }}>{tr.type === 0 ? "AC" : "DC"}</td>
+                                      <td style={{ padding: "8px", textAlign: "center" }}>{tr.type === 0 ? "AC" : tr.type === 1 ? "DC" : "دیزل"}</td>
                                       <td style={{ padding: "8px", textAlign: "center" }} className="num">{tr.slotIndex + 1}</td>
                                     </tr>
                                   );

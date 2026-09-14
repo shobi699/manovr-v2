@@ -3,7 +3,7 @@
 import React from "react";
 import DataTable, { BulkAction } from "@/components/DataTable";
 import TrainRowActions from "./TrainRowActions";
-import { TrainType } from "@/lib/enums";
+import { TrainType, TrainTypeFull } from "@/lib/enums";
 
 import { updateTrainStatus, importTrainsFromExcel, updateTrainFlags, bulkUpdateTrainStatus, bulkUpdateTrainFlags, bulkToggleTrainDisposed } from "@/app/actions/train";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -16,6 +16,7 @@ interface LookupValue {
   code: number;
   label: string;
   color?: string | null;
+  isActive?: boolean;
 }
 
 interface TrainsTableClientProps {
@@ -52,6 +53,12 @@ export default function TrainsTableClient({
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
+  const [localTrains, setLocalTrains] = useState(trains);
+
+  React.useEffect(() => {
+    setLocalTrains(trains);
+  }, [trains]);
+
   const [bulkDisposeTarget, setBulkDisposeTarget] = useState<{ items: any[]; clear: () => void } | null>(null);
   const [isDisposing, setIsDisposing] = useState(false);
 
@@ -60,10 +67,13 @@ export default function TrainsTableClient({
     setIsDisposing(true);
     const { items, clear } = bulkDisposeTarget;
     const ids = items.map((i) => i.id);
+    const prev = localTrains;
+    setLocalTrains((p) => p.filter((t) => !ids.includes(t.id)));
     const res = await bulkToggleTrainDisposed(ids, true);
     setIsDisposing(false);
     setBulkDisposeTarget(null);
     if (res.error) {
+      setLocalTrains(prev);
       toast.error(res.error);
     } else {
       toast.success(`${ids.length} قطار با موفقیت غیرفعال شدند.`);
@@ -286,7 +296,7 @@ export default function TrainsTableClient({
       label: "نوع قطار",
       sortable: true,
       render: (t: any) => (
-        <span className={`pill ${t.type === 0 ? "p-rail" : "p-warn"}`}>
+        <span className={`pill ${t.type === 0 ? "p-rail" : t.type === 1 ? "p-info" : "p-warn"}`}>
           {getTrainTypeLabel(t.type)}
         </span>
       ),
@@ -311,9 +321,12 @@ export default function TrainsTableClient({
               disabled={isPending}
               onChange={(e) => {
                 const val = Number(e.target.value);
+                const prev = localTrains;
+                setLocalTrains((p) => p.map((item) => (item.id === t.id ? { ...item, status: val } : item)));
                 startTransition(async () => {
                   const res = await updateTrainStatus(t.id, val);
                   if (res.error) {
+                    setLocalTrains(prev);
                     toast.error(res.error);
                   } else {
                     toast.success("وضعیت قطار بروزرسانی شد.");
@@ -388,9 +401,17 @@ export default function TrainsTableClient({
                   title="تغییر وضعیت کفشک"
                   disabled={isPending}
                   onClick={() => {
+                    const prev = localTrains;
+                    const nextVal = !t.hasKafshak;
+                    setLocalTrains((p) => p.map((item) => (item.id === t.id ? { ...item, hasKafshak: nextVal } : item)));
                     startTransition(async () => {
-                      await updateTrainFlags(t.id, { hasKafshak: !t.hasKafshak });
-                      router.refresh();
+                      const res = await updateTrainFlags(t.id, { hasKafshak: nextVal });
+                      if (res?.error) {
+                        setLocalTrains(prev);
+                        toast.error(res.error);
+                      } else {
+                        router.refresh();
+                      }
                     });
                   }}
                 >
@@ -405,9 +426,17 @@ export default function TrainsTableClient({
                   title="تغییر وضعیت ATP"
                   disabled={isPending}
                   onClick={() => {
+                    const prev = localTrains;
+                    const nextVal = !t.noAtp;
+                    setLocalTrains((p) => p.map((item) => (item.id === t.id ? { ...item, noAtp: nextVal } : item)));
                     startTransition(async () => {
-                      await updateTrainFlags(t.id, { noAtp: !t.noAtp });
-                      router.refresh();
+                      const res = await updateTrainFlags(t.id, { noAtp: nextVal });
+                      if (res?.error) {
+                        setLocalTrains(prev);
+                        toast.error(res.error);
+                      } else {
+                        router.refresh();
+                      }
                     });
                   }}
                 >
@@ -422,9 +451,16 @@ export default function TrainsTableClient({
                   disabled={isPending}
                   onChange={(e) => {
                     const val = e.target.value || null;
+                    const prev = localTrains;
+                    setLocalTrains((p) => p.map((item) => (item.id === t.id ? { ...item, movadDavvar: val } : item)));
                     startTransition(async () => {
-                      await updateTrainFlags(t.id, { movadDavvar: val });
-                      router.refresh();
+                      const res = await updateTrainFlags(t.id, { movadDavvar: val });
+                      if (res?.error) {
+                        setLocalTrains(prev);
+                        toast.error(res.error);
+                      } else {
+                        router.refresh();
+                      }
                     });
                   }}
                 >
@@ -442,9 +478,17 @@ export default function TrainsTableClient({
                   title="تغییر وضعیت مجوز"
                   disabled={isPending}
                   onClick={() => {
+                    const prev = localTrains;
+                    const nextVal = !t.noLicense;
+                    setLocalTrains((p) => p.map((item) => (item.id === t.id ? { ...item, noLicense: nextVal } : item)));
                     startTransition(async () => {
-                      await updateTrainFlags(t.id, { noLicense: !t.noLicense });
-                      router.refresh();
+                      const res = await updateTrainFlags(t.id, { noLicense: nextVal });
+                      if (res?.error) {
+                        setLocalTrains(prev);
+                        toast.error(res.error);
+                      } else {
+                        router.refresh();
+                      }
                     });
                   }}
                 >
@@ -502,9 +546,13 @@ export default function TrainsTableClient({
         variant: "warning",
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
+          const prev = localTrains;
+          setLocalTrains((p) => p.map((item) => (ids.includes(item.id) ? { ...item, status: 2 } : item)));
           const res = await bulkUpdateTrainStatus(ids, 2);
-          if (res.error) toast.error(res.error);
-          else {
+          if (res.error) {
+            setLocalTrains(prev);
+            toast.error(res.error);
+          } else {
             toast.success(`وضعیت ${ids.length} قطار به «تعمیرات» تغییر یافت.`);
             clear();
             router.refresh();
@@ -517,9 +565,13 @@ export default function TrainsTableClient({
         variant: "danger",
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
+          const prev = localTrains;
+          setLocalTrains((p) => p.map((item) => (ids.includes(item.id) ? { ...item, status: 3 } : item)));
           const res = await bulkUpdateTrainStatus(ids, 3);
-          if (res.error) toast.error(res.error);
-          else {
+          if (res.error) {
+            setLocalTrains(prev);
+            toast.error(res.error);
+          } else {
             toast.success(`وضعیت ${ids.length} قطار به «غیرفعال» تغییر یافت.`);
             clear();
             router.refresh();
@@ -532,9 +584,13 @@ export default function TrainsTableClient({
         variant: "accent",
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
+          const prev = localTrains;
+          setLocalTrains((p) => p.map((item) => (ids.includes(item.id) ? { ...item, hasKafshak: true } : item)));
           const res = await bulkUpdateTrainFlags(ids, { hasKafshak: true });
-          if (res.error) toast.error(res.error);
-          else {
+          if (res.error) {
+            setLocalTrains(prev);
+            toast.error(res.error);
+          } else {
             toast.success(`کفشک برای ${ids.length} قطار فعال شد.`);
             clear();
             router.refresh();
@@ -547,9 +603,13 @@ export default function TrainsTableClient({
         variant: "danger",
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
+          const prev = localTrains;
+          setLocalTrains((p) => p.map((item) => (ids.includes(item.id) ? { ...item, noAtp: true } : item)));
           const res = await bulkUpdateTrainFlags(ids, { noAtp: true });
-          if (res.error) toast.error(res.error);
-          else {
+          if (res.error) {
+            setLocalTrains(prev);
+            toast.error(res.error);
+          } else {
             toast.success(`عدم ATP برای ${ids.length} قطار ثبت شد.`);
             clear();
             router.refresh();
@@ -561,9 +621,13 @@ export default function TrainsTableClient({
         label: "🔄 دوّار A",
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
+          const prev = localTrains;
+          setLocalTrains((p) => p.map((item) => (ids.includes(item.id) ? { ...item, movadDavvar: "A" } : item)));
           const res = await bulkUpdateTrainFlags(ids, { movadDavvar: "A" });
-          if (res.error) toast.error(res.error);
-          else {
+          if (res.error) {
+            setLocalTrains(prev);
+            toast.error(res.error);
+          } else {
             toast.success(`موعد دوّار A برای ${ids.length} قطار اعمال شد.`);
             clear();
             router.refresh();
@@ -576,9 +640,13 @@ export default function TrainsTableClient({
         variant: "danger",
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
+          const prev = localTrains;
+          setLocalTrains((p) => p.map((item) => (ids.includes(item.id) ? { ...item, noLicense: true } : item)));
           const res = await bulkUpdateTrainFlags(ids, { noLicense: true });
-          if (res.error) toast.error(res.error);
-          else {
+          if (res.error) {
+            setLocalTrains(prev);
+            toast.error(res.error);
+          } else {
             toast.success(`وضعیت بدون مجوز برای ${ids.length} قطار اعمال شد.`);
             clear();
             router.refresh();
@@ -644,10 +712,12 @@ export default function TrainsTableClient({
             >
               <option value="all">همه نوع‌ها</option>
               {trainTypes && trainTypes.length > 0
-                ? trainTypes.map((t) => (
-                    <option key={t.code} value={String(t.code)}>{t.label}</option>
-                  ))
-                : Object.entries(TrainType).map(([val, label]) => (
+                ? trainTypes
+                    .filter((t) => t.isActive !== false)
+                    .map((t) => (
+                      <option key={t.code} value={String(t.code)}>{t.label}</option>
+                    ))
+                : Object.entries(TrainTypeFull).map(([val, label]) => (
                     <option key={val} value={val}>{label}</option>
                   ))
               }
@@ -777,7 +847,7 @@ export default function TrainsTableClient({
           <DataTable
             tableName="trains"
             columns={columns}
-            data={trains}
+            data={localTrains}
             searchPlaceholder="جستجو بر اساس کد قطار..."
             searchFields={["code"]}
             bulkActions={trainBulkActions}

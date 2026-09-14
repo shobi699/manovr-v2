@@ -42,8 +42,8 @@ export async function sendAdminMessage(data: {
   targetUserId?: number | null; // نال یعنی ارسال همگانی
 }) {
   const session = await getSession();
-  if (!session || !(await hasPerm(session, "branding.manage"))) {
-    return { ok: false, error: "عدم دسترسی کافی (فقط مدیر سیستم)" };
+  if (!session || (!(await hasPerm(session, "ticket.broadcast")) && !(await hasPerm(session, "branding.manage")))) {
+    return { ok: false, error: "عدم دسترسی کافی (فقط مدیر سیستم و پرسنل مجاز)" };
   }
 
   try {

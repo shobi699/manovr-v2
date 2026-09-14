@@ -1,0 +1,74 @@
+# ==============================================================================
+# پیکربندی پیشرفته بسته‌بندی و استقرار نرم‌افزار Manovr V3 تحت شبکه
+# Electron Builder Production Configuration (Enterprise Network Deployment)
+# ==============================================================================
+
+appId: "com.manovr.app"
+productName: "ManovrSystem"
+copyright: "Copyright © 2026 شرکت بهره‌برداری متروی تهران و حومه"
+
+# استراتژی فشرده‌سازی و یکپارچگی فایل‌های بسته
+compression: "normal"
+asar: true
+asarUnpack:
+  - ".next/standalone/**/*"
+
+directories:
+  output: "D:/manovr-build-dist"
+  buildResources: "public"
+
+files:
+  - "main.js"
+  - "preload.js"
+  - "splash.html"
+  - "manovr-config.json"
+  - ".next/standalone/**/*"
+  - "!.next/standalone/**/.env*"
+  - "public/**/*"
+  - "!node_modules/**/*"
+
+extraResources:
+  - from: "prisma/dev.db"
+    to: "dev.db"
+  - from: "manovr-config.json"
+    to: "manovr-config.json"
+
+# ==============================================================================
+# پیکربندی اختصاصی ویندوز و ۳ قالب توزیع (Distribution Formats)
+# ==============================================================================
+win:
+  icon: "public/logo.png"
+  target:
+    - target: "nsis"
+      arch:
+        - "x64"
+    - target: "portable"
+      arch:
+        - "x64"
+    - target: "dir"
+      arch:
+        - "x64"
+
+# ۱. نصاب استاندارد (Standard Windows Installer - NSIS)
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: "سامانه مدیریت مانور دپو"
+  uninstallDisplayName: "سامانه مدیریت مانور و پایش خطوط ریلی دپو"
+  deleteAppDataOnUninstall: false
+  differentialPackage: false
+
+# ۲. فایل اجرایی مستقل پرتابل (Ultra-Optimized Portable Executable)
+portable:
+  requestExecutionLevel: "user"
+  artifactName: "${productName}-Portable-${version}.${ext}"
+  unpackDirName: "ManovrSystem-Portable"
+  splashImage: "public/splash.bmp"
+  useZip: true
+
+# ==============================================================================
+# پایان پیکربندی
+# ==============================================================================

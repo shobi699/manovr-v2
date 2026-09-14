@@ -50,3 +50,38 @@ export const finishManovrSchema = z.object({
 });
 
 export type FinishManovrInput = z.infer<typeof finishManovrSchema>;
+
+/**
+ * شِمای تایید یا رد دسته‌جمعی (گروهی) مانورها
+ */
+export const bulkConfirmManovrSchema = z.object({
+  ids: z
+    .array(z.number().int().positive("شناسه مانور باید عدد مثبت باشد"))
+    .min(1, "حداقل یک مانور باید انتخاب شود"),
+  status: requiredNumber("وضعیت تایید", 1, 2),
+});
+
+export type BulkConfirmManovrInput = z.infer<typeof bulkConfirmManovrSchema>;
+
+/**
+ * شِمای بستن دسته‌جمعی (گروهی) مانورها
+ */
+export const bulkFinishManovrSchema = z.object({
+  ids: z
+    .array(z.number().int().positive("شناسه مانور باید عدد مثبت باشد"))
+    .min(1, "حداقل یک مانور باید انتخاب شود"),
+});
+
+export type BulkFinishManovrInput = z.infer<typeof bulkFinishManovrSchema>;
+
+/**
+ * شِمای حذف دسته‌جمعی (گروهی) مانورها
+ */
+export const bulkDeleteManovrSchema = z.object({
+  ids: z
+    .array(z.number().int().positive("شناسه مانور باید عدد مثبت باشد"))
+    .min(1, "حداقل یک مانور باید انتخاب شود"),
+});
+
+export type BulkDeleteManovrInput = z.infer<typeof bulkDeleteManovrSchema>;
+

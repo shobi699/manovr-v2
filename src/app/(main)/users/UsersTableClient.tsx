@@ -22,6 +22,18 @@ import {
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import ConfirmModal from "@/components/ui/ConfirmModal";
+import {
+  preValidatePersonnelImport,
+  executePersonnelImportBatch,
+} from "@/app/actions/excel-import";
+import ExcelConflictModal from "@/components/ExcelConflictModal";
+import ExcelImportSummaryModal from "@/components/ExcelImportSummaryModal";
+import type {
+  ImportConflictItem,
+  ImportPersonnelRow,
+  BatchImportPayload,
+  ImportSummaryReport,
+} from "@/lib/excel-import-types";
 
 interface LookupValue {
   code: number;
@@ -61,6 +73,25 @@ export default function UsersTableClient({
 
   const [bulkDeleteTarget, setBulkDeleteTarget] = useState<{ items: any[]; clear: () => void } | null>(null);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
+  const [localAccounts, setLocalAccounts] = useState(accounts);
+  const [localNonAccounts, setLocalNonAccounts] = useState(nonAccounts);
+
+  // استیت‌های مدال تعارضات اکسل و گزارش آماری
+  const [conflictModalOpen, setConflictModalOpen] = useState(false);
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
+  const [isSubmittingImport, setIsSubmittingImport] = useState(false);
+  const [conflictsList, setConflictsList] = useState<ImportConflictItem[]>([]);
+  const [nonConflictingList, setNonConflictingList] = useState<ImportPersonnelRow[]>([]);
+  const [importSummary, setImportSummary] = useState<ImportSummaryReport | null>(null);
+
+  React.useEffect(() => {
+    setLocalAccounts(accounts);
+  }, [accounts]);
+
+  React.useEffect(() => {
+    setLocalNonAccounts(nonAccounts);
+  }, [nonAccounts]);
+
   const getOrgPosLabel = (code: number) => orgPositions.find((v) => v.code === code)?.label || OrgPosition[code] || `پست ${code}`;
   const getShiftLabel = (code: number) => shifts.find((v) => v.code === code)?.label || Shift[code] || `شیفت ${code}`;
   const getRoleLabel = (code: number) => roles.find((v) => v.code === code)?.label || Role[code] || `نقش ${code}`;
@@ -97,9 +128,13 @@ export default function UsersTableClient({
         label: "🏢 شیفت ۱ (صبح)",
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
+          // اعمال آنی در رابط کاربری بدون تاخیر (Optimistic UI)
+          setLocalAccounts((prev) => prev.map((a) => (ids.includes(a.id) ? { ...a, shift: 1 } : a)));
+          setLocalNonAccounts((prev) => prev.map((a) => (ids.includes(a.id) ? { ...a, shift: 1 } : a)));
           const res = await bulkUpdateUserShift(ids, 1);
           if (res.error) {
             toast.error(res.error);
+            router.refresh();
           } else {
             toast.success("شیفت پرسنل انتخاب‌شده به شیفت ۱ تغییر یافت.");
             clear();
@@ -112,9 +147,12 @@ export default function UsersTableClient({
         label: "🏢 شیفت ۲ (عصر)",
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
+          setLocalAccounts((prev) => prev.map((a) => (ids.includes(a.id) ? { ...a, shift: 2 } : a)));
+          setLocalNonAccounts((prev) => prev.map((a) => (ids.includes(a.id) ? { ...a, shift: 2 } : a)));
           const res = await bulkUpdateUserShift(ids, 2);
           if (res.error) {
             toast.error(res.error);
+            router.refresh();
           } else {
             toast.success("شیفت پرسنل انتخاب‌شده به شیفت ۲ تغییر یافت.");
             clear();
@@ -127,9 +165,12 @@ export default function UsersTableClient({
         label: "🏢 شیفت ۳ (شب)",
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
+          setLocalAccounts((prev) => prev.map((a) => (ids.includes(a.id) ? { ...a, shift: 3 } : a)));
+          setLocalNonAccounts((prev) => prev.map((a) => (ids.includes(a.id) ? { ...a, shift: 3 } : a)));
           const res = await bulkUpdateUserShift(ids, 3);
           if (res.error) {
             toast.error(res.error);
+            router.refresh();
           } else {
             toast.success("شیفت پرسنل انتخاب‌شده به شیفت ۳ تغییر یافت.");
             clear();
@@ -143,9 +184,12 @@ export default function UsersTableClient({
         variant: "accent",
         onClick: async (items, clear) => {
           const ids = items.map((i) => i.id);
+          setLocalAccounts((prev) => prev.map((a) => (ids.includes(a.id) ? { ...a, orgPosition: 1 } : a)));
+          setLocalNonAccounts((prev) => prev.map((a) => (ids.includes(a.id) ? { ...a, orgPosition: 1 } : a)));
           const res = await bulkUpdateUserOrgPosition(ids, 1);
           if (res.error) {
             toast.error(res.error);
+            router.refresh();
           } else {
             toast.success("سمت پرسنل انتخاب‌شده به راهبر قطار تغییر یافت.");
             clear();
@@ -180,37 +224,46 @@ export default function UsersTableClient({
     ];
   }, [canEdit, canDelete, router, toast]);
 
-  // استخراج تمام نقش‌های متمایز موجود در حساب‌ها برای نمایش در دراپ‌داون فیلتر
+  // استخراج تمام نقش‌های متمایز موجود در سیستم و حساب‌ها برای نمایش در دراپ‌داون فیلتر
   const uniqueRoles = React.useMemo(() => {
     const rolesMap = new Map<string, string>();
-    accounts.forEach((p) => {
-      const roleIdStr = String(p.role);
-      const roleName = p.accessRole?.name || Role[p.role] || `نقش ${p.role}`;
-      rolesMap.set(roleIdStr, roleName);
+    roles.forEach((r) => {
+      rolesMap.set(String(r.code), r.label);
+    });
+    localAccounts.forEach((p) => {
+      if (p.accessRole) {
+        rolesMap.set(String(p.accessRole.id), p.accessRole.name);
+      } else if (p.role) {
+        rolesMap.set(String(p.role), Role[p.role] || `نقش ${p.role}`);
+      }
     });
     return Array.from(rolesMap.entries()).map(([value, label]) => ({ value, label }));
-  }, [accounts]);
+  }, [roles, localAccounts]);
 
   // فیلتر کردن حساب‌های کاربری فعال
   const filteredAccounts = React.useMemo(() => {
-    return accounts.filter((p) => {
+    return localAccounts.filter((p) => {
       if (filterShift !== "all" && String(p.shift) !== filterShift) return false;
       if (filterOrgPosition !== "all" && String(p.orgPosition) !== filterOrgPosition) return false;
       if (filterPersonnelType !== "all" && String(p.personnelType) !== filterPersonnelType) return false;
-      if (filterRole !== "all" && String(p.role) !== filterRole) return false;
+      if (filterRole !== "all") {
+        const matchesAccess = p.accessRoleId && String(p.accessRoleId) === filterRole;
+        const matchesLegacy = String(p.role) === filterRole;
+        if (!matchesAccess && !matchesLegacy) return false;
+      }
       return true;
     });
-  }, [accounts, filterShift, filterOrgPosition, filterPersonnelType, filterRole]);
+  }, [localAccounts, filterShift, filterOrgPosition, filterPersonnelType, filterRole]);
 
   // فیلتر کردن پرسنل بدون حساب
   const filteredNonAccounts = React.useMemo(() => {
-    return nonAccounts.filter((p) => {
+    return localNonAccounts.filter((p) => {
       if (filterShift !== "all" && String(p.shift) !== filterShift) return false;
       if (filterOrgPosition !== "all" && String(p.orgPosition) !== filterOrgPosition) return false;
       if (filterPersonnelType !== "all" && String(p.personnelType) !== filterPersonnelType) return false;
       return true;
     });
-  }, [nonAccounts, filterShift, filterOrgPosition, filterPersonnelType]);
+  }, [localNonAccounts, filterShift, filterOrgPosition, filterPersonnelType]);
 
   const handleExportExcel = async () => {
     try {
@@ -226,6 +279,7 @@ export default function UsersTableClient({
         { header: "نام کاربری", key: "userName", width: 15 },
         { header: "شیفت", key: "shift", width: 10 },
         { header: "پست سازمانی", key: "orgPosition", width: 15 },
+        { header: "راهبر غیردائم", key: "isPartTimeDriver", width: 15 },
         { header: "نوع پرسنل", key: "personnelType", width: 15 },
         { header: "همراه ۱", key: "phone1", width: 15 },
         { header: "همراه ۲", key: "phone2", width: 15 },
@@ -242,6 +296,7 @@ export default function UsersTableClient({
           userName: p.userName || "—",
           shift: getShiftLabel(p.shift),
           orgPosition: getOrgPosLabel(p.orgPosition),
+          isPartTimeDriver: p.isPartTimeDriver ? "بله (دارای صلاحیت)" : "خیر",
           personnelType: PersonnelType[p.personnelType] || p.personnelType,
           phone1: p.phone1 || "—",
           phone2: p.phone2 || "—",
@@ -337,7 +392,7 @@ export default function UsersTableClient({
         await workbook.xlsx.load(arrayBuffer);
         const worksheet = workbook.worksheets[0];
 
-        const rows: any[] = [];
+        const rows: ImportPersonnelRow[] = [];
         worksheet.eachRow((row, rowNumber) => {
           if (rowNumber === 1) return; // skip header
           const vals = Array.isArray(row.values) ? row.values : [];
@@ -356,6 +411,7 @@ export default function UsersTableClient({
           const orgPosition = vals[10] ? Number(vals[10]) : undefined;
 
           rows.push({
+            rowIndex: rowNumber,
             firstName,
             lastName,
             personnelCode,
@@ -374,14 +430,31 @@ export default function UsersTableClient({
           return;
         }
 
-        const res = await importPersonnelFromExcel(rows);
-        if (res.error) {
-          toast.error(res.error);
+        // پیش‌اعتبارسنجی داده‌ها و استخراج تعارض‌ها
+        const valResult = await preValidatePersonnelImport(rows);
+        if (!valResult.ok) {
+          toast.error(valResult.error || "خطا در بررسی اولیه داده‌های فایل اکسل.");
+          return;
+        }
+
+        if (valResult.conflicts.length > 0) {
+          // در صورت وجود مغایرت، نمایش مدال تعاملی
+          setConflictsList(valResult.conflicts);
+          setNonConflictingList(valResult.nonConflicting);
+          setConflictModalOpen(true);
         } else {
-          toast.success(
-            `تعداد ${res.count} پرسنل جدید با موفقیت درج شدند (برای رکوردهای دارای نام کاربری، حساب با رمز ۱۲۳۴۵۶ فعال شد).`
-          );
-          router.refresh();
+          // بدون تعارض، درج مستقیم با تراکنش اتمیک
+          const res = await executePersonnelImportBatch({
+            newRecords: valResult.nonConflicting,
+            resolutions: [],
+          });
+          if (!res.ok) {
+            toast.error(res.error || "خطا در ثبت اطلاعات در دیتابیس.");
+          } else {
+            setImportSummary(res);
+            setSummaryModalOpen(true);
+            router.refresh();
+          }
         }
       } catch (err) {
         console.error(err);
@@ -393,12 +466,57 @@ export default function UsersTableClient({
     reader.readAsArrayBuffer(file);
   };
 
+  const handleConfirmConflictResolution = async (payload: BatchImportPayload) => {
+    setIsSubmittingImport(true);
+    try {
+      const res = await executePersonnelImportBatch(payload);
+      setConflictModalOpen(false);
+      if (!res.ok) {
+        toast.error(res.error || "خطا در اعمال تغییرات دسته‌ای.");
+      } else {
+        setImportSummary(res);
+        setSummaryModalOpen(true);
+        router.refresh();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("خطای غیرمنتظره در ثبت اطلاعات.");
+    } finally {
+      setIsSubmittingImport(false);
+    }
+  };
+
   const rolePill = (r: number) =>
     r === 1 ? "p-crit" : r === 2 ? "p-warn" : r === 3 ? "p-rail" : "p-mut";
 
   const accountColumns = [
     { key: "userName", label: "نام کاربری", sortable: true, render: (p: any) => <span className="num">{p.userName}</span> },
-    { key: "fullName", label: "نام و نام خانوادگی", sortable: true, render: (p: any) => `${p.firstName} ${p.lastName}` },
+    {
+      key: "fullName",
+      label: "نام و نام خانوادگی",
+      sortable: true,
+      render: (p: any) => (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+          <span>{`${p.firstName} ${p.lastName}`}</span>
+          {p.isPartTimeDriver && (
+            <span
+              className="pill"
+              style={{
+                fontSize: "10px",
+                padding: "1px 5px",
+                background: "rgba(245, 158, 11, 0.15)",
+                color: "#d97706",
+                border: "1px solid rgba(245, 158, 11, 0.35)",
+                fontWeight: 600,
+              }}
+              title="دارای صلاحیت راهبر غیردائم"
+            >
+              راهبر غیردائم
+            </span>
+          )}
+        </span>
+      ),
+    },
     { key: "personnelCode", label: "کد پرسنلی", sortable: true, render: (p: any) => <span className="num">{p.personnelCode || "—"}</span> },
     {
       key: "role",
@@ -432,7 +550,32 @@ export default function UsersTableClient({
   ];
 
   const nonAccountColumns = [
-    { key: "fullName", label: "نام و نام خانوادگی", sortable: true, render: (p: any) => `${p.firstName} ${p.lastName}` },
+    {
+      key: "fullName",
+      label: "نام و نام خانوادگی",
+      sortable: true,
+      render: (p: any) => (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+          <span>{`${p.firstName} ${p.lastName}`}</span>
+          {p.isPartTimeDriver && (
+            <span
+              className="pill"
+              style={{
+                fontSize: "10px",
+                padding: "1px 5px",
+                background: "rgba(245, 158, 11, 0.15)",
+                color: "#d97706",
+                border: "1px solid rgba(245, 158, 11, 0.35)",
+                fontWeight: 600,
+              }}
+              title="دارای صلاحیت راهبر غیردائم"
+            >
+              راهبر غیردائم
+            </span>
+          )}
+        </span>
+      ),
+    },
     { key: "personnelCode", label: "کد پرسنلی", sortable: true, render: (p: any) => <span className="num">{p.personnelCode || "—"}</span> },
     { key: "orgPosition", label: "پست سازمانی", sortable: true, render: (p: any) => getOrgPosLabel(p.orgPosition) },
     { key: "shift", label: "شیفت", sortable: true, render: (p: any) => <span className="num">{getShiftLabel(p.shift)}</span> },
@@ -714,6 +857,23 @@ export default function UsersTableClient({
         isLoading={isDeletingBulk}
         onConfirm={handleConfirmBulkDelete}
         onCancel={() => setBulkDeleteTarget(null)}
+      />
+
+      {/* مدال تعاملی مدیریت تعارضات و موارد تکراری اکسل */}
+      <ExcelConflictModal
+        isOpen={conflictModalOpen}
+        conflicts={conflictsList}
+        nonConflicting={nonConflictingList}
+        isSubmitting={isSubmittingImport}
+        onConfirm={handleConfirmConflictResolution}
+        onCancel={() => setConflictModalOpen(false)}
+      />
+
+      {/* مدال گزارش آماری پس از درون‌ریزی اکسل */}
+      <ExcelImportSummaryModal
+        isOpen={summaryModalOpen}
+        summary={importSummary}
+        onClose={() => setSummaryModalOpen(false)}
       />
     </>
   );

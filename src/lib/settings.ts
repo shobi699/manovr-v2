@@ -20,7 +20,7 @@ export type DepotPrefs = {
 export const DEFAULT_APPEARANCE: Appearance = {
   theme: "auto", accent: "#d8842a", density: "normal", fontSize: 14, digits: "fa", navPosition: "right",
 };
-export const DEFAULT_DEPOT: DepotPrefs = { quality: "2d", refreshSec: 15, defaultTerminal: 0, view2DMode: "structured" };
+export const DEFAULT_DEPOT: DepotPrefs = { quality: "2d", refreshSec: 15, defaultTerminal: 0, view2DMode: "map" };
 
 export type OfflinePolicy = "auto_sync" | "read_only";
 

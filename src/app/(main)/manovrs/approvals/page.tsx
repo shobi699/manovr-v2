@@ -4,6 +4,7 @@ import PageHeader from "@/components/PageHeader";
 import { getSession } from "@/lib/auth";
 import { hasPerm } from "@/lib/perms";
 import { getCachedLookup } from "@/lib/lookups";
+import { isAdmin } from "@/lib/enums";
 import ApprovalsPanelClient from "./ApprovalsPanelClient";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,8 @@ export default async function ApprovalsPage() {
       </div>
     );
   }
+
+  const isManager = isAdmin(session.role);
 
   // لود مانورها و لوکاپ‌های مورد نیاز
   const [manovrs, manovrTypeLookup, manovrStatusLookup, confirmationStatusLookup] = await Promise.all([
@@ -60,8 +63,10 @@ export default async function ApprovalsPage() {
           manovrTypes={manovrTypeLookup?.values || []}
           manovrStatuses={manovrStatusLookup?.values || []}
           confirmationStatuses={confirmationStatusLookup?.values || []}
+          isAdmin={isManager}
         />
       </div>
     </>
   );
 }
+

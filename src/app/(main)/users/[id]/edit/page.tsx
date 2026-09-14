@@ -11,7 +11,7 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
   if (!session) redirect("/login");
 
   const { id } = await params;
-  const [currentUser, user, roles, orgPosLookup, shiftLookup, roleLookup] = await Promise.all([
+  const [currentUser, user, roles, orgPosLookup, shiftLookup] = await Promise.all([
     prisma.personnel.findUnique({
       where: { id: session.id },
     }),
@@ -21,7 +21,6 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
     }),
     getCachedLookup("org_position"),
     getCachedLookup("shift"),
-    getCachedLookup("role"),
   ]);
 
   if (!user) notFound();
@@ -64,6 +63,7 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
                 role: user.role,
                 shift: user.shift,
                 orgPosition: user.orgPosition,
+                isPartTimeDriver: user.isPartTimeDriver ?? false,
                 personnelType: user.personnelType,
                 personnelCode: user.personnelCode || "",
                 hasAccount: user.hasAccount,
@@ -78,7 +78,6 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
               currentUser={serializableCurrentUser}
               orgPositions={orgPosLookup?.values || []}
               shifts={shiftLookup?.values || []}
-              systemRoles={roleLookup?.values || []}
             />
           </div>
         </div>

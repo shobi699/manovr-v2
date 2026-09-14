@@ -63,6 +63,41 @@ describe("buildPrismaWhere", () => {
     expect(where.status).toBe(1);
   });
 
+  it("builds the relational 'rahbar2' OR branch across firstName and lastName", () => {
+    const filters: ReportFilter[] = [{ field: "rahbar2", operator: "contains", value: "Reza" }];
+    const where = buildPrismaWhere("manovr", filters);
+    expect(where.rahbar2.OR).toHaveLength(2);
+    expect(where.rahbar2.OR).toEqual([
+      { firstName: { contains: "Reza" } },
+      { lastName: { contains: "Reza" } },
+    ]);
+  });
+
+  it("coerces rahbar2Id to a number, not a string", () => {
+    const filters: ReportFilter[] = [{ field: "rahbar2Id", operator: "equals", value: "14" }];
+    const where = buildPrismaWhere("manovr", filters);
+    expect(where.rahbar2Id).toBe(14);
+    expect(typeof where.rahbar2Id).toBe("number");
+  });
+
+  it("handles isSolo filter: 'true' sets rahbar2Id to null (solo maneuver)", () => {
+    const filters: ReportFilter[] = [{ field: "isSolo", operator: "equals", value: "true" }];
+    const where = buildPrismaWhere("manovr", filters);
+    expect(where.rahbar2Id).toBeNull();
+  });
+
+  it("handles crewType filter: 'assisted' sets rahbar2Id to { not: null }", () => {
+    const filters: ReportFilter[] = [{ field: "crewType", operator: "equals", value: "assisted" }];
+    const where = buildPrismaWhere("manovr", filters);
+    expect(where.rahbar2Id).toEqual({ not: null });
+  });
+
+  it("handles crewType filter: 'solo' sets rahbar2Id to null", () => {
+    const filters: ReportFilter[] = [{ field: "crewType", operator: "equals", value: "solo" }];
+    const where = buildPrismaWhere("manovr", filters);
+    expect(where.rahbar2Id).toBeNull();
+  });
+
   it("uses gte/lte for a 'between' operator on a numeric field", () => {
     const filters: ReportFilter[] = [
       { field: "capacity", operator: "between", value: "10", value2: "20" },

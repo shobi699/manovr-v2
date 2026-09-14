@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Icons } from "@/lib/icons";
+import { persianSearchMatch } from "@/lib/persian-text";
 
 interface Option {
   value: string | number;
@@ -104,8 +105,11 @@ export default function SearchableSelect({
 
   const filteredOptions = useMemo(() => {
     if (!search.trim()) return options;
-    const term = search.toLowerCase();
-    return options.filter((opt) => opt.label.toLowerCase().includes(term));
+    return options.filter(
+      (opt) =>
+        persianSearchMatch(opt.label, search) ||
+        (opt.value !== undefined && opt.value !== null && persianSearchMatch(String(opt.value), search))
+    );
   }, [options, search]);
 
   const handleSelect = (val: string | number, optDisabled?: boolean) => {

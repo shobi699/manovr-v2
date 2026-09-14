@@ -26,6 +26,12 @@ const DEFAULT_PERMANENT_LOOKUPS = [
   { code: 24, label: "انتقال دائم", color: "#991b1b", meta: JSON.stringify({ isPermanent: true }) },
 ];
 
+const DEFAULT_TRAIN_LOOKUPS = [
+  { code: 0, label: "AC (برقی - نسل جدید)", color: "#3b82f6" },
+  { code: 1, label: "DC (برقی - نسل قدیم)", color: "#10b981" },
+  { code: 2, label: "دیزل (لوکوموتیو)", color: "#f59e0b" },
+];
+
 async function ensurePermanentManovrLookups(typeId: number, values: { id: number; code: number; label: string }[]) {
   const valueMap = new Map(values.map((v) => [v.code, v]));
   const usedCodes = new Set(values.map((v) => v.code));
@@ -98,6 +104,29 @@ export const getCachedLookup = (key: string): Promise<LookupData | null> => {
 
         if (isMissingOrOverwritten) {
           await ensurePermanentManovrLookups(type.id, type.values);
+          const reFetched = await prisma.lookupType.findUnique({
+            where: { key: lookupKey },
+            include: { values: { orderBy: { sortIdx: "asc" } } },
+          });
+          if (reFetched) return reFetched as LookupData;
+        }
+      }
+
+      if (lookupKey === "train_type") {
+        const valMap = new Map(type.values.map((v) => [v.code, v]));
+        const isMissingOrOverwritten = DEFAULT_TRAIN_LOOKUPS.some((req) => {
+          const ex = valMap.get(req.code);
+          return !ex || ex.label !== req.label || !ex.isActive;
+        });
+
+        if (isMissingOrOverwritten) {
+          for (const req of DEFAULT_TRAIN_LOOKUPS) {
+            await prisma.lookupValue.upsert({
+              where: { typeId_code: { typeId: type.id, code: req.code } },
+              update: { label: req.label, color: req.color, isActive: true },
+              create: { typeId: type.id, code: req.code, label: req.label, color: req.color, isActive: true, sortIdx: req.code },
+            });
+          }
           const reFetched = await prisma.lookupType.findUnique({
             where: { key: lookupKey },
             include: { values: { orderBy: { sortIdx: "asc" } } },

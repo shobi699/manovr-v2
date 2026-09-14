@@ -4,14 +4,17 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { hasPerm } from "@/lib/perms";
+import { hasPerm, getRoleLevel } from "@/lib/perms";
 import { audit } from "@/lib/audit";
-import { ManovrType } from "@/lib/enums";
+import { ManovrType, isAdmin } from "@/lib/enums";
 import { hasRoomOnLine, shouldSetKafshak, isPermanentTransfer } from "@/lib/manovr-rules";
 import {
   createManovrSchema,
   confirmManovrSchema,
   finishManovrSchema,
+  bulkConfirmManovrSchema,
+  bulkFinishManovrSchema,
+  bulkDeleteManovrSchema,
   formatZodError,
 } from "@/lib/validations";
 import { getOfflinePolicy } from "@/lib/settings";
@@ -85,7 +88,7 @@ export async function createManovr(
 
       // در مانور انتقال دائم (خروج قطار)، قطار از پایانه خارج می‌شود و ظرفیت اشغال نمی‌کند
       if (!isPerm && dest) {
-        // بدون احتساب خود این قطار، تا مانور در محل مسدود نشود
+        // ۱. بررسی ظرفیت کلی خط مقصد (بدون احتساب خود این قطار تا مانور در محل مسدود نشود)
         const onDest = await tx.train.count({
           where: {
             lineId: destinationLineId,
@@ -95,6 +98,24 @@ export async function createManovr(
         });
         if (!hasRoomOnLine(onDest, dest.capacity)) {
           throw new ManovrError("ظرفیت خط مقصد پر شده است.");
+        }
+
+        // ۲. بررسی محدوده مجاز اسلات بر اساس ظرفیت خط
+        if (slotIndex < 0 || slotIndex >= dest.capacity) {
+          throw new ManovrError(`جایگاه انتخابی خارج از ظرفیت خط مقصد (${dest.capacity} جایگاه) است.`);
+        }
+
+        // ۳. بررسی اتمیک عدم اشغال همزمان اسلات توسط قطار دیگر (جلوگیری قطعی از Race Condition و رزرو دوبل)
+        const existingInSlot = await tx.train.findFirst({
+          where: {
+            lineId: destinationLineId,
+            slotIndex: slotIndex,
+            isDisposed: false,
+            id: { not: trainId },
+          },
+        });
+        if (existingInSlot) {
+          throw new ManovrError(`جایگاه ${slotIndex + 1} در خط ${dest.name} در حال حاضر توسط قطار ${existingInSlot.code} اشغال شده است.`);
         }
       }
 
@@ -212,6 +233,13 @@ export async function finishManovr(id: number) {
   if (!parsed.success) return { error: formatZodError(parsed.error) };
 
   const before = await prisma.manovr.findUnique({ where: { id } });
+  if (!before) return { error: "مانور مورد نظر یافت نشد." };
+
+  // بررسی قفل سوابق تکمیل‌شده ("به پایان رسید" / status === 2)
+  if (before.status === 2) {
+    return { error: "این مانور قبلاً به پایان رسیده است و امکان ویرایش یا خاتمه مجدد آن وجود ندارد." };
+  }
+
   const after = await prisma.manovr.update({
     where: { id },
     data: { status: 2, finishedAt: new Date() },
@@ -228,6 +256,7 @@ export async function finishManovr(id: number) {
   );
 
   revalidatePath("/manovrs");
+  revalidatePath("/manovrs/approvals");
   revalidatePath("/dashboard");
   revalidatePath("/depot");
   return { ok: true };
@@ -258,9 +287,61 @@ export async function confirmManovr(id: number, value: number) {
   );
 
   revalidatePath("/manovrs");
+  revalidatePath("/manovrs/approvals");
   revalidatePath("/dashboard");
   revalidatePath("/depot");
   return { ok: true };
+}
+
+export async function bulkConfirmManovr(ids: number[], value: number) {
+  const session = await getSession();
+  if (!session || !(await hasPerm(session, "manovr.confirm"))) {
+    return { error: "دسترسی ندارید. شما مجوز تأیید یا رد مانورها را ندارید." };
+  }
+
+  const parsed = bulkConfirmManovrSchema.safeParse({ ids, status: value });
+  if (!parsed.success) return { error: formatZodError(parsed.error) };
+
+  const validIds = parsed.data.ids;
+  const word = value === 1 ? "تأیید" : "رد";
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const records = await tx.manovr.findMany({
+        where: { id: { in: validIds }, status: { not: 3 } },
+        select: { id: true, confirmationStatus: true },
+      });
+
+      if (records.length === 0) {
+        throw new Error("هیچ مانور معتبری برای تغییر وضعیت یافت نشد.");
+      }
+
+      await tx.manovr.updateMany({
+        where: { id: { in: records.map((r) => r.id) } },
+        data: { confirmationStatus: value },
+      });
+
+      return records;
+    });
+
+    await audit(
+      session,
+      "manovr",
+      validIds[0],
+      "CONFIRM",
+      null,
+      { count: result.length, status: value, ids: validIds },
+      `${result.length} فقره مانور به صورت گروهی توسط مسئول شیفت ${word} گردید.`
+    );
+
+    revalidatePath("/manovrs");
+    revalidatePath("/manovrs/approvals");
+    revalidatePath("/dashboard");
+    return { ok: true, count: result.length };
+  } catch (err: any) {
+    console.error("bulkConfirmManovr error:", err);
+    return { error: err?.message || "خطا در تأیید یا رد گروهی مانورها." };
+  }
 }
 
 export async function deleteManovr(id: number) {
@@ -268,6 +349,18 @@ export async function deleteManovr(id: number) {
   if (!session || !(await hasPerm(session, "manovr.delete"))) return { error: "دسترسی ندارید." };
 
   const before = await prisma.manovr.findUnique({ where: { id } });
+  if (!before) return { error: "مانور مورد نظر یافت نشد." };
+
+  // قفل امنیتی: مانورهای تکمیل‌شده («به پایان رسید» / status === 2) فقط توسط مدیر سیستم قابل حذف هستند
+  if (before.status === 2) {
+    const isManager = isAdmin(session.role) || getRoleLevel(session.role) >= 80;
+    if (!isManager) {
+      return {
+        error: "این مانور به پایان رسیده است. حذف مانورهای خاتمه‌یافته منحصراً در اختیارات مدیر سیستم می‌باشد.",
+      };
+    }
+  }
+
   const after = await prisma.manovr.update({ where: { id }, data: { status: 3 } });
 
   await audit(
@@ -277,11 +370,141 @@ export async function deleteManovr(id: number) {
     "DELETE",
     before,
     after,
-    `سند مانور شماره ${id} به صورت نرم از سیستم حذف گردید.`
+    before.status === 2
+      ? `سند مانور خاتمه‌یافته شماره ${id} توسط مدیر سیستم به صورت نرم حذف گردید.`
+      : `سند مانور شماره ${id} به صورت نرم از سیستم حذف گردید.`
   );
 
   revalidatePath("/manovrs");
+  revalidatePath("/manovrs/approvals");
   revalidatePath("/dashboard");
   revalidatePath("/depot");
   return { ok: true };
 }
+
+/**
+ * اتمام و بستن دسته‌جمعی (گروهی) مانورها
+ */
+export async function bulkFinishManovr(ids: number[]) {
+  const session = await getSession();
+  if (!session || !(await hasPerm(session, "manovr.edit"))) {
+    return { error: "دسترسی ندارید. شما مجوز خاتمه مانورها را ندارید." };
+  }
+
+  const parsed = bulkFinishManovrSchema.safeParse({ ids });
+  if (!parsed.success) return { error: formatZodError(parsed.error) };
+
+  const validIds = parsed.data.ids;
+
+  try {
+    const result = await prisma.$transaction(
+      async (tx) => {
+        // فقط مانورهایی که در حال اجرا هستند (status === 1)
+        const records = await tx.manovr.findMany({
+          where: { id: { in: validIds }, status: 1 },
+          select: { id: true, trainId: true },
+        });
+
+        if (records.length === 0) {
+          throw new Error("هیچ مانور در حال اجرایی برای بستن یافت نشد.");
+        }
+
+        await tx.manovr.updateMany({
+          where: { id: { in: records.map((r) => r.id) } },
+          data: { status: 2, finishedAt: new Date() },
+        });
+
+        return records;
+      },
+      { timeout: 30000, maxWait: 10000 }
+    );
+
+    await audit(
+      session,
+      "manovr",
+      validIds[0],
+      "UPDATE",
+      null,
+      { count: result.length, ids: validIds },
+      `${result.length} فقره مانور در حال اجرا به صورت گروهی خاتمه یافته و بسته شدند.`
+    );
+
+    revalidatePath("/manovrs");
+    revalidatePath("/manovrs/approvals");
+    revalidatePath("/dashboard");
+    revalidatePath("/depot");
+    return { ok: true, count: result.length };
+  } catch (err: any) {
+    console.error("bulkFinishManovr error:", err);
+    return { error: err?.message || "خطا در بستن گروهی مانورها." };
+  }
+}
+
+/**
+ * حذف دسته‌جمعی (گروهی) مانورها با رعایت قیود امنیتی مدیر
+ */
+export async function bulkDeleteManovr(ids: number[]) {
+  const session = await getSession();
+  if (!session || !(await hasPerm(session, "manovr.delete"))) {
+    return { error: "دسترسی ندارید. شما مجوز حذف مانورها را ندارید." };
+  }
+
+  const parsed = bulkDeleteManovrSchema.safeParse({ ids });
+  if (!parsed.success) return { error: formatZodError(parsed.error) };
+
+  const validIds = parsed.data.ids;
+  const isManager = isAdmin(session.role) || getRoleLevel(session.role) >= 80;
+
+  try {
+    const result = await prisma.$transaction(
+      async (tx) => {
+        const records = await tx.manovr.findMany({
+          where: { id: { in: validIds }, status: { not: 3 } },
+          select: { id: true, status: true },
+        });
+
+        if (records.length === 0) {
+          throw new Error("هیچ مانور فعالی برای حذف یافت نشد.");
+        }
+
+        // اگر کاربر مدیر نیست، مانورهای تکمیل‌شده (status === 2) حذف نشوند
+        const allowedRecords = isManager
+          ? records
+          : records.filter((r) => r.status !== 2);
+
+        if (allowedRecords.length === 0) {
+          throw new Error("مانورهای انتخاب‌شده به پایان رسیده‌اند و حذف آن‌ها منحصراً در اختیارات مدیر سیستم می‌باشد.");
+        }
+
+        await tx.manovr.updateMany({
+          where: { id: { in: allowedRecords.map((r) => r.id) } },
+          data: { status: 3 },
+        });
+
+        return allowedRecords;
+      },
+      { timeout: 30000, maxWait: 10000 }
+    );
+
+    await audit(
+      session,
+      "manovr",
+      validIds[0],
+      "DELETE",
+      null,
+      { count: result.length, ids: validIds },
+      `${result.length} فقره مانور به صورت گروهی از سیستم حذف نرم گردیدند.`
+    );
+
+    revalidatePath("/manovrs");
+    revalidatePath("/manovrs/approvals");
+    revalidatePath("/dashboard");
+    revalidatePath("/depot");
+    return { ok: true, count: result.length };
+  } catch (err: any) {
+    console.error("bulkDeleteManovr error:", err);
+    return { error: err?.message || "خطا در حذف گروهی مانورها." };
+  }
+}
+
+

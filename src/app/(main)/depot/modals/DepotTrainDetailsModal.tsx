@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { TrainType } from "@/lib/enums";
+import { TrainType, TrainTypeFull } from "@/lib/enums";
 import { LineData, TrainData } from "../types";
 
 export interface DepotTrainDetailsModalProps {
@@ -52,7 +52,7 @@ export default function DepotTrainDetailsModal({
         <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <span className="muted">نوع قطار:</span>
-            <b>{TrainType[train.type]}</b>
+            <b>{TrainTypeFull[train.type] || TrainType[train.type]}</b>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <span className="muted">خط استقرار جاری:</span>

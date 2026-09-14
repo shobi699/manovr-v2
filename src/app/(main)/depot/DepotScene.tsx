@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useTransition, useMemo } from "react";
+import React, { useState, useEffect, useRef, useTransition, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Terminal as TerminalEnum, TrainType, ManovrType } from "@/lib/enums";
@@ -17,6 +17,8 @@ import { Icons } from "@/lib/icons";
 import SearchableSelect from "@/components/SearchableSelect";
 import { BorderRotate } from "@/components/ui/animated-gradient-border";
 import { useToast } from "@/components/ui/Toast";
+import { persianSearchMatch } from "@/lib/persian-text";
+import { useRegisterContextMenu, ContextMenuItem } from "@/components/context-menu";
 
 import {
   LineData,
@@ -127,6 +129,10 @@ export default function DepotScene({
   useLiveRefresh(["manovr_changed", "train_changed"]);
   const { appearance } = useTheme();
   const [isPending, startTransition] = useTransition();
+  const isPendingRef = useRef(isPending);
+  useEffect(() => {
+    isPendingRef.current = isPending;
+  }, [isPending]);
   const [trains, setTrains] = useState<TrainData[]>(initialTrains);
   const [selectedTrain, setSelectedTrain] = useState<TrainData | null>(null);
   const [selectedLine, setSelectedLine] = useState<LineData | null>(null);
@@ -160,17 +166,20 @@ export default function DepotScene({
   const [relocateSlotIdx, setRelocateSlotIdx] = useState<number>(0);
   const [newTrainIdState, setNewTrainIdState] = useState<number | "">("");
 
-  // وضعیت کیفیت و نمای ۲بعدی/۳بعدی جاری — به درخواست صریح کاربر پیش‌فرض اکیداً نمای ۲بعدی است
+  // وضعیت کیفیت و نمای ۲بعدی/۳بعدی جاری — به درخواست صریح کاربر پیش‌فرض اکیداً نمای نقشه پایانه (۲بعدی) است
   const [currentQuality, setCurrentQuality] = useState<"high" | "low" | "2d">("2d");
-  const [view2DMode, setView2DMode] = useState<"grid" | "structured" | "map">(prefs?.view2DMode || "structured");
+  const [view2DMode, setView2DMode] = useState<"grid" | "structured" | "map">(prefs?.view2DMode || "map");
   const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
+  // بزرگ‌نمایی صفحه پایانه و المان‌های ریلی (بزرگ‌نمایی با مثبت/منفی و کلیدهای میانبر)
+  const [mapZoom, setMapZoom] = useState<number>(100);
 
   // تابع کمکی سوئیچ بین حالت تمام‌صفحه مرورگر (HTML5 Fullscreen) و معمولی
   // فقط container دپو fullscreen می‌شود تا PageHeader و عملیات پایانه مخفی شوند
-  const toggleFullscreen = () => {
+  const toggleFullscreen = useCallback(() => {
+    if (typeof document === "undefined") return;
+    const el = document.getElementById("depot-scene-container") || document.documentElement;
     if (!document.fullscreenElement) {
-      const el = sceneContainerRef.current || document.documentElement;
-      if (el.requestFullscreen) {
+      if (el && el.requestFullscreen) {
         el.requestFullscreen().then(() => setIsFocusMode(true)).catch(() => setIsFocusMode(true));
       } else {
         setIsFocusMode(true);
@@ -182,7 +191,7 @@ export default function DepotScene({
         setIsFocusMode(false);
       }
     }
-  };
+  }, []);
 
   // همگام‌سازی وضعیت حالت تمام‌صفحه با کلید Esc یا خروج از Fullscreen
   useEffect(() => {
@@ -197,23 +206,79 @@ export default function DepotScene({
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
 
+  // میانبرهای صفحه‌کلید برای کنترل بزرگ‌نمایی نقشه (Ctrl +, Ctrl -, Ctrl 0) در تمام حالات به‌ویژه تمام‌صفحه
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = document.activeElement?.tagName?.toLowerCase();
+      if (activeTag === "input" || activeTag === "textarea" || activeTag === "select") return;
+
+      if (currentQuality !== "2d") return;
+
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === "+" || e.key === "=") {
+          e.preventDefault();
+          setMapZoom((prev) => Math.min(160, prev + 10));
+        } else if (e.key === "-" || e.key === "_") {
+          e.preventDefault();
+          setMapZoom((prev) => Math.max(70, prev - 10));
+        } else if (e.key === "0") {
+          e.preventDefault();
+          setMapZoom(100);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentQuality]);
+
   // شناسه قطار پیش‌انتخاب شده برای مودال مانور کشیدن و رها کردن
   const [preSelectedTrainId, setPreSelectedTrainId] = useState<number | "">("");
 
   // زمان اجرای مانور انتخابی کاربر
   const [manovrExecutionTime, setManovrExecutionTime] = useState<string>(new Date().toISOString());
 
+  // هدایت هوشمند انتخاب خط: نوع مانور پیش‌فرض اکیداً «انتقال قطار» (کد ۲)
+  const handleSelectLine = (l: LineData) => {
+    setSelectedLine(l);
+    setDestLineId(l.id);
+    const lineTrains = trains.filter((t) => t.lineId === l.id);
+    if (lineTrains.length === 0) {
+      setActiveLineTab("manovr");
+      setManovrDestLineId(l.id);
+      setManovrSourceLineId("");
+      setManovrType(2); // پیش‌فرض: انتقال قطار (کد ۲)
+    } else {
+      setActiveLineTab("trains");
+      setManovrSourceLineId(l.id);
+      setManovrDestLineId("");
+      setManovrType(2); // پیش‌فرض: انتقال قطار (کد ۲)
+    }
+  };
+
   // ریست کردن فیلدهای مودال با تغییر ریل انتخابی
   useEffect(() => {
     if (selectedLine) {
-      setActiveLineTab("trains");
-      setManovrTrainId("");
-      setManovrSourceLineId(selectedLine.id);
-      setManovrDestLineId("");
-      setManovrSlotIdx(0);
+      const lineTrains = trains.filter((t) => t.lineId === selectedLine.id);
+      const isLineEmpty = lineTrains.length === 0;
+
+      if (isLineEmpty) {
+        setActiveLineTab("manovr");
+        setManovrTrainId("");
+        setManovrSourceLineId("");
+        setManovrDestLineId(selectedLine.id);
+        setManovrSlotIdx(0);
+        setManovrType(2); // پیش‌فرض: انتقال قطار (کد ۲)
+      } else {
+        setActiveLineTab("trains");
+        setManovrTrainId("");
+        setManovrSourceLineId(selectedLine.id);
+        setManovrDestLineId("");
+        setManovrSlotIdx(0);
+        setManovrType(2); // پیش‌فرض: انتقال قطار (کد ۲)
+      }
+
       setManovrRahbar1("");
       setManovrRahbar2("");
-      setManovrType(2);
       setManovrDesc("");
       setManovrExecutionTime(new Date().toISOString());
 
@@ -222,7 +287,7 @@ export default function DepotScene({
       setRelocateSlotIdx(0);
       setNewTrainIdState("");
     }
-  }, [selectedLine]);
+  }, [selectedLine?.id]);
 
   // همگام‌سازی وضعیت قطارها با تغییر پروپس ورودی از سرور
   useEffect(() => {
@@ -235,7 +300,6 @@ export default function DepotScene({
 
   // مودال‌ها
   const [showManovrModal, setShowManovrModal] = useState(false);
-  const [showLineModal, setShowLineModal] = useState(false);
   const [sourceLineId, setSourceLineId] = useState<number | null>(null);
   const [destLineId, setDestLineId] = useState<number | null>(null);
   const [targetSlot, setTargetSlot] = useState<number>(0);
@@ -246,23 +310,183 @@ export default function DepotScene({
   const [modifiedPositions, setModifiedPositions] = useState<Record<number, { posX: number; posY: number; rotation: number }>>({});
   const [isSavingLayout, setIsSavingLayout] = useState(false);
 
-  // مدیریت رفرش خودکار بر اساس پولینگ
+  // ثبت خودکار ابزارهای تعاملی پایانه دپو در موتور کلیک‌راست هوشمند
+  const depotContextMenuItems = useMemo<ContextMenuItem[]>(() => {
+    const activeTargetLine = selectedLine || (hoveredLineId ? lines.find((l) => l.id === hoveredLineId) : null);
+    const activeTargetTrain = selectedTrain || (trains.length > 0 ? trains[0] : null);
+
+    const items: ContextMenuItem[] = [];
+
+    // ۱. کنترل قفل یا آزادسازی خط ریلی
+    if (activeTargetLine) {
+      items.push({
+        id: "depot-track-lock",
+        label: activeTargetLine.isActive
+          ? `قفل و مسدودسازی ریل «${activeTargetLine.name}»`
+          : `آزادسازی و فعال‌سازی ریل «${activeTargetLine.name}»`,
+        icon: <span>{activeTargetLine.isActive ? "🔒" : "🔓"}</span>,
+        badge: activeTargetLine.isActive ? "فعال / آزاد" : "مسدود",
+        badgeVariant: activeTargetLine.isActive ? "good" : "warn",
+        onClick: async () => {
+          if (!canManageLines) {
+            toast.error("شما مجوز تغییر وضعیت خطوط ریل را ندارید.");
+            return;
+          }
+          const nextActive = !activeTargetLine.isActive;
+          try {
+            const res = await toggleLineActive(activeTargetLine.id, nextActive);
+            if (res?.ok) {
+              toast.success(`خط ریلی «${activeTargetLine.name}» با موفقیت ${nextActive ? "آزاد" : "مسدود"} شد.`);
+              router.refresh();
+            } else {
+              toast.error(res?.error || "خطا در تغییر وضعیت ریل");
+            }
+          } catch {
+            toast.error("خطا در برقراری ارتباط با سرور پایانه");
+          }
+        },
+      });
+    }
+
+    // ۲. ثبت سریع جابجایی و مانور قطار
+    items.push({
+      id: "depot-quick-manovr",
+      label: activeTargetTrain
+        ? `ثبت مانور برای قطار ${activeTargetTrain.code}`
+        : "ثبت سریع مانور قطار",
+      icon: <span>⚡</span>,
+      shortcut: "Ctrl+M",
+      badge: "عملیاتی",
+      badgeVariant: "accent",
+      onClick: () => {
+        if (activeTargetTrain) {
+          setPreSelectedTrainId(activeTargetTrain.id);
+          setSourceLineId(activeTargetTrain.lineId);
+        }
+        setShowManovrModal(true);
+      },
+    });
+
+    // ۳. شناسنامه و بررسی وضعیت ناوگان
+    if (activeTargetTrain) {
+      items.push({
+        id: "depot-train-inspect",
+        label: `شناسنامه و وضعیت فنی قطار ${activeTargetTrain.code}`,
+        icon: <span>🚆</span>,
+        shortcut: "Ctrl+T",
+        onClick: () => {
+          setSelectedTrain(activeTargetTrain);
+        },
+      });
+    }
+
+    // ۴. تغییر حالت نمایش پایانه (نقشه پایانه / ۲بعدی افقی / شبیه‌سازی سه‌بعدی)
+    items.push({
+      id: "depot-switch-view",
+      label:
+        currentQuality === "2d"
+          ? view2DMode === "map"
+            ? "تغییر نما به چیدمان ۲بعدی افقی"
+            : view2DMode === "structured"
+            ? "تغییر نما به شبیه‌سازی سه‌بعدی"
+            : "تغییر نما به نقشه خطوط پایانه"
+          : "تغییر نما به نقشه پایانه",
+      icon: <span>🗺️</span>,
+      badge:
+        currentQuality === "2d"
+          ? view2DMode === "map"
+            ? "نقشه پایانه"
+            : view2DMode === "structured"
+            ? "۲بعدی افقی"
+            : "۲بعدی ۵ ستونه"
+          : "سه‌بعدی",
+      badgeVariant: "blue",
+      onClick: () => {
+        if (currentQuality === "2d" && view2DMode === "map") {
+          setView2DMode("structured");
+          toast.info("نمای ۲بعدی ساختاریافته پایانه فعال شد.");
+        } else if (currentQuality === "2d" && view2DMode === "structured") {
+          setCurrentQuality("low");
+          toast.info("موتور سه‌بعدی شبیه‌سازی پایانه فعال شد.");
+        } else {
+          setCurrentQuality("2d");
+          setView2DMode("map");
+          toast.info("نمای نقشه خطوط پایانه فعال شد.");
+        }
+      },
+    });
+
+    // ۵. بازنشانی زاویه دید و دوربین
+    items.push({
+      id: "depot-reset-camera",
+      label: "بازنشانی زاویه دید و موقعیت دوربین",
+      icon: <span>🎯</span>,
+      shortcut: "Home",
+      onClick: () => {
+        setCameraFocusTarget([0, 0, 0]);
+        toast.info("زاویه دید و مرکز پایانه به حالت پیش‌فرض بازنشانی شد.");
+      },
+    });
+
+    // ۶. سوئیچ حالت تمام‌صفحه (Focus Mode)
+    items.push({
+      id: "depot-toggle-fullscreen",
+      label: isFocusMode ? "خروج از حالت تمام‌صفحه" : "حالت تمام‌صفحه پایانه (Focus Mode)",
+      icon: <span>🖥️</span>,
+      shortcut: "F11",
+      badge: isFocusMode ? "فعال" : undefined,
+      badgeVariant: "accent",
+      separatorAfter: true,
+      onClick: toggleFullscreen,
+    });
+
+    return items;
+  }, [
+    selectedLine,
+    hoveredLineId,
+    lines,
+    selectedTrain,
+    trains,
+    canManageLines,
+    currentQuality,
+    view2DMode,
+    isFocusMode,
+    router,
+    toast,
+    toggleFullscreen,
+  ]);
+
+  useRegisterContextMenu("depot_tools", depotContextMenuItems);
+
+  // مدیریت رفرش خودکار بر اساس پولینگ با حفاظت در برابر تراکم درخواست در شبکه کند
   useEffect(() => {
     if (prefs.refreshSec === 0) return;
+    const intervalMs = Math.max(prefs.refreshSec, 5) * 1000;
     const timer = setInterval(() => {
-      startTransition(() => {
-        router.refresh();
-      });
-    }, prefs.refreshSec * 1000);
+      if (!isPendingRef.current) {
+        startTransition(() => {
+          router.refresh();
+        });
+      }
+    }, intervalMs);
     return () => clearInterval(timer);
   }, [prefs.refreshSec, router]);
 
-  // رویداد فشردن کیبورد Ctrl+K برای جستجو
+  // رویداد فشردن کیبورد Ctrl+K برای جستجو و Ctrl + / Ctrl - / Ctrl 0 برای بزرگ‌نمایی
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K" || e.key === "ک")) {
         e.preventDefault();
         setShowSearch((prev) => !prev);
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === "+" || e.key === "=")) {
+        e.preventDefault();
+        setMapZoom((prev) => Math.min(160, prev + 10));
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === "-" || e.key === "_")) {
+        e.preventDefault();
+        setMapZoom((prev) => Math.max(70, prev - 10));
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === "0" || e.key === "۰")) {
+        e.preventDefault();
+        setMapZoom(100);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -294,17 +518,35 @@ export default function DepotScene({
   const handleCreateManovrSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    if (sourceLineId) fd.append("sourceLineId", String(sourceLineId));
-    if (destLineId) fd.append("destinationLineId", String(destLineId));
-    fd.append("slotIndex", String(targetSlot));
+    if (sourceLineId && !fd.has("sourceLineId")) fd.append("sourceLineId", String(sourceLineId));
+    if (destLineId && !fd.has("destinationLineId")) fd.append("destinationLineId", String(destLineId));
+    if (!fd.has("slotIndex")) fd.append("slotIndex", String(targetSlot));
     fd.append("noRedirect", "1");
+
+    const tId = Number(fd.get("trainId"));
+    const dId = Number(fd.get("destinationLineId"));
+    const sIdx = Number(fd.get("slotIndex") ?? targetSlot);
+
+    // به‌روزرسانی محلی و آنی وضعیت قطارها در نقشه (Optimistic UI Update)
+    if (tId && dId) {
+      setTrains((prev) =>
+        prev.map((t) => (t.id === tId ? { ...t, lineId: dId, slotIndex: sIdx } : t))
+      );
+    }
+
+    setShowManovrModal(false);
+    setQuickRahbar1("");
+    setQuickRahbar2("");
+    setManovrRahbar1("");
+    setManovrRahbar2("");
+    setManovrDesc("");
+    toast.success("مانور با موفقیت ثبت شد و در سیستم قرار گرفت.");
 
     const res = await createManovr(null, fd);
     if (res?.error) {
       toast.error(res.error);
+      router.refresh();
     } else {
-      setShowManovrModal(false);
-      setSuccessMsg("مانور با موفقیت ثبت شد و در سیستم قرار گرفت.");
       router.refresh();
     }
   };
@@ -330,12 +572,19 @@ export default function DepotScene({
     }
   };
 
-  // فیلتر کردن ریل‌ها بر اساس جستجوی کاربر
+  // فیلتر کردن ریل‌ها و قطارها بر اساس جستجوی کاربر با نرمال‌سازی حروف فارسی و عربی
   const filteredSearchList = useMemo(() => {
-    if (!searchQuery) return [];
-    const q = searchQuery.toLowerCase();
-    const matchesLine = lines.filter((l) => l.name.toLowerCase().includes(q) || (l.tag && l.tag.toLowerCase().includes(q)));
-    const matchesTrain = trains.filter((t) => t.code.toLowerCase().includes(q));
+    if (!searchQuery.trim()) return [];
+    const matchesLine = lines.filter(
+      (l) =>
+        persianSearchMatch(l.name, searchQuery) ||
+        (l.tag && persianSearchMatch(l.tag, searchQuery))
+    );
+    const matchesTrain = trains.filter(
+      (t) =>
+        persianSearchMatch(t.code, searchQuery) ||
+        (t.movadDavvar && persianSearchMatch(t.movadDavvar, searchQuery))
+    );
 
     return [
       ...matchesLine.map((l) => ({ type: "line" as const, id: l.id, title: `خط: ${l.name}`, obj: l })),
@@ -353,10 +602,30 @@ export default function DepotScene({
     setSearchQuery("");
   };
 
-  // هندلر مشترک انتقال/مانور قطار به یک ریل یا جایگاه خالی
+  // هندلر مشترک انتقال/مانور قطار به یک ریل یا جایگاه خالی با اعتبارسنجی کامل
   const handleTrainDropOnLine = (trainId: number, targetLine: LineData, slotIdx?: number) => {
+    if ((targetLine as any).isActive === false) {
+      toast.warning(`خط ریلی «${targetLine.name}» مسدود است و امکان مانور به آن وجود ندارد.`);
+      return;
+    }
+
     const trainObj = trains.find((t) => t.id === trainId);
-    if (!trainObj || trainObj.lineId === targetLine.id) return;
+    if (!trainObj) return;
+
+    // مانور درون همان خط (جابجایی جایگاه یا مانور در محل)
+    if (trainObj.lineId === targetLine.id) {
+      setSelectedLine(targetLine);
+      setActiveLineTab("manovr");
+      setManovrTrainId(trainObj.id);
+      setManovrSourceLineId(targetLine.id);
+      setManovrDestLineId(targetLine.id);
+      setManovrSlotIdx(typeof slotIdx === "number" ? slotIdx : trainObj.slotIndex);
+      setManovrType(2); // پیش‌فرض سراسری: انتقال قطار (کد ۲)
+      setQuickType("2");
+      toast.info(`فرم مانور قطار ${trainObj.code} در خط «${targetLine.name}» باز شد.`);
+      return;
+    }
+
     const occupiedSlots = trains.filter((t) => t.lineId === targetLine.id && !t.isDisposed).map((t) => t.slotIndex);
     if (occupiedSlots.length >= targetLine.capacity) {
       toast.warning("ظرفیت ریل مقصد تکمیل است.");
@@ -375,11 +644,106 @@ export default function DepotScene({
     setDestLineId(targetLine.id);
     setTargetSlot(targetSlotIdx);
     setPreSelectedTrainId(trainObj.id);
+    setQuickType("2"); // پیش‌فرض سراسری: انتقال قطار (کد ۲)
     setShowManovrModal(true);
+  };
+
+  // المان چندمنظوره بزرگ‌نمایی نقشه دپو (هم در نوار ابزار و هم در حالت تمام‌صفحه)
+  const renderZoomControl = (isFloating = false) => {
+    if (currentQuality !== "2d") return null;
+
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "4px",
+          backgroundColor: isFloating
+            ? (appearance.theme === "dark" ? "rgba(15, 23, 42, 0.88)" : "rgba(255, 255, 255, 0.95)")
+            : "var(--bg)",
+          color: isFloating ? "var(--ink)" : undefined,
+          padding: isFloating ? "4px 8px" : "2px 6px",
+          borderRadius: "var(--r-sm, 6px)",
+          border: isFloating
+            ? (appearance.theme === "dark" ? "1px solid rgba(255, 255, 255, 0.2)" : "1px solid var(--line)")
+            : "1px solid var(--line)",
+          boxShadow: isFloating ? "var(--sh-2, 0 8px 24px rgba(0, 0, 0, 0.25))" : undefined,
+          backdropFilter: isFloating ? "blur(12px)" : undefined,
+          direction: "rtl",
+        }}
+      >
+        <button
+          type="button"
+          className="btn sm"
+          style={{
+            padding: "2px 8px",
+            fontSize: "12px",
+            fontWeight: "bold",
+            minWidth: "26px",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+          }}
+          onClick={() => setMapZoom((prev) => Math.min(160, prev + 10))}
+          title="افزایش بزرگ‌نمایی (Ctrl +)"
+        >
+          ➕
+        </button>
+        <span
+          style={{
+            fontSize: "11.5px",
+            fontWeight: "bold",
+            minWidth: "38px",
+            textAlign: "center",
+            userSelect: "none",
+            color: "var(--ink)",
+          }}
+          className="num"
+        >
+          {mapZoom}٪
+        </span>
+        <button
+          type="button"
+          className="btn sm"
+          style={{
+            padding: "2px 8px",
+            fontSize: "12px",
+            fontWeight: "bold",
+            minWidth: "26px",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+          }}
+          onClick={() => setMapZoom((prev) => Math.max(70, prev - 10))}
+          title="کاهش بزرگ‌نمایی (Ctrl -)"
+        >
+          ➖
+        </button>
+        {mapZoom !== 100 && (
+          <button
+            type="button"
+            className="btn sm outline"
+            style={{
+              padding: "2px 6px",
+              fontSize: "10px",
+              cursor: "pointer",
+              fontWeight: "600",
+            }}
+            onClick={() => setMapZoom(100)}
+            title="اندازه پیش‌فرض ۱۰۰٪ (Ctrl 0)"
+          >
+            ۱۰۰٪
+          </button>
+        )}
+      </div>
+    );
   };
 
   return (
     <div
+      id="depot-scene-container"
       ref={sceneContainerRef}
       style={{
         height: "100%",
@@ -391,33 +755,54 @@ export default function DepotScene({
       }}
     >
 
-      {/* دکمه شناور خروج از تمام‌صفحه */}
+      {/* نوار کنترل شناور در حالت تمام‌صفحه (شامل بزرگ‌نمایی و خروج) */}
       {isFocusMode && (
-        <button
-          onClick={toggleFullscreen}
+        <div
           style={{
             position: "absolute",
             bottom: "16px",
             right: "16px",
             zIndex: 9999,
-            padding: "6px 14px",
-            borderRadius: "var(--r-sm)",
-            backgroundColor: "rgba(0,0,0,0.7)",
-            color: "#fff",
-            border: "1px solid rgba(255,255,255,0.2)",
-            fontSize: "12px",
-            fontWeight: "bold",
-            cursor: "pointer",
-            backdropFilter: "blur(8px)",
-            transition: "opacity 0.2s",
-            opacity: 0.6,
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.6")}
-          title="خروج از تمام‌صفحه (Esc)"
         >
-          ✕ خروج از تمام‌صفحه
-        </button>
+          {renderZoomControl(true)}
+
+          <button
+            onClick={toggleFullscreen}
+            style={{
+              padding: "6px 14px",
+              borderRadius: "var(--r-sm, 6px)",
+              backgroundColor: appearance.theme === "dark" ? "rgba(0, 0, 0, 0.75)" : "rgba(30, 41, 59, 0.85)",
+              color: "#fff",
+              border: "1px solid rgba(255,255,255,0.2)",
+              fontSize: "12px",
+              fontWeight: "bold",
+              cursor: "pointer",
+              backdropFilter: "blur(12px)",
+              transition: "opacity 0.2s, transform 0.15s ease",
+              opacity: 0.85,
+              boxShadow: "0 4px 16px rgba(0, 0, 0, 0.3)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = "1";
+              e.currentTarget.style.transform = "scale(1.02)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = "0.85";
+              e.currentTarget.style.transform = "scale(1)";
+            }}
+            title="خروج از تمام‌صفحه (Esc)"
+          >
+            <span>✕</span>
+            <span>خروج از تمام‌صفحه</span>
+          </button>
+        </div>
       )}
 
       {/* هدر بالایی کنترل صحنه دپو — در حالت تمام‌صفحه مخفی */}
@@ -446,6 +831,13 @@ export default function DepotScene({
           {currentQuality === "2d" && (
             <div style={{ display: "flex", gap: "4px", backgroundColor: "var(--bg)", padding: "2px 4px", borderRadius: "var(--r-sm)", border: "1px solid var(--line)" }}>
               <button
+                className={`btn sm ${view2DMode === "map" ? "primary" : ""}`}
+                onClick={() => setView2DMode("map")}
+                style={{ fontSize: "11.5px", fontWeight: view2DMode === "map" ? "bold" : "normal" }}
+              >
+                🗺️ نقشه پایانه
+              </button>
+              <button
                 className={`btn sm ${view2DMode === "structured" ? "primary" : ""}`}
                 onClick={() => setView2DMode("structured")}
                 style={{ fontSize: "11.5px", fontWeight: view2DMode === "structured" ? "bold" : "normal" }}
@@ -459,15 +851,11 @@ export default function DepotScene({
               >
                 🔲 نمای ۵ ستونه (کلاسیک)
               </button>
-              <button
-                className={`btn sm ${view2DMode === "map" ? "primary" : ""}`}
-                onClick={() => setView2DMode("map")}
-                style={{ fontSize: "11.5px", fontWeight: view2DMode === "map" ? "bold" : "normal" }}
-              >
-                🗺️ نقشه پایانه
-              </button>
             </div>
           )}
+
+          {/* ابزار کنترل بزرگ‌نمایی نقشه پایانه */}
+          {renderZoomControl(false)}
 
           {currentQuality === "2d" && (
             <button
@@ -515,10 +903,7 @@ export default function DepotScene({
             canLayout={canLayout}
             isFocusMode={isFocusMode}
             theme={appearance.theme}
-            onSelectLine={(l) => {
-              setSelectedLine(l);
-              setDestLineId(l.id);
-            }}
+            onSelectLine={handleSelectLine}
             onSelectTrain={setSelectedTrain}
             onDropTrainToLine={handleTrainDropOnLine}
             onSelectEmptySlot={(srcLineId, dstLineId, slotIdx) => {
@@ -540,10 +925,8 @@ export default function DepotScene({
             canLayout={canLayout}
             isFocusMode={isFocusMode}
             theme={appearance.theme}
-            onSelectLine={(l) => {
-              setSelectedLine(l);
-              setDestLineId(l.id);
-            }}
+            zoom={mapZoom}
+            onSelectLine={handleSelectLine}
             onSelectTrain={setSelectedTrain}
             onDropTrainToLine={handleTrainDropOnLine}
             onSelectEmptySlot={(srcLineId, dstLineId, slotIdx) => {
@@ -566,10 +949,7 @@ export default function DepotScene({
             canLayout={canLayout}
             isFocusMode={isFocusMode}
             theme={appearance.theme}
-            onSelectLine={(l) => {
-              setSelectedLine(l);
-              setDestLineId(l.id);
-            }}
+            onSelectLine={handleSelectLine}
             onSelectTrain={setSelectedTrain}
             onDropTrainToLine={handleTrainDropOnLine}
             onSelectEmptySlot={(srcLineId, dstLineId, slotIdx) => {
@@ -626,7 +1006,7 @@ export default function DepotScene({
           setManovrTrainId(train.id);
           setManovrDestLineId(train.lineId ?? "");
           setManovrSlotIdx(train.slotIndex);
-          setManovrType(4);
+          setManovrType(2); // پیش‌فرض سراسری: انتقال قطار (کد ۲)
           setSelectedTrain(null);
         }}
         onStartMoveManovr={(train) => {
@@ -662,12 +1042,19 @@ export default function DepotScene({
           const found = lines.find((l) => l.id === updated.id);
           if (found) (found as any).isActive = updated.isActive;
         }}
+        onTrainChange={(updated) => {
+          setTrains((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+        }}
       />
 
       {/* مودال شناور ثبت مانور سریع */}
       <DepotCreateManovrModal
         isOpen={showManovrModal}
-        onClose={() => setShowManovrModal(false)}
+        onClose={() => {
+          setShowManovrModal(false);
+          setQuickRahbar1("");
+          setQuickRahbar2("");
+        }}
         onSubmit={handleCreateManovrSubmit}
         lines={lines}
         trains={trains}

@@ -26,9 +26,14 @@ export default async function DepotPage() {
       select: { id: true, trainId: true, destinationLineId: true },
     }),
     prisma.personnel.findMany({
-      where: { orgPosition: 1 }, // پرسنل با سمت راهبر
-      select: { id: true, firstName: true, lastName: true },
-      orderBy: { lastName: "asc" },
+      where: {
+        OR: [
+          { orgPosition: 1 },
+          { isPartTimeDriver: true },
+        ],
+      },
+      select: { id: true, firstName: true, lastName: true, isPartTimeDriver: true, orgPosition: true },
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
     prisma.lookupValue.findMany({
       where: {
@@ -104,7 +109,10 @@ export default async function DepotPage() {
           lines={lines}
           initialTrains={trains}
           activeManovrs={activeManovrs}
-          rahbaran={rahbaran.map((r) => ({ id: r.id, name: `${r.firstName} ${r.lastName}`.trim() }))}
+          rahbaran={rahbaran.map((r) => ({
+            id: r.id,
+            name: `${r.firstName} ${r.lastName}${r.isPartTimeDriver && r.orgPosition !== 1 ? " (راهبر غیردائم)" : ""}`.trim(),
+          }))}
           terminals={terminals as any[]}
           manovrTypes={manovrTypeLookup?.values || []}
           canLayout={canLayout}

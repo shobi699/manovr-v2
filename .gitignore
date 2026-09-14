@@ -63,3 +63,13 @@ graphify-out/
 ~$*
 *.docx
 *.pdf
+
+# SQLite temporary WAL and lock files
+prisma/*.db-shm
+prisma/*.db-wal
+prisma/*.db.backup-*
+
+# Test outputs & virtual test shares
+test-results/
+playwright-report/
+tests/virtual-network-share/
