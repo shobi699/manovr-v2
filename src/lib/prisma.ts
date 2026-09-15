@@ -31,6 +31,18 @@ function createPrismaClient(): PrismaClient {
         await baseClient.$queryRawUnsafe("PRAGMA temp_store = MEMORY;");
         await baseClient.$queryRawUnsafe("PRAGMA cache_size = -32000;"); // ۳۲ مگابایت کش حافظه
         await baseClient.$queryRawUnsafe("PRAGMA locking_mode = NORMAL;");
+
+        // اعتبارسنجی و ارتقای خودکار ساختار دیتابیس (Auto-Migration) بدون از دست رفتن داده‌ها
+        try {
+          const tableCols = (await baseClient.$queryRawUnsafe('PRAGMA table_info("Personnel");')) as Array<{ name: string }>;
+          const hasCol = Array.isArray(tableCols) && tableCols.some((c) => c.name === 'isPartTimeDriver');
+          if (!hasCol) {
+            await baseClient.$executeRawUnsafe('ALTER TABLE "Personnel" ADD COLUMN "isPartTimeDriver" BOOLEAN NOT NULL DEFAULT 0;');
+            await baseClient.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "Personnel_isPartTimeDriver_idx" ON "Personnel"("isPartTimeDriver");');
+          }
+        } catch {
+          // در صورت بروز خطای موقت مانع اجرای نرم‌افزار نشود
+        }
         pragmasConfigured = true;
       } catch {
         // در صورت بروز خطای موقت، مانع اجرای کوئری نشود
