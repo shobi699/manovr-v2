@@ -69,6 +69,8 @@ export const ALL_PERMS = [
   "backup.manage",    // پشتیبان‌گیری و بازگردانی دیتابیس
   "settings.global",  // تنظیمات سراسری سیستم
   "updater.manage",   // مدیریت پچ‌ها و به‌روزرسانی سیستم
+  "system.diagnostics", // عیب‌یابی پایگاه داده و شبکه متمرکز دپو
+  "logs.diagnostics",   // مشاهده و استخراج لاگ‌های تشخیصی سیستم
 ] as const;
 
 export type Perm = (typeof ALL_PERMS)[number];
@@ -127,6 +129,8 @@ export const PERM_LABELS: Record<Perm, string> = {
   "backup.manage": "پشتیبان‌گیری و بازگردانی پایگاه‌داده",
   "settings.global": "پیکربندی سراسری و پارامترهای پایانه",
   "updater.manage": "بررسی، دریافت و اعمال پچ‌های به‌روزرسانی",
+  "system.diagnostics": "عیب‌یابی پایگاه داده و شبکه متمرکز دپو",
+  "logs.diagnostics": "مشاهده و استخراج لاگ‌های تشخیصی سیستم",
 };
 
 export interface PermGroup {
@@ -213,8 +217,18 @@ export const PERM_GROUPS: Record<string, PermGroup> = {
   admin: {
     label: "تنظیمات سیستمی و امنیت",
     icon: "⚙️",
-    description: "تنظیمات سراسری، برندینگ، لوکاپ‌ها، ممیزی، بکاپ و پچ",
-    perms: ["settings.global", "branding.manage", "lookups.manage", "audit.view", "audit.export", "backup.manage", "updater.manage"],
+    description: "تنظیمات سراسری، عیب‌یابی شبکه، لاگ‌های تشخیصی، برندینگ، ممیزی و بکاپ",
+    perms: [
+      "settings.global",
+      "system.diagnostics",
+      "logs.diagnostics",
+      "branding.manage",
+      "lookups.manage",
+      "audit.view",
+      "audit.export",
+      "backup.manage",
+      "updater.manage",
+    ],
   },
 };
 
@@ -231,7 +245,8 @@ const LEGACY: Record<number, string[]> = {
     "user.view", "user.create", "user.edit", "user.delete",
     "phonebook.view", "phonebook.edit", "report.build", "report.export", "report.schedule",
     "ticket.view", "ticket.create", "ticket.manage",
-    "depot.view", "dashboard.view", "help.view", "about.view", "settings.global"
+    "depot.view", "dashboard.view", "help.view", "about.view", "settings.global",
+    "system.diagnostics", "logs.diagnostics"
   ],
   3: [
     "manovr.view", "manovr.report", "train.view", "line.view", "terminal.view",

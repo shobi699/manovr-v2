@@ -22,6 +22,17 @@ export interface OfflineAction {
   userFullName?: string | null;
 }
 
+export interface OfflineSyncStatus {
+  queueLength: number;
+  hasStaleItems: boolean;
+  staleWarningMessage: string | null;
+  oldestItemAgeMs: number;
+  oldestItemTimestamp: string | null;
+  policy: "auto_sync" | "read_only";
+  isSyncing: boolean;
+  lastSyncAttempt: string | null;
+}
+
 const OFFLINE_QUEUE_KEY = "offline_sync_queue";
 
 /**
@@ -65,6 +76,89 @@ export async function getOfflineQueue(): Promise<OfflineAction[]> {
 
   return [];
 }
+
+// وضعیت سراسری همگام‌سازی در حافظه
+let globalIsSyncing = false;
+let globalLastSyncAttempt: string | null = null;
+let syncIntervalHandle: NodeJS.Timeout | null = null;
+
+
+/**
+ * دریافت وضعیت تحلیلی صف و بررسی هشدارهای ماندگاری بیش از ۱۰ دقیقه
+ */
+export async function getOfflineSyncStatus(): Promise<OfflineSyncStatus> {
+  const queue = await getOfflineQueue();
+  const policy = await getOfflinePolicy();
+  const now = Date.now();
+
+  let oldestAge = 0;
+  let oldestTimestamp: string | null = null;
+  let hasStale = false;
+
+  for (const item of queue) {
+    const itemTime = new Date(item.timestamp).getTime();
+    if (!isNaN(itemTime)) {
+      const age = now - itemTime;
+      if (age > oldestAge) {
+        oldestAge = age;
+        oldestTimestamp = item.timestamp;
+      }
+      // بررسی سقف ماندگاری بیش از ۱۰ دقیقه (۶۰۰،۰۰۰ میلی‌ثانیه)
+      if (age > 10 * 60 * 1000) {
+        hasStale = true;
+      }
+    }
+  }
+
+  const staleWarningMessage = hasStale
+    ? "هشدار: برخی اقدامات بیش از ۱۰ دقیقه است که در صف آفلاین مانده‌اند و به سرور دپو ارسال نشده‌اند. لطفاً اتصال شبکه یا مجوزهای پوشه اشتراکی را بررسی کنید."
+    : null;
+
+  return {
+    queueLength: queue.length,
+    hasStaleItems: hasStale,
+    staleWarningMessage,
+    oldestItemAgeMs: oldestAge,
+    oldestItemTimestamp: oldestTimestamp,
+    policy,
+    isSyncing: globalIsSyncing,
+    lastSyncAttempt: globalLastSyncAttempt,
+  };
+}
+
+/**
+ * راه‌اندازی ورکر پس‌زمینه جهت تلاش خودکار هر ۶۰ ثانیه (۱ دقیقه) برای تخلیه صف آفلاین به سرور
+ */
+export function startOfflineSyncBackgroundWorker(): void {
+  if (syncIntervalHandle) return;
+
+  if (typeof setInterval !== "undefined") {
+    syncIntervalHandle = setInterval(async () => {
+      try {
+        const netStatus = await getNetworkStatus();
+        if (netStatus.isShared && netStatus.isDatabaseReady) {
+          const queue = await getOfflineQueue();
+          if (queue.length > 0) {
+            console.log(`[OfflineSyncWorker] تلاش خودکار دوره‌ای (۱ دقیقه) برای همگام‌سازی ${queue.length} رکورد آفلاین...`);
+            await syncOfflineActionsToServer();
+          }
+        }
+      } catch (err) {
+        console.error("[OfflineSyncWorker] خطا در چرخه زمان‌بندی همگام‌سازی:", err);
+      }
+    }, 60 * 1000); // دقیقاً ۶۰ ثانیه
+
+    if (syncIntervalHandle.unref) {
+      syncIntervalHandle.unref();
+    }
+  }
+}
+
+// فعال‌سازی خودکار ورکر پس‌زمینه در محیط‌های سرور
+if (typeof process !== "undefined" && process.env.NODE_ENV !== "test") {
+  startOfflineSyncBackgroundWorker();
+}
+
 
 /**
  * ذخیره لیست صف رکوردهای آفلاین
@@ -123,179 +217,216 @@ export async function syncOfflineActionsToServer(): Promise<{
   syncedCount: number;
   message: string;
 }> {
-  // ۱. بررسی وضعیت اتصال به سرور دپو
-  const netStatus = await getNetworkStatus();
-  if (!netStatus.isShared || !netStatus.isDatabaseReady) {
-    return {
-      success: false,
-      syncedCount: 0,
-      message: "ارتباط با سرور متمرکز دپو برقرار نیست؛ همگام‌سازی به تعویق افتاد.",
-    };
-  }
+  globalIsSyncing = true;
+  globalLastSyncAttempt = new Date().toISOString();
 
-  // ۲. دریافت صف اقدامات معوق
-  const queue = await getOfflineQueue();
-  if (queue.length === 0) {
-    return {
-      success: true,
-      syncedCount: 0,
-      message: "هیچ داده آفلاینی برای همگام‌سازی وجود ندارد.",
-    };
-  }
+  try {
+    // ۱. بررسی وضعیت اتصال به سرور دپو
+    const netStatus = await getNetworkStatus();
+    if (!netStatus.isShared || !netStatus.isDatabaseReady) {
+      return {
+        success: false,
+        syncedCount: 0,
+        message: "ارتباط با سرور متمرکز دپو برقرار نیست؛ همگام‌سازی به تعویق افتاد.",
+      };
+    }
 
-  // ۳. مرتب‌سازی زمانی اکید (Chronological Ordering)
-  // در صورتی که چندین کاربر هم‌زمان در زمان قطعی تغییراتی ثبت کرده باشند،
-  // تغییرات دقیقاً بر اساس ساعت و دقیقه ثبت (timestamp) اعمال می‌شوند تا تداخل‌ها به درستی حل شوند.
-  const sortedQueue = [...queue].sort((a, b) => {
-    const timeA = new Date(a.timestamp).getTime();
-    const timeB = new Date(b.timestamp).getTime();
-    return timeA - timeB;
-  });
+    // ۲. دریافت صف اقدامات معوق
+    const queue = await getOfflineQueue();
+    if (queue.length === 0) {
+      return {
+        success: true,
+        syncedCount: 0,
+        message: "هیچ داده آفلاینی برای همگام‌سازی وجود ندارد.",
+      };
+    }
 
-  console.log(`[OfflineSync] در حال پردازش و همگام‌سازی ${sortedQueue.length} اکشن آفلاین بر اساس ساعت ثبت...`);
+    // ۳. مرتب‌سازی زمانی اکید (Chronological Ordering)
+    // در صورتی که چندین کاربر هم‌زمان در زمان قطعی تغییراتی ثبت کرده باشند،
+    // تغییرات دقیقاً بر اساس ساعت و دقیقه ثبت (timestamp) اعمال می‌شوند تا تداخل‌ها به درستی حل شوند.
+    const sortedQueue = [...queue].sort((a, b) => {
+      const timeA = new Date(a.timestamp).getTime();
+      const timeB = new Date(b.timestamp).getTime();
+      return timeA - timeB;
+    });
 
-  let appliedCount = 0;
-  const failedActions: OfflineAction[] = [];
+    console.log(`[OfflineSync] در حال پردازش و همگام‌سازی ${sortedQueue.length} اکشن آفلاین بر اساس ساعت ثبت...`);
 
-  for (const item of sortedQueue) {
-    try {
-      const originalTime = new Date(item.timestamp);
+    let appliedCount = 0;
+    const failedActions: OfflineAction[] = [];
 
-      switch (item.actionType) {
-        case "CREATE_MANOVR": {
-          const mData = item.data;
-          // جلوگیری از درج تکراری با بررسی تطابق قطار، مبدا، مقصد و زمان ثبت
-          const existing = await prisma.manovr.findFirst({
-            where: {
-              trainId: mData.trainId,
-              sourceLineId: mData.sourceLineId,
-              destinationLineId: mData.destinationLineId,
-              createdAt: {
-                gte: new Date(originalTime.getTime() - 2000),
-                lte: new Date(originalTime.getTime() + 2000),
-              },
-            },
-          });
+    for (const item of sortedQueue) {
+      try {
+        const originalTime = new Date(item.timestamp);
+        const actorSession = item.userId
+          ? {
+              id: item.userId,
+              userName: item.userFullName || "کاربر آفلاین",
+              fullName: item.userFullName || "کاربر آفلاین",
+              role: 2,
+            }
+          : null;
 
-          if (!existing) {
-            const desc = mData.description
-              ? `${mData.description} (همگام‌سازی شده از حالت آفلاین)`
-              : "ثبت شده در حالت آفلاین و همگام‌سازی شده خودکار با سرور";
-
-            const createdManovr = await prisma.manovr.create({
-              data: {
-                type: mData.type || 2,
+        switch (item.actionType) {
+          case "CREATE_MANOVR": {
+            const mData = item.data;
+            // جلوگیری از درج تکراری با بررسی تطابق قطار، مبدا، مقصد و زمان ثبت
+            const existing = await prisma.manovr.findFirst({
+              where: {
                 trainId: mData.trainId,
                 sourceLineId: mData.sourceLineId,
                 destinationLineId: mData.destinationLineId,
-                rahbar1Id: mData.rahbar1Id,
-                rahbar2Id: mData.rahbar2Id || null,
-                creatorId: mData.creatorId || item.userId || null,
-                description: desc,
-                status: mData.status || 1,
-                executionTime: mData.executionTime ? new Date(mData.executionTime) : originalTime,
-                createdAt: originalTime, // حفظ دقیق ساعت ثبت آفلاین
+                createdAt: {
+                  gte: new Date(originalTime.getTime() - 2000),
+                  lte: new Date(originalTime.getTime() + 2000),
+                },
               },
             });
 
-            // در صورتی که مانور از نوع جابجایی قطار باشد، خط قطار نیز در سرور آپدیت شود
-            if (mData.destinationLineId) {
-              await prisma.train.update({
-                where: { id: mData.trainId },
+            if (!existing) {
+              const desc = mData.description
+                ? `${mData.description} (همگام‌سازی شده از حالت آفلاین)`
+                : "ثبت شده در حالت آفلاین و همگام‌سازی شده خودکار با سرور";
+
+              const createdManovr = await prisma.manovr.create({
                 data: {
-                  lineId: mData.destinationLineId,
-                  slotIndex: mData.slotIndex || 0,
+                  type: mData.type || 2,
+                  trainId: mData.trainId,
+                  sourceLineId: mData.sourceLineId,
+                  destinationLineId: mData.destinationLineId,
+                  rahbar1Id: mData.rahbar1Id,
+                  rahbar2Id: mData.rahbar2Id || null,
+                  creatorId: mData.creatorId || item.userId || null,
+                  description: desc,
+                  status: mData.status || 1,
+                  executionTime: mData.executionTime ? new Date(mData.executionTime) : originalTime,
+                  createdAt: originalTime, // حفظ دقیق ساعت ثبت آفلاین
                 },
               });
+
+              // در صورتی که مانور از نوع جابجایی قطار باشد، خط قطار نیز در سرور آپدیت شود
+              if (mData.destinationLineId) {
+                await prisma.train.update({
+                  where: { id: mData.trainId },
+                  data: {
+                    lineId: mData.destinationLineId,
+                    slotIndex: mData.slotIndex || 0,
+                  },
+                });
+              }
+
+              await audit(
+                actorSession,
+                "manovr",
+                createdManovr.id,
+                "CREATE",
+                null,
+                createdManovr,
+                `مانور آفلاین ثبت‌شده در ساعت ${item.timestamp} توسط ${item.userFullName || "کاربر"} با موفقیت در سرور ثبت شد.`
+              );
             }
+            appliedCount++;
+            break;
+          }
 
-            const actorSession = item.userId
-              ? {
-                  id: item.userId,
-                  userName: item.userFullName || "کاربر آفلاین",
-                  fullName: item.userFullName || "کاربر آفلاین",
-                  role: 2,
-                }
-              : null;
-
+          case "RELOCATE_TRAIN": {
+            const rData = item.data;
+            const before = await prisma.train.findUnique({ where: { id: rData.trainId } });
+            const after = await prisma.train.update({
+              where: { id: rData.trainId },
+              data: {
+                lineId: rData.destinationLineId,
+                slotIndex: rData.slotIndex || 0,
+              },
+            });
             await audit(
               actorSession,
-              "manovr",
-              createdManovr.id,
-              "CREATE",
-              null,
-              createdManovr,
-              `مانور آفلاین ثبت‌شده در ساعت ${item.timestamp} توسط ${item.userFullName || "کاربر"} با موفقیت در سرور ثبت شد.`
+              "train",
+              rData.trainId,
+              "UPDATE",
+              before,
+              after,
+              `جابجایی آفلاین قطار ${before?.code} به خط ${rData.destinationLineId} در سرور ثبت شد.`
             );
+            appliedCount++;
+            break;
           }
-          appliedCount++;
-          break;
-        }
 
-        case "RELOCATE_TRAIN": {
-          const rData = item.data;
-          await prisma.train.update({
-            where: { id: rData.trainId },
-            data: {
-              lineId: rData.destinationLineId,
-              slotIndex: rData.slotIndex || 0,
-            },
-          });
-          appliedCount++;
-          break;
-        }
+          case "UPDATE_TRAIN_STATUS": {
+            const sData = item.data;
+            const before = await prisma.train.findUnique({ where: { id: sData.trainId } });
+            const after = await prisma.train.update({
+              where: { id: sData.trainId },
+              data: {
+                status: sData.status,
+              },
+            });
+            await audit(
+              actorSession,
+              "train",
+              sData.trainId,
+              "UPDATE",
+              before,
+              after,
+              `تغییر وضعیت فنی آفلاین قطار ${before?.code} در سرور ثبت شد.`
+            );
+            appliedCount++;
+            break;
+          }
 
-        case "UPDATE_TRAIN_STATUS": {
-          const sData = item.data;
-          await prisma.train.update({
-            where: { id: sData.trainId },
-            data: {
-              status: sData.status,
-            },
-          });
-          appliedCount++;
-          break;
-        }
+          case "UPDATE_TRAIN_FLAGS": {
+            const fData = item.data;
+            const before = await prisma.train.findUnique({ where: { id: fData.trainId } });
+            const after = await prisma.train.update({
+              where: { id: fData.trainId },
+              data: {
+                ...(fData.hasKafshak !== undefined && { hasKafshak: fData.hasKafshak }),
+                ...(fData.noAtp !== undefined && { noAtp: fData.noAtp }),
+                ...(fData.movadDavvar !== undefined && { movadDavvar: fData.movadDavvar }),
+                ...(fData.noLicense !== undefined && { noLicense: fData.noLicense }),
+              },
+            });
+            await audit(
+              actorSession,
+              "train",
+              fData.trainId,
+              "UPDATE",
+              before,
+              after,
+              `بروزرسانی نشانگرهای فنی آفلاین قطار ${before?.code} در سرور ثبت شد.`
+            );
+            appliedCount++;
+            break;
+          }
 
-        case "UPDATE_TRAIN_FLAGS": {
-          const fData = item.data;
-          await prisma.train.update({
-            where: { id: fData.trainId },
-            data: {
-              ...(fData.hasKafshak !== undefined && { hasKafshak: fData.hasKafshak }),
-              ...(fData.noAtp !== undefined && { noAtp: fData.noAtp }),
-              ...(fData.movadDavvar !== undefined && { movadDavvar: fData.movadDavvar }),
-              ...(fData.noLicense !== undefined && { noLicense: fData.noLicense }),
-            },
-          });
-          appliedCount++;
-          break;
+          default:
+            break;
         }
-
-        default:
-          break;
+      } catch (err: any) {
+        console.error(`[OfflineSync] خطا در همگام‌سازی اکشن ${item.id}:`, err);
+        failedActions.push(item);
       }
-    } catch (err: any) {
-      console.error(`[OfflineSync] خطا در همگام‌سازی اکشن ${item.id}:`, err);
-      failedActions.push(item);
     }
+
+    // ۴. به‌روزرسانی صف با مواردی که با خطا مواجه شدند (در صورت وجود)
+    await saveOfflineQueue(failedActions);
+
+    // ۵. ارسال رویداد زنده SSE به تمامی کلاینت‌های شبکه تا نمای دپو فوراً به‌روز شود
+    try {
+      emitSSEEvent("manovr_changed", { syncedCount: appliedCount });
+      emitSSEEvent("train_changed", { syncedCount: appliedCount });
+    } catch {}
+
+    const successMessage = `${appliedCount} مورد ثبت‌شده در حالت آفلاین، بر اساس ساعت و دقیقه ثبت با موفقیت با سرور متمرکز دپو همگام‌سازی شد.`;
+    console.log(`[OfflineSync] نتیجه: ${successMessage}`);
+
+    return {
+      success: true,
+      syncedCount: appliedCount,
+      message: successMessage,
+    };
+  } finally {
+    globalIsSyncing = false;
   }
-
-  // ۴. به‌روزرسانی صف با مواردی که با خطا مواجه شدند (در صورت وجود)
-  await saveOfflineQueue(failedActions);
-
-  // ۵. ارسال رویداد زنده SSE به تمامی کلاینت‌های شبکه تا نمای دپو فوراً به‌روز شود
-  try {
-    emitSSEEvent("manovr_changed", { syncedCount: appliedCount });
-    emitSSEEvent("train_changed", { syncedCount: appliedCount });
-  } catch {}
-
-  const successMessage = `${appliedCount} مورد ثبت‌شده در حالت آفلاین، بر اساس ساعت و دقیقه ثبت با موفقیت با سرور متمرکز دپو همگام‌سازی شد.`;
-  console.log(`[OfflineSync] نتیجه: ${successMessage}`);
-
-  return {
-    success: true,
-    syncedCount: appliedCount,
-    message: successMessage,
-  };
 }
+

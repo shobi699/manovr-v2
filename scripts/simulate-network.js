@@ -8,20 +8,29 @@ const targetDb = path.join(virtualShareDir, 'network-dev.db');
 
 /**
  * Initializes the virtual simulated network share directory.
+ * @param {string} [customName] - Optional unique name to prevent parallel test collision
  */
-function setupVirtualNetworkShare() {
+function setupVirtualNetworkShare(customName) {
   if (!fs.existsSync(virtualShareDir)) {
     fs.mkdirSync(virtualShareDir, { recursive: true });
   }
 
+  const dbFileName = customName ? `${customName}.db` : `network-dev-${process.pid || 'default'}.db`;
+  const customTargetDb = path.join(virtualShareDir, dbFileName);
+
   if (fs.existsSync(sourceDb)) {
-    fs.copyFileSync(sourceDb, targetDb);
-    console.log(`[Virtual Network Share] پایگاه داده در پوشه شبکه مجازی کپی شد: ${targetDb}`);
+    try {
+      fs.copyFileSync(sourceDb, customTargetDb);
+      // پاکسازی هرگونه ژورنال موقت قبلی
+      if (fs.existsSync(`${customTargetDb}-wal`)) fs.unlinkSync(`${customTargetDb}-wal`);
+      if (fs.existsSync(`${customTargetDb}-shm`)) fs.unlinkSync(`${customTargetDb}-shm`);
+      console.log(`[Virtual Network Share] پایگاه داده در پوشه شبکه مجازی کپی شد: ${customTargetDb}`);
+    } catch {}
   }
 
   return {
     virtualShareDir,
-    targetDb,
+    targetDb: customTargetDb,
   };
 }
 
