@@ -353,7 +353,9 @@ function startNextServer(port) {
 
   function formatDatabaseUrl(rawPath) {
     const normalized = rawPath.replace(/\\/g, '/');
-    return `file:${normalized}`;
+    const isNetwork = normalized.startsWith('//') || normalized.includes('srvdfs01') || normalized.includes('data');
+    const params = isNetwork ? '?connection_limit=1&socket_timeout=60' : '?connection_limit=1';
+    return `file:${normalized}${params}`;
   }
 
   let serverCwd = app.isPackaged

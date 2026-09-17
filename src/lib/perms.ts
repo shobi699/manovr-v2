@@ -60,6 +60,7 @@ export const ALL_PERMS = [
   "dashboard.view",   // مشاهده داشبورد و شاخص‌های آماری
   // Help & Training
   "help.view",        // دسترسی به مرکز آموزش و دانشنامه
+  "about.view",       // مشاهده اطلاعات سامانه و درباره ما
   // Settings, Admin & Maintenance
   "lookups.manage",   // مدیریت مقادیر پویا و لوکاپ‌ها
   "branding.manage",  // تنظیمات هویت بصری و برندینگ
@@ -118,6 +119,7 @@ export const PERM_LABELS: Record<Perm, string> = {
   "depot.layout": "چیدمان سه‌بعدی پایانه و سوله‌ها",
   "dashboard.view": "مشاهده داشبورد و شاخص‌های آماری",
   "help.view": "مشاهده مرکز آموزش و راهنمای منوها",
+  "about.view": "مشاهده شناسنامه نرم‌افزار و درباره ما",
   "lookups.manage": "مدیریت مقادیر پویا و جداول پایه",
   "branding.manage": "شخصی‌سازی هویت بصری، نام و رنگ تم",
   "audit.view": "مشاهده لاگ وقایع امنیتی و ممیزی (Audit Log)",
@@ -206,7 +208,7 @@ export const PERM_GROUPS: Record<string, PermGroup> = {
     label: "مرکز آموزش و دانشنامه",
     icon: "📚",
     description: "مشاهده راهنمای تفصیلی منوها و آموزش‌های عملیاتی",
-    perms: ["help.view"],
+    perms: ["help.view", "about.view"],
   },
   admin: {
     label: "تنظیمات سیستمی و امنیت",
@@ -229,11 +231,11 @@ const LEGACY: Record<number, string[]> = {
     "user.view", "user.create", "user.edit", "user.delete",
     "phonebook.view", "phonebook.edit", "report.build", "report.export", "report.schedule",
     "ticket.view", "ticket.create", "ticket.manage",
-    "depot.view", "dashboard.view", "help.view", "settings.global"
+    "depot.view", "dashboard.view", "help.view", "about.view", "settings.global"
   ],
   3: [
     "manovr.view", "manovr.report", "train.view", "line.view", "terminal.view",
-    "phonebook.view", "report.export", "ticket.view", "depot.view", "dashboard.view", "help.view"
+    "phonebook.view", "report.export", "ticket.view", "depot.view", "dashboard.view", "help.view", "about.view"
   ],
   0: [],
 };
@@ -270,6 +272,7 @@ export function permsInclude(perms: string[], perm: Perm) {
 // چک مجوز برای server action ها
 export async function hasPerm(session: Session | null, perm: Perm): Promise<boolean> {
   if (!session) return false;
+  if (perm === "about.view") return true; // صفحه درباره ما برای تمام کاربران احراز هویت شده در دسترس است
   if (session.role === 4) return true; // سوپرادمین همواره به تمامی بخش‌ها دسترسی کامل دارد
   if (Array.isArray(session.perms)) {
     if (session.perms.includes(perm)) return true;

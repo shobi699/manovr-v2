@@ -102,7 +102,8 @@ function copyAssets() {
     console.log('Cleaning unneeded directories and files from standalone...');
     const dirsToRemove = [
       'export', 'backups', 'data', 'seed', 'plans', '.agents', '.claude', 'graphify-out',
-      'e2e', 'e2e-skills-1.16.0', 'qa-skills-1.13.3', 'workflows', 'docs', 'test-results', '.playwright'
+      'e2e', 'e2e-skills-1.16.0', 'qa-skills-1.13.3', 'workflows', 'docs', 'test-results', '.playwright',
+      '.specify', 'specs', '.git', '.github', '.idea', '.vscode', 'tests'
     ];
     dirsToRemove.forEach(d => {
       const p = path.join(standaloneDir, d);
@@ -114,7 +115,7 @@ function copyAssets() {
 
     fs.readdirSync(standaloneDir).forEach(f => {
       const ext = path.extname(f).toLowerCase();
-      if (['.exe', '.rar', '.zip', '.docx', '.pdf'].includes(ext) || f.startsWith('ManovrSystem')) {
+      if (['.exe', '.rar', '.zip', '.docx', '.pdf', '.md', '.log', '.tmp', '.markdown'].includes(ext) || f.startsWith('ManovrSystem') || f.startsWith('AGENTS') || f.startsWith('CLAUDE') || f.startsWith('README')) {
         try {
           fs.unlinkSync(path.join(standaloneDir, f));
           console.log(`Cleaned file from standalone: ${f}`);

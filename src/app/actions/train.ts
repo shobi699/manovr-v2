@@ -89,30 +89,37 @@ export async function updateTrain(
 
   const dup = await prisma.train.findFirst({ where: { code, NOT: { id } } });
   if (dup) return { error: "قطاری با این کد وجود دارد." };
-  const after = await prisma.train.update({
-    where: { id },
-    data: {
-      code,
-      type,
-      lineId,
-      ...(slotIndex !== null && slotIndex !== undefined ? { slotIndex } : {}),
-      isDisposed,
-      hasKafshak,
-      noAtp,
-      movadDavvar,
-      noLicense,
-    },
-  });
+  try {
+    const after = await prisma.train.update({
+      where: { id },
+      data: {
+        code,
+        type,
+        lineId,
+        ...(slotIndex !== null && slotIndex !== undefined ? { slotIndex } : {}),
+        isDisposed,
+        hasKafshak,
+        noAtp,
+        movadDavvar,
+        noLicense,
+      },
+    });
 
-  await audit(
-    session,
-    "train",
-    id,
-    "UPDATE",
-    before,
-    after,
-    `مشخصات قطار پلاک ${code} به‌روزرسانی گردید.`
-  );
+    await audit(
+      session,
+      "train",
+      id,
+      "UPDATE",
+      before,
+      after,
+      `مشخصات قطار پلاک ${code} به‌روزرسانی گردید.`
+    );
+  } catch (err: unknown) {
+    console.error("[Train Update Error]", err);
+    return {
+      error: "خطا در ثبت اطلاعات قطار در دیتابیس شبکه. لطفاً چند لحظه بعد مجدداً تلاش نمایید.",
+    };
+  }
 
   revalidatePath("/trains");
   revalidatePath("/dashboard");

@@ -61,12 +61,16 @@ describe("Terminal Database Integrity & Concurrency Stress Test", () => {
   });
 
   afterAll(async () => {
-    // پاکسازی کامل رکوردها پس از اتمام تست با تحمل تاخیر و بسته‌شدن ترنزکشن‌ها
+    // پاکسازی رکوردها با محافظ زمانی برای جلوگیری از معطلی هوک
     try {
-      await new Promise((r) => setTimeout(r, 200));
-      await prisma.manovr.deleteMany({ where: { destinationLineId: testLineId } });
-      await prisma.train.deleteMany({ where: { id: { in: [testTrain1Id, testTrain2Id] } } });
-      await prisma.line.deleteMany({ where: { id: testLineId } });
+      await Promise.race([
+        (async () => {
+          await prisma.manovr.deleteMany({ where: { destinationLineId: testLineId } }).catch(() => {});
+          await prisma.train.deleteMany({ where: { id: { in: [testTrain1Id, testTrain2Id] } } }).catch(() => {});
+          await prisma.line.deleteMany({ where: { id: testLineId } }).catch(() => {});
+        })(),
+        new Promise((r) => setTimeout(r, 2000)),
+      ]);
     } catch {}
   });
 

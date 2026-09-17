@@ -238,6 +238,53 @@ function build() {
       }
     });
 
+    // کپی اسکریپت‌های عیب‌یابی، تعمیر و رفع محدودیت‌های دیتابیس و شبکه
+    const toolScripts = [
+      'repair-server-db.bat',
+      'repair-server-db.ps1',
+      'check-database-permissions.bat',
+      'check-database-permissions.ps1'
+    ];
+    toolScripts.forEach(scriptFile => {
+      const src = path.join(rootDir, scriptFile);
+      if (fs.existsSync(src)) {
+        fs.copyFileSync(src, path.join(exportDir, scriptFile));
+        fs.copyFileSync(src, path.join(distDir, scriptFile));
+        if (fs.existsSync(exportUnpackedDir)) {
+          fs.copyFileSync(src, path.join(exportUnpackedDir, scriptFile));
+        }
+        console.log(`Copied maintenance tool to package: ${scriptFile}`);
+      }
+    });
+
+    // کپی اسکریپت تخصصی repair-network-db.mjs به پوشه scripts در پکیج‌ها
+    const repairMjsSrc = path.join(rootDir, 'scripts', 'repair-network-db.mjs');
+    if (fs.existsSync(repairMjsSrc)) {
+      const exportScriptsDir = path.join(exportDir, 'scripts');
+      const distScriptsDir = path.join(distDir, 'scripts');
+      fs.mkdirSync(exportScriptsDir, { recursive: true });
+      fs.mkdirSync(distScriptsDir, { recursive: true });
+      fs.copyFileSync(repairMjsSrc, path.join(exportScriptsDir, 'repair-network-db.mjs'));
+      fs.copyFileSync(repairMjsSrc, path.join(distScriptsDir, 'repair-network-db.mjs'));
+      if (fs.existsSync(exportUnpackedDir)) {
+        const unpackedScriptsDir = path.join(exportUnpackedDir, 'scripts');
+        fs.mkdirSync(unpackedScriptsDir, { recursive: true });
+        fs.copyFileSync(repairMjsSrc, path.join(unpackedScriptsDir, 'repair-network-db.mjs'));
+      }
+      console.log('Copied repair-network-db.mjs to scripts folders.');
+    }
+
+    // کپی راهنمای جامع رفع محدودیت و دسترسی دیتابیس
+    const dbGuideSrc = path.join(rootDir, 'راهنمای_جامع_رفع_محدودیت_و_دسترسی_دیتابیس.md');
+    if (fs.existsSync(dbGuideSrc)) {
+      fs.copyFileSync(dbGuideSrc, path.join(exportDir, 'راهنمای_جامع_رفع_محدودیت_و_دسترسی_دیتابیس.md'));
+      fs.copyFileSync(dbGuideSrc, path.join(distDir, 'راهنمای_جامع_رفع_محدودیت_و_دسترسی_دیتابیس.md'));
+      if (fs.existsSync(exportUnpackedDir)) {
+        fs.copyFileSync(dbGuideSrc, path.join(exportUnpackedDir, 'راهنمای_جامع_رفع_محدودیت_و_دسترسی_دیتابیس.md'));
+      }
+      console.log('Copied database permissions guide to packages.');
+    }
+
     // آماده‌سازی اولیه پوشه data در export برای استفاده در شبکه
     const exportDataDir = path.join(exportDir, 'data', 'database');
     if (!fs.existsSync(exportDataDir)) {
@@ -288,7 +335,7 @@ function build() {
 آدرس پیش‌فرض پوشه اشتراکی شبکه در فایل manovr-config.json:
 \\\\srvdfs01\\Line1\\Depo\\data
 
-محتویات این بسته خروجی (نسخه ${version}):
+محتویات این بسته خروجی (نسخه ${version} - تاریخ ۲۵ شهریور ۱۴۰۵):
 ----------------------------------------------------------------------
 ۱. پوشه استخراج‌شده آماده استقرار در شبکه (بدون نیاز به نصب): ManovrSystem/
    - این پوشه را مستقیماً داخل پوشه اشتراکی شبکه سرور کپی کنید.
@@ -299,14 +346,20 @@ function build() {
    - جهت نصب محلی دائمی با قابلیت ایجاد میانبر خودکار.
 ۴. فایل پرتابل تک‌فایلی: ManovrSystem-Portable-${version}.exe و ManovrSystem ${version}.exe
    - نسخه سبک و قابل حمل بر روی فلش‌مموری یا سیستم‌های اضطراری.
-۵. فایل تنظیمات شبکه: manovr-config.json
+۵. ابزار تست و عیب‌یابی دسترسی شبکه و دیتابیس: check-database-permissions.bat
+   - بررسی خودکار اتصال، مجوز نوشتن، قفل فایل و سلامت دیتابیس بدون نیاز به ابزار اضافی.
+۶. ابزار تخصصی آزادسازی قفل و تعمیر دیتابیس سرور: repair-server-db.bat
+   - پاکسازی قفل‌ها، ادغام لاگ‌ها و تثبیت حالت TRUNCATE دیتابیس سرور.
+۷. راهنمای جامع رفع محدودیت و دسترسی دیتابیس: راهنمای_جامع_رفع_محدودیت_و_دسترسی_دیتابیس.md
+   - راهنمای فنی، تنظیمات Share & NTFS، رفع خطای ۲۵۷۰ دیسک و تنظیمات آنتی‌ویروس.
+۸. فایل تنظیمات شبکه: manovr-config.json
    - تعیین‌کننده مسیر پایگاه داده مشترک شبکه.
-۶. پوشه data/database/dev.db
+۹. پوشه data/database/dev.db
    - پایگاه داده متمرکز اولیه SQLite بهینه‌شده برای شبکه.
 
 روش پیشنهادی استقرار فوق‌سریع در شبکه:
 ----------------------------------------------------------------------
-۱. پوشه «ManovrSystem» را همراه با پوشه «data» و فایل «manovr-config.json» داخل مسیر شبکه زیر قرار دهید:
+۱. پوشه «ManovrSystem» را همراه با پوشه «data»، اسکریپت‌ها و فایل «manovr-config.json» داخل مسیر شبکه سرور قرار دهید:
    \\\\srvdfs01\\Line1\\Depo\\
 
 ۲. روی سیستم هر همکار یا کلاینت، وارد مسیر فوق شده و روی فایل «create-client-shortcut.bat» دوبار کلیک کنید.
@@ -338,12 +391,19 @@ function build() {
     const explicitExe = path.join(distDir, `ManovrSystem ${version}.exe`);
     const setupExe = path.join(distDir, `ManovrSystem Setup ${version}.exe`);
     const userGuide = path.join(distDir, 'USER_GUIDE.md');
+    const dbGuide = path.join(distDir, 'راهنمای_جامع_رفع_محدودیت_و_دسترسی_دیتابیس.md');
 
     const manifestData = {
-      manifestId: `MANOVR-DIST-20260915-011`,
+      manifestId: `MANOVR-DIST-20260915-012`,
       productName: 'ManovrSystem - سامانه هوشمند مدیریت پایانه و مانور فتح‌آباد',
       version: version,
+      buildDate: '2026-09-15',
       buildDateJalali: '۱۴۰۵/۰۶/۲۵',
+      developer: 'سید شبیر موسوی',
+      sponsors: [
+        'مدیریت عملیات خط یک شرکت بهره‌برداری راه‌آهن شهری تهران و حومه',
+        'ریاست عملیات پایانه و مانور خط یک'
+      ],
       distributionDirectory: 'D:/manovr-build-dist',
       artifacts: [
         {
@@ -375,11 +435,18 @@ function build() {
         },
         {
           format: 'UNPACKED_DIR',
-          fileName: 'win-unpacked',
-          relativePath: 'win-unpacked',
+          fileName: 'ManovrSystem',
+          relativePath: 'ManovrSystem',
           sizeBytes: getDirSize(unpackedDir),
           sizeFormatted: (getDirSize(unpackedDir) / (1024*1024)).toFixed(1) + ' MB',
           verifiedExecutable: true
+        },
+        {
+          format: 'DOCUMENTATION',
+          fileName: 'راهنمای_جامع_رفع_محدودیت_و_دسترسی_دیتابیس.md',
+          relativePath: 'راهنمای_جامع_رفع_محدودیت_و_دسترسی_دیتابیس.md',
+          sizeBytes: fs.existsSync(dbGuide) ? fs.statSync(dbGuide).size : 0,
+          sha256Hash: getHash(dbGuide)
         },
         {
           format: 'USER_GUIDE',
@@ -401,6 +468,41 @@ function build() {
 
     fs.writeFileSync(path.join(distDir, 'distribution-manifest.json'), JSON.stringify(manifestData, null, 2), 'utf8');
     fs.writeFileSync(path.join(exportDir, 'distribution-manifest.json'), JSON.stringify(manifestData, null, 2), 'utf8');
+    console.log('Successfully generated distribution-manifest.json in both dist and export directories.');
+
+    // ساخت مانیفست version.json سازگار با ماژول auto-updater
+    const versionManifest = {
+      version: version,
+      releaseDate: '2026-09-15T18:00:00Z',
+      releaseDateJalali: '۱۴۰۵/۰۶/۲۵',
+      minSupportedVersion: '0.1.0',
+      packageType: 'full',
+      packageFile: `ManovrSystem-Portable-${version}.exe`,
+      sha256: getHash(portableExe) || '0000000000000000000000000000000000000000000000000000000000000000',
+      fileSizeBytes: fs.existsSync(portableExe) ? fs.statSync(portableExe).size : 1,
+      mandatory: false,
+      changelog: {
+        highlights: [
+          'ارتقای نگارش رسمی به ۰.۱.۲',
+          'افزودن صفحه اختصاصی درباره ما و شناسنامه سامانه',
+          'تثبیت قطعی پایداری شبکه و پایگاه داده سرور'
+        ],
+        features: [
+          'صفحه درباره ما و شناسنامه سامانه با معرفی مدیریت عملیات خط یک، ریاست پایانه و مانور و برنامه‌نویس',
+          'ابزار عیب‌یابی و بررسی مجوزهای شبکه و دیتابیس (check-database-permissions)',
+          'ابزار آزادسازی و تعمیر دیتابیس مشترک سرور (repair-server-db)'
+        ],
+        fixes: [
+          'حل قطعی خطای ۲۵۷۰ SQLite (SQLITE_IOERR_DELETE) با تبدیل ژورنال به TRUNCATE',
+          'محاسبه دقیق تاخیر فیزیکی دیسک شبکه (Physical Ping)',
+          'ایزولاسیون تراکنش‌های شبکه و صف‌بندی با Exponential Backoff'
+        ]
+      },
+      targetPlatform: 'win-x64'
+    };
+    fs.writeFileSync(path.join(distDir, 'version.json'), JSON.stringify(versionManifest, null, 2), 'utf8');
+    fs.writeFileSync(path.join(exportDir, 'version.json'), JSON.stringify(versionManifest, null, 2), 'utf8');
+    console.log('Successfully generated version.json for auto-updater.');
     console.log('Successfully generated distribution-manifest.json in both dist and export directories.');
 
     console.log('Success! Optimized build completed successfully.');

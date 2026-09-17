@@ -58,6 +58,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/tickets", icKey: "Tickets", label: "تیکت‌های پشتیبانی", perm: "ticket.view" },
       { href: "/reports", icKey: "Reports", label: "گزارش‌ساز پویا", perm: "report.build" },
       { href: "/help", icKey: "Help", label: "راهنما و آموزش", perm: "help.view" },
+      { href: "/about", icKey: "Info", label: "درباره ما" },
       { href: "/settings", icKey: "Settings", label: "شخصی‌سازی تم" },
       { href: "/admin/terminals", icKey: "Lookups", label: "مدیریت ترمینال‌ها", perm: "terminal.view" },
       { href: "/admin/lookups", icKey: "Lookups", label: "مدیریت مقادیر پویا", perm: "lookups.manage" },
@@ -185,6 +186,7 @@ export default function Sidebar({
     const checkPermission = (perm?: string) => {
       if (role === 4) return true; // سوپرادمین به همه جا دسترسی دارد
       if (!perm) return true;
+      if (perm === "about.view") return true;
       if (perms.includes(perm)) return true;
       if (perm === "ticket.view") {
         return perms.includes("ticket.view") || perms.includes("ticket.create") || perms.includes("ticket.manage");
@@ -510,14 +512,27 @@ export default function Sidebar({
             direction: "rtl",
           }}
         >
-          {isCollapsed ? (
-            <span title="سامانه مانور نسخه ۰.۱.۱ — توسعه: سید شبیر موسوی">v0.1.1</span>
-          ) : (
-            <div>
-              سامانه مانور دپو · نسخه ۰.۱.۱
-              <div style={{ marginTop: "2px", fontWeight: 500 }}>توسعه توسط سید شبیر موسوی © ۲۰۲۶</div>
-            </div>
-          )}
+          <Link
+            href="/about"
+            style={{
+              textDecoration: "none",
+              color: "inherit",
+              display: "block",
+              borderRadius: "6px",
+              padding: "4px",
+              transition: "background-color 0.2s, color 0.2s",
+            }}
+            title="مشاهده شناسنامه سامانه و اطلاعات درباره ما"
+          >
+            {isCollapsed ? (
+              <span title="سامانه مانور نسخه ۰.۱.۲ (۱۴۰۵/۰۶/۲۵) — توسعه: سید شبیر موسوی">v0.1.2</span>
+            ) : (
+              <div>
+                <span style={{ fontWeight: 600 }}>سامانه مانور دپو · نسخه ۰.۱.۲</span>
+                <div style={{ marginTop: "2px", fontSize: "9.5px", color: "var(--ink-faint)" }}>۲۵ شهریور ۱۴۰۵ · توسعه توسط سید شبیر موسوی</div>
+              </div>
+            )}
+          </Link>
         </div>
       </div>
     </aside>

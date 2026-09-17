@@ -1,5 +1,8 @@
 {
   "sharedDataPath": "\\\\srvdfs01\\Line1\\Depo\\data",
   "fallbackToLocal": true,
+  "appVersion": "0.1.2",
+  "buildDate": "2026-09-15",
+  "buildDateJalali": "۱۴۰۵/۰۶/۲۵",
   "description": "پیکربندی مسیر متمرکز پایگاه داده و تنظیمات امنیتی سامانه دپو و مانور پایانه فتح‌آباد"
 }

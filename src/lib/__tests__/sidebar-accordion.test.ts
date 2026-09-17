@@ -6,6 +6,7 @@ describe("Sidebar Collapsible Accordion Logic", () => {
     { href: "/tickets", label: "تیکت‌های پشتیبانی" },
     { href: "/reports", label: "گزارش‌ساز پویا" },
     { href: "/help", label: "راهنما و آموزش" },
+    { href: "/about", label: "درباره ما" },
     { href: "/settings", label: "شخصی‌سازی تم" },
     { href: "/admin/terminals", label: "مدیریت ترمینال‌ها" },
     { href: "/admin/lookups", label: "مدیریت مقادیر پویا" },
@@ -21,8 +22,9 @@ describe("Sidebar Collapsible Accordion Logic", () => {
     return path === href || (path.startsWith(href) && href !== "/dashboard" && href !== "/depot");
   };
 
-  it("contains exactly 10 analysis and settings sub-items", () => {
-    expect(analysisItems).toHaveLength(10);
+  it("contains exactly 11 analysis and settings sub-items including about us", () => {
+    expect(analysisItems).toHaveLength(11);
+    expect(analysisItems.some((i) => i.href === "/about")).toBe(true);
   });
 
   it("detects active nested routes for auto-expansion", () => {

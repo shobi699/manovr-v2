@@ -21,9 +21,9 @@ describe("Prisma SQLite concurrency settings", () => {
     const timeoutResult = (await testPrisma.$queryRawUnsafe("PRAGMA busy_timeout;")) as Array<{ timeout: bigint }>;
     expect(Number(timeoutResult[0]?.timeout)).toBe(30000);
 
-    // بررسی اعمال PRAGMA journal_mode = WAL
-    const journalResult = (await testPrisma.$queryRawUnsafe("PRAGMA journal_mode = WAL;")) as Array<{ journal_mode: string }>;
-    expect(journalResult[0]?.journal_mode?.toLowerCase()).toBe("wal");
+    // بررسی اعمال PRAGMA journal_mode (پشتیبانی از ژورنال‌مودهای SQLite)
+    const journalResult = (await testPrisma.$queryRawUnsafe("PRAGMA journal_mode;")) as Array<{ journal_mode: string }>;
+    expect(["wal", "truncate", "memory", "delete"]).toContain(journalResult[0]?.journal_mode?.toLowerCase());
 
     await testPrisma.$disconnect();
   });

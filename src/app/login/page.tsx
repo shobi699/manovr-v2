@@ -54,7 +54,7 @@ export default async function LoginPage() {
           paddingTop: "14px",
         }}>
           برنامه‌نویسی و توسعه توسط <b>سید شبیر موسوی</b>
-          <div style={{ marginTop: "4px", fontSize: "10px" }}>سامانه نسخه ۰.۱.۱ • حق تکثیر محفوظ است © ۲۰۲۶</div>
+          <div style={{ marginTop: "4px", fontSize: "10px" }}>سامانه نسخه ۰.۱.۲ • ۲۵ شهریور ۱۴۰۵ • حق تکثیر محفوظ است © ۲۰۲۶</div>
         </div>
       </div>
     </div>
