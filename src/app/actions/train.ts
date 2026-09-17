@@ -13,7 +13,7 @@ import {
 } from "@/lib/validations";
 import { getOfflinePolicy } from "@/lib/settings";
 import { getNetworkStatus } from "@/lib/network-status";
-import { recordOfflineAction } from "@/lib/offline-sync";
+import { recordOfflineAction, withFastOfflineFallback } from "@/lib/offline-sync";
 
 export async function createTrain(
   _prev: { error?: string } | null,
@@ -204,33 +204,39 @@ export async function relocateTrainDirectly(
     }
 
     const before = await prisma.train.findUnique({ where: { id: trainId } });
-    const after = await prisma.train.update({
-      where: { id: trainId },
-      data: { lineId, slotIndex },
-    });
 
-    await audit(
-      session,
-      "train",
-      trainId,
-      "UPDATE",
-      before,
-      after,
-      `قطار پلاک ${before?.code} مستقیماً روی نقشه دپو جابجا شد.`
-    );
+    const executeRelocateOnServer = async () => {
+      const after = await prisma.train.update({
+        where: { id: trainId },
+        data: { lineId, slotIndex },
+      });
+
+      await audit(
+        session,
+        "train",
+        trainId,
+        "UPDATE",
+        before,
+        after,
+        `قطار پلاک ${before?.code} مستقیماً روی نقشه دپو جابجا شد.`
+      );
+      return after;
+    };
+
+    const handleOfflineFallback = async () => {
+      await recordOfflineAction({
+        actionType: "RELOCATE_TRAIN",
+        data: { trainId, destinationLineId: lineId, slotIndex },
+        timestamp: new Date().toISOString(),
+        userId: session.id,
+        userFullName: (session as any).name || (session as any).username || "کاربر سیستم",
+      });
+    };
 
     if (!netStatus.isShared) {
-      try {
-        await recordOfflineAction({
-          actionType: "RELOCATE_TRAIN",
-          data: { trainId, destinationLineId: lineId, slotIndex },
-          timestamp: new Date().toISOString(),
-          userId: session.id,
-          userFullName: (session as any).name || (session as any).username || "کاربر سیستم",
-        });
-      } catch (e) {
-        console.error("[relocateTrainDirectly] خطا در ثبت صف آفلاین:", e);
-      }
+      await handleOfflineFallback();
+    } else {
+      await withFastOfflineFallback(executeRelocateOnServer, handleOfflineFallback, 3000);
     }
 
     revalidatePath("/depot");
@@ -259,33 +265,39 @@ export async function updateTrainStatus(trainId: number, status: number) {
 
   try {
     const before = await prisma.train.findUnique({ where: { id: trainId } });
-    const after = await prisma.train.update({
-      where: { id: trainId },
-      data: { status },
-    });
 
-    await audit(
-      session,
-      "train",
-      trainId,
-      "UPDATE",
-      before,
-      after,
-      `وضعیت فنی قطار پلاک ${before?.code} تغییر یافت.`
-    );
+    const executeStatusOnServer = async () => {
+      const after = await prisma.train.update({
+        where: { id: trainId },
+        data: { status },
+      });
+
+      await audit(
+        session,
+        "train",
+        trainId,
+        "UPDATE",
+        before,
+        after,
+        `وضعیت فنی قطار پلاک ${before?.code} تغییر یافت.`
+      );
+      return after;
+    };
+
+    const handleOfflineFallback = async () => {
+      await recordOfflineAction({
+        actionType: "UPDATE_TRAIN_STATUS",
+        data: { trainId, status },
+        timestamp: new Date().toISOString(),
+        userId: session.id,
+        userFullName: (session as any).name || (session as any).username || "کاربر سیستم",
+      });
+    };
 
     if (!netStatus.isShared) {
-      try {
-        await recordOfflineAction({
-          actionType: "UPDATE_TRAIN_STATUS",
-          data: { trainId, status },
-          timestamp: new Date().toISOString(),
-          userId: session.id,
-          userFullName: (session as any).name || (session as any).username || "کاربر سیستم",
-        });
-      } catch (e) {
-        console.error("[updateTrainStatus] خطا در ثبت صف آفلاین:", e);
-      }
+      await handleOfflineFallback();
+    } else {
+      await withFastOfflineFallback(executeStatusOnServer, handleOfflineFallback, 3000);
     }
 
     revalidatePath("/depot");
@@ -379,33 +391,39 @@ export async function updateTrainFlags(
 
   try {
     const before = await prisma.train.findUnique({ where: { id: trainId } });
-    const after = await prisma.train.update({
-      where: { id: trainId },
-      data: flags,
-    });
 
-    await audit(
-      session,
-      "train",
-      trainId,
-      "UPDATE",
-      before,
-      after,
-      `تغییر وضعیت فنی قطار ${before?.code} (کفشک/ATP/دوّار/مجوز)`
-    );
+    const executeFlagsOnServer = async () => {
+      const after = await prisma.train.update({
+        where: { id: trainId },
+        data: flags,
+      });
+
+      await audit(
+        session,
+        "train",
+        trainId,
+        "UPDATE",
+        before,
+        after,
+        `تغییر وضعیت فنی قطار ${before?.code} (کفشک/ATP/دوّار/مجوز)`
+      );
+      return after;
+    };
+
+    const handleOfflineFallback = async () => {
+      await recordOfflineAction({
+        actionType: "UPDATE_TRAIN_FLAGS",
+        data: { trainId, ...flags },
+        timestamp: new Date().toISOString(),
+        userId: session.id,
+        userFullName: (session as any).name || (session as any).username || "کاربر سیستم",
+      });
+    };
 
     if (!netStatus.isShared) {
-      try {
-        await recordOfflineAction({
-          actionType: "UPDATE_TRAIN_FLAGS",
-          data: { trainId, ...flags },
-          timestamp: new Date().toISOString(),
-          userId: session.id,
-          userFullName: (session as any).name || (session as any).username || "کاربر سیستم",
-        });
-      } catch (e) {
-        console.error("[updateTrainFlags] خطا در ثبت صف آفلاین:", e);
-      }
+      await handleOfflineFallback();
+    } else {
+      await withFastOfflineFallback(executeFlagsOnServer, handleOfflineFallback, 3000);
     }
 
     revalidatePath("/depot");

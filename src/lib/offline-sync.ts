@@ -33,6 +33,47 @@ export interface OfflineSyncStatus {
   lastSyncAttempt: string | null;
 }
 
+export const FAST_OFFLINE_TIMEOUT_MS = 3000; // سقف استاندارد ۳ ثانیه برای پاسخ‌دهی سرور قبل از انتقال خودکار به صف آفلاین
+
+/**
+ * اجرای عملیات با سقف زمانی مشخص جهت جلوگیری قطعی از معطلی کاربر در شبکه‌های کند
+ * در صورت بروز تاخیر بالای ۳ ثانیه یا خطای شبکه، عملیات بی‌درنگ در صف آفلاین ذخیره شده و موفقیت برمی‌گرداند.
+ */
+export async function withFastOfflineFallback<T>(
+  actionPromise: () => Promise<T>,
+  onFallbackToOffline: () => Promise<void>,
+  timeoutMs: number = FAST_OFFLINE_TIMEOUT_MS
+): Promise<{ result?: T; wasOfflineFallback: boolean; error?: string }> {
+  let timer: any = null;
+  try {
+    const timeoutPromise = new Promise<{ isTimeout: true }>((resolve) => {
+      timer = setTimeout(() => resolve({ isTimeout: true }), timeoutMs);
+    });
+
+    const executionPromise = actionPromise().then((res) => {
+      if (timer) clearTimeout(timer);
+      return { res, isTimeout: false as const };
+    });
+
+    const raceResult = await Promise.race([executionPromise, timeoutPromise]);
+
+    if (raceResult.isTimeout) {
+      console.warn(
+        `[FastOfflineFallback] عملیات سرور در مدت ${timeoutMs}ms تکمیل نشد (کندی شبکه دپو). انتقال فوری به صف آفلاین محلی...`
+      );
+      await onFallbackToOffline();
+      return { wasOfflineFallback: true };
+    }
+
+    return { result: raceResult.res, wasOfflineFallback: false };
+  } catch (err: any) {
+    if (timer) clearTimeout(timer);
+    console.warn(`[FastOfflineFallback] خطا یا تاخیر در اجرای عملیات سرور، انتقال به صف آفلاین:`, err?.message || err);
+    await onFallbackToOffline();
+    return { wasOfflineFallback: true };
+  }
+}
+
 const OFFLINE_QUEUE_KEY = "offline_sync_queue";
 
 /**
@@ -127,7 +168,7 @@ export async function getOfflineSyncStatus(): Promise<OfflineSyncStatus> {
 }
 
 /**
- * راه‌اندازی ورکر پس‌زمینه جهت تلاش خودکار هر ۶۰ ثانیه (۱ دقیقه) برای تخلیه صف آفلاین به سرور
+ * راه‌اندازی ورکر پس‌زمینه جهت تلاش خودکار هر ۳۰ ثانیه برای تخلیه صف آفلاین به سرور
  */
 export function startOfflineSyncBackgroundWorker(): void {
   if (syncIntervalHandle) return;
@@ -139,14 +180,14 @@ export function startOfflineSyncBackgroundWorker(): void {
         if (netStatus.isShared && netStatus.isDatabaseReady) {
           const queue = await getOfflineQueue();
           if (queue.length > 0) {
-            console.log(`[OfflineSyncWorker] تلاش خودکار دوره‌ای (۱ دقیقه) برای همگام‌سازی ${queue.length} رکورد آفلاین...`);
+            console.log(`[OfflineSyncWorker] تلاش خودکار دوره‌ای (۳۰ ثانیه) برای همگام‌سازی ${queue.length} رکورد آفلاین...`);
             await syncOfflineActionsToServer();
           }
         }
       } catch (err) {
         console.error("[OfflineSyncWorker] خطا در چرخه زمان‌بندی همگام‌سازی:", err);
       }
-    }, 60 * 1000); // دقیقاً ۶۰ ثانیه
+    }, 30 * 1000); // دقیقاً ۳۰ ثانیه طبق دستور کارفرما
 
     if (syncIntervalHandle.unref) {
       syncIntervalHandle.unref();
