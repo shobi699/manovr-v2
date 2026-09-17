@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   calculateDateRange,
   categorizeManovrType,
-} from "@/app/actions/train-performance";
+} from "@/lib/train-performance";
 import {
   recordDiagnosticLog,
   generateDiagnosticReportForAdmin,
