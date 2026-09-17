@@ -331,6 +331,14 @@ export default function ReportBuilderClient({
       setChart("table");
       setSortField("id");
       setSortDirection("desc");
+    } else if (type === "fleet_train_performance") {
+      setEntity("manovr");
+      setFields(["id", "train", "type", "sourceLine", "destinationLine", "rahbar1", "createdAt", "status"]);
+      setFilters([]);
+      setGroupBy("train");
+      setChart("bar");
+      setSortField("id");
+      setSortDirection("desc");
     } else if (type === "triangulated") {
       setEntity("manovr");
       setFields(["id", "train", "type", "sourceLine", "destinationLine", "executionTime", "status"]);
@@ -920,6 +928,17 @@ export default function ReportBuilderClient({
               )
             },
             {
+              id: "fleet_train_performance",
+              title: "تحلیل جامع عملکرد و حرکات ناوگان",
+              desc: "ماتریس مانورها و تراکم حرکتی به تفکیک شماره قطار",
+              icon: (
+                <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path d="M4 15V8a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v7m-16 0v4h16v-4m-16 0h16M7 11h2m6 0h2" />
+                  <path d="M9 19v-6m6 6v-4" />
+                </svg>
+              )
+            },
+            {
               id: "month_manovrs",
               title: "مانورهای ۳۰ روز اخیر",
               desc: "گزارش کلیه عملیات مانور ماه گذشته",
@@ -1123,7 +1142,7 @@ export default function ReportBuilderClient({
             </div>
           </div>
           <a
-            href="/manovrs"
+            href="/manovrs?tab=driver_reports"
             className="btn sm primary"
             style={{
               display: "flex",
@@ -1135,17 +1154,78 @@ export default function ReportBuilderClient({
               whiteSpace: "nowrap"
             }}
           >
-            <span>مشاهده گزارش کامل در تاریخچه مانورها</span>
+            <span>مشاهده گزارش شیفت راهبران</span>
+            <span>←</span>
+          </a>
+        </div>
+
+        {/* بنر اتصال به کارنامه و گزارش عملکرد قطارها در منوی مانورها */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "14px 20px",
+            borderRadius: "12px",
+            background: "linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(30,58,138,0.09) 100%)",
+            border: "1px solid var(--line)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+            <div
+              style={{
+                width: "42px",
+                height: "42px",
+                borderRadius: "10px",
+                background: "#059669",
+                color: "#fff",
+                display: "grid",
+                placeItems: "center",
+                boxShadow: "0 4px 12px rgba(16,185,129,0.3)"
+              }}
+            >
+              <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M4 15V8a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v7m-16 0v4h16v-4m-16 0h16M7 11h2m6 0h2" />
+              </svg>
+            </div>
+            <div>
+              <div style={{ fontSize: "14px", fontWeight: "bold", color: "var(--ink)" }}>
+                کارنامه تخصصی و ارزیابی عملکرد ناوگان قطارها
+              </div>
+              <div style={{ fontSize: "12px", color: "var(--ink-soft)", marginTop: "2px" }}>
+                برای مشاهده ریز سوابق هر قطار، کارت‌های شاخص KPI، خطوط تردد و خروجی اکسل راست‌چین هر ناوگان، مستقیماً به تب کارنامه قطارها مراجعه فرمایید.
+              </div>
+            </div>
+          </div>
+          <a
+            href="/manovrs?tab=train_reports"
+            className="btn sm"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "8px 16px",
+              fontWeight: 600,
+              backgroundColor: "#059669",
+              color: "#fff",
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+              borderRadius: "8px"
+            }}
+          >
+            <span>مشاهده کارنامه قطارها</span>
             <span>←</span>
           </a>
         </div>
 
         {/* پنل‌های فیلتر پیشرفته بر اساس الگوها */}
-        {(activeReportTab === "history" || activeReportTab === "triangulated" || activeReportTab === "air_charged" || activeReportTab === "permanent_transfers" || activeReportTab === "solo_manovrs" || activeReportTab === "assisted_manovrs" || activeReportTab === "month_manovrs") && (
+        {(activeReportTab === "history" || activeReportTab === "fleet_train_performance" || activeReportTab === "triangulated" || activeReportTab === "air_charged" || activeReportTab === "permanent_transfers" || activeReportTab === "solo_manovrs" || activeReportTab === "assisted_manovrs" || activeReportTab === "month_manovrs") && (
           <div className="card" style={{ padding: "16px", borderRadius: "12px", background: "var(--panel)", overflow: "visible" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px", borderBottom: "1px solid var(--line)", paddingBottom: "8px" }}>
               <span style={{ fontSize: "14px", fontWeight: "bold", color: "var(--accent)" }}>
                 🔍 فیلترهای پیشرفته تاریخچه مانورها
+                {activeReportTab === "fleet_train_performance" && " (تحلیل عملکرد ناوگان)"}
                 {activeReportTab === "triangulated" && " (قطارهای مثلث شده)"}
                 {activeReportTab === "air_charged" && " (قطارهای بادگیری شده)"}
                 {activeReportTab === "permanent_transfers" && " (گزارش انتقال‌های دائم)"}

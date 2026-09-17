@@ -117,6 +117,7 @@ export default async function ManovrsPage({
     confirmationStatusLookup,
     shiftLookup,
     drivers,
+    trains,
   ] = await Promise.all([
     prisma.manovr.findMany({
       where,
@@ -156,6 +157,11 @@ export default async function ManovrsPage({
       },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
+    prisma.train.findMany({
+      where: { isDisposed: false },
+      select: { id: true, code: true, type: true, status: true },
+      orderBy: { code: "asc" },
+    }),
   ]);
 
   return (
@@ -184,6 +190,7 @@ export default async function ManovrsPage({
           confirmationStatuses={confirmationStatusLookup?.values || []}
           shifts={shiftLookup?.values || []}
           drivers={drivers}
+          trains={trains}
           isAdmin={isManager}
         />
       </div>
