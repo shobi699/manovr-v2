@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { useTheme } from "@/components/ThemeProvider";
 import { safeAccentColor } from "@/lib/branding";
 import ServerStatusBadge from "@/components/ServerStatusBadge";
+import SidebarFlyoutTooltip, { type FlyoutTooltipItem } from "@/components/SidebarFlyoutTooltip";
 
 interface NavItem {
   href: string;
@@ -89,6 +90,26 @@ export default function Sidebar({
   // مقدار اولیه پایدار برای هماهنگی کامل SSR و کلاینت و جلوگیری از خطای هیدریشن
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isAnalysisExpanded, setIsAnalysisExpanded] = useState(true);
+  const [activeTooltip, setActiveTooltip] = useState<FlyoutTooltipItem | null>(null);
+
+  const showTooltip = useCallback(
+    (
+      e: React.MouseEvent<HTMLElement> | React.FocusEvent<HTMLElement>,
+      item: Omit<FlyoutTooltipItem, "anchorRect">
+    ) => {
+      if (!isCollapsed) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      setActiveTooltip({
+        ...item,
+        anchorRect: rect,
+      });
+    },
+    [isCollapsed]
+  );
+
+  const hideTooltip = useCallback(() => {
+    setActiveTooltip(null);
+  }, []);
 
   const [branding, setBranding] = useState({
     title: "سامانه مدیریت مانور",
@@ -149,6 +170,26 @@ export default function Sidebar({
       eventSource.close();
     };
   }, []);
+
+  // پاکسازی تول‌تیپ فعال در هنگام اسکرول پنجره یا تغییر سایز
+  useEffect(() => {
+    if (!isCollapsed) {
+      setActiveTooltip(null);
+      return;
+    }
+    const handleDismiss = () => setActiveTooltip(null);
+    window.addEventListener("scroll", handleDismiss, true);
+    window.addEventListener("resize", handleDismiss);
+    return () => {
+      window.removeEventListener("scroll", handleDismiss, true);
+      window.removeEventListener("resize", handleDismiss);
+    };
+  }, [isCollapsed]);
+
+  // پاکسازی تول‌تیپ با تغییر مسیر
+  useEffect(() => {
+    setActiveTooltip(null);
+  }, [path]);
 
   const toggleSidebar = () => {
     const nextState = !isCollapsed;
@@ -245,7 +286,24 @@ export default function Sidebar({
               overflow: "hidden",
             }}
             onClick={toggleSidebar}
-            title="تغییر وضعیت منو"
+            onMouseEnter={(e) =>
+              showTooltip(e, {
+                title: branding.title,
+                subtitle: "کلیک جهت تغییر وضعیت منو",
+                category: "سامانه مانور",
+                badge: "پایانه فتح‌آباد",
+              })
+            }
+            onMouseLeave={hideTooltip}
+            onFocus={(e) =>
+              showTooltip(e, {
+                title: branding.title,
+                subtitle: "کلیک جهت تغییر وضعیت منو",
+                category: "سامانه مانور",
+                badge: "پایانه فتح‌آباد",
+              })
+            }
+            onBlur={hideTooltip}
           >
             {branding.logoType === "image" && branding.logoImage ? (
               <img src={branding.logoImage} alt="Logo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -267,7 +325,29 @@ export default function Sidebar({
         </div>
 
         {/* نشانگر وضعیت ارتباط با سرور متمرکز دپو */}
-        <div style={{ width: "100%", marginTop: "2px", marginBottom: "2px" }}>
+        <div
+          style={{ width: "100%", marginTop: "2px", marginBottom: "2px" }}
+          onMouseEnter={(e) =>
+            showTooltip(e, {
+              title: "وضعیت اتصال سرور پایانه",
+              category: "شبکه و پایگاه‌داده",
+              subtitle: "کلیک جهت ابزار عیب‌یابی و تاخیر شبکه",
+              badge: "بررسی زنده",
+              badgeVariant: "amber",
+            })
+          }
+          onMouseLeave={hideTooltip}
+          onFocus={(e) =>
+            showTooltip(e, {
+              title: "وضعیت اتصال سرور پایانه",
+              category: "شبکه و پایگاه‌داده",
+              subtitle: "کلیک جهت ابزار عیب‌یابی و تاخیر شبکه",
+              badge: "بررسی زنده",
+              badgeVariant: "amber",
+            })
+          }
+          onBlur={hideTooltip}
+        >
           <ServerStatusBadge isCollapsed={isCollapsed} />
         </div>
 
@@ -284,6 +364,22 @@ export default function Sidebar({
           <button
             type="button"
             onClick={toggleSidebar}
+            onMouseEnter={(e) =>
+              showTooltip(e, {
+                title: isCollapsed ? "گسترش منوی ناوبری" : "جمع‌کردن منوی ناوبری",
+                category: "ناوبری",
+                subtitle: isCollapsed ? "نمایش کامل عناوین و زیرمنوها" : "کوچک‌سازی منو برای فضای بیشتر",
+              })
+            }
+            onMouseLeave={hideTooltip}
+            onFocus={(e) =>
+              showTooltip(e, {
+                title: isCollapsed ? "گسترش منوی ناوبری" : "جمع‌کردن منوی ناوبری",
+                category: "ناوبری",
+                subtitle: isCollapsed ? "نمایش کامل عناوین و زیرمنوها" : "کوچک‌سازی منو برای فضای بیشتر",
+              })
+            }
+            onBlur={hideTooltip}
             style={{
               border: "none",
               background: "none",
@@ -296,7 +392,6 @@ export default function Sidebar({
               borderRadius: "4px",
               transition: "var(--transition-fluid)",
             }}
-            title={isCollapsed ? "گسترش منو" : "جمع کردن منو"}
           >
             {isCollapsed
               ? (navPos === "left" ? <Icons.CaretRight size={16} weight="bold" /> : <Icons.CaretLeft size={16} weight="bold" />)
@@ -316,12 +411,31 @@ export default function Sidebar({
                   <button
                     type="button"
                     onClick={toggleAnalysisAccordion}
+                    onMouseEnter={(e) =>
+                      showTooltip(e, {
+                        title: section.title,
+                        category: "مدیریت و تنظیمات",
+                        subtitle: isAnalysisExpanded ? "کلیک جهت بستن زیرمنوها" : "کلیک جهت نمایش زیرمنوها",
+                        badge: `${section.items.length} زیرمنو`,
+                        isActive: isAnyAnalysisActive,
+                      })
+                    }
+                    onMouseLeave={hideTooltip}
+                    onFocus={(e) =>
+                      showTooltip(e, {
+                        title: section.title,
+                        category: "مدیریت و تنظیمات",
+                        subtitle: isAnalysisExpanded ? "کلیک جهت بستن زیرمنوها" : "کلیک جهت نمایش زیرمنوها",
+                        badge: `${section.items.length} زیرمنو`,
+                        isActive: isAnyAnalysisActive,
+                      })
+                    }
+                    onBlur={hideTooltip}
                     className={`w-11 h-11 mx-auto rounded-full flex items-center justify-center transition-all relative ${
                       isAnyAnalysisActive
                         ? "bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 ring-2 ring-amber-500/40"
                         : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
                     }`}
-                    title={`${section.title} (${isAnalysisExpanded ? "بستن" : "باز کردن"})`}
                   >
                     <Icons.Settings size={20} weight={isAnyAnalysisActive ? "bold" : "regular"} />
                     {isAnyAnalysisActive && (
@@ -347,7 +461,23 @@ export default function Sidebar({
                               key={n.href}
                               href={n.href}
                               className={active ? "active" : ""}
-                              title={n.label}
+                              onClick={hideTooltip}
+                              onMouseEnter={(e) =>
+                                showTooltip(e, {
+                                  title: n.label,
+                                  category: section.title,
+                                  isActive: active,
+                                })
+                              }
+                              onMouseLeave={hideTooltip}
+                              onFocus={(e) =>
+                                showTooltip(e, {
+                                  title: n.label,
+                                  category: section.title,
+                                  isActive: active,
+                                })
+                              }
+                              onBlur={hideTooltip}
                             >
                               <span className="ic">
                                 {IconComponent && <IconComponent size={18} weight={active ? "bold" : "regular"} />}
@@ -466,7 +596,27 @@ export default function Sidebar({
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.25, delay: i * 0.02, ease: [0.32, 0.72, 0, 1] }}
                   >
-                    <Link href={n.href} className={active ? "active" : ""} title={isCollapsed ? n.label : undefined}>
+                    <Link
+                      href={n.href}
+                      className={active ? "active" : ""}
+                      onClick={hideTooltip}
+                      onMouseEnter={(e) =>
+                        showTooltip(e, {
+                          title: n.label,
+                          category: section.title,
+                          isActive: active,
+                        })
+                      }
+                      onMouseLeave={hideTooltip}
+                      onFocus={(e) =>
+                        showTooltip(e, {
+                          title: n.label,
+                          category: section.title,
+                          isActive: active,
+                        })
+                      }
+                      onBlur={hideTooltip}
+                    >
                       <span className="ic">
                         {IconComponent && <IconComponent size={18} weight={active ? "bold" : "regular"} />}
                       </span>
@@ -494,7 +644,27 @@ export default function Sidebar({
               justifyContent: "center",
               padding: isCollapsed ? "0" : "8px 12px",
             }}
-            title="خروج از سیستم"
+            onClick={hideTooltip}
+            onMouseEnter={(e) =>
+              showTooltip(e, {
+                title: "خروج از سامانه",
+                category: "امنیت حساب",
+                subtitle: `خروج کاربر ${fullName || ""}`,
+                badge: "پایان نشست",
+                badgeVariant: "warning",
+              })
+            }
+            onMouseLeave={hideTooltip}
+            onFocus={(e) =>
+              showTooltip(e, {
+                title: "خروج از سامانه",
+                category: "امنیت حساب",
+                subtitle: `خروج کاربر ${fullName || ""}`,
+                badge: "پایان نشست",
+                badgeVariant: "warning",
+              })
+            }
+            onBlur={hideTooltip}
           >
             <Icons.Logout size={14} weight="bold" style={{ marginInlineEnd: isCollapsed ? 0 : 4 }} />
             {!isCollapsed && <span>خروج</span>}
@@ -522,10 +692,28 @@ export default function Sidebar({
               padding: "4px",
               transition: "background-color 0.2s, color 0.2s",
             }}
-            title="مشاهده شناسنامه سامانه و اطلاعات درباره ما"
+            onClick={hideTooltip}
+            onMouseEnter={(e) =>
+              showTooltip(e, {
+                title: "سامانه مانور دپو · نسخه ۰.۱.۲",
+                category: "شناسنامه سیستم",
+                subtitle: "۲۵ شهریور ۱۴۰۵ · توسعه: سید شبیر موسوی",
+                badge: "درباره ما",
+              })
+            }
+            onMouseLeave={hideTooltip}
+            onFocus={(e) =>
+              showTooltip(e, {
+                title: "سامانه مانور دپو · نسخه ۰.۱.۲",
+                category: "شناسنامه سیستم",
+                subtitle: "۲۵ شهریور ۱۴۰۵ · توسعه: سید شبیر موسوی",
+                badge: "درباره ما",
+              })
+            }
+            onBlur={hideTooltip}
           >
             {isCollapsed ? (
-              <span title="سامانه مانور نسخه ۰.۱.۲ (۱۴۰۵/۰۶/۲۵) — توسعه: سید شبیر موسوی">v0.1.2</span>
+              <span>v0.1.2</span>
             ) : (
               <div>
                 <span style={{ fontWeight: 600 }}>سامانه مانور دپو · نسخه ۰.۱.۲</span>
@@ -535,6 +723,10 @@ export default function Sidebar({
           </Link>
         </div>
       </div>
+
+      {isCollapsed && (
+        <SidebarFlyoutTooltip item={activeTooltip} navPos={navPos as "right" | "left"} />
+      )}
     </aside>
   );
 }
