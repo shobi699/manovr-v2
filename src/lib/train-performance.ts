@@ -93,8 +93,11 @@ export function calculateDateRange(
   }
 
   if (preset === "custom") {
-    const start = customStart ? new Date(customStart) : null;
-    const end = customEnd ? new Date(customEnd) : null;
+    const rawStart = customStart ? new Date(customStart) : null;
+    const rawEnd = customEnd ? new Date(customEnd) : null;
+    const start = rawStart && !isNaN(rawStart.getTime()) ? rawStart : null;
+    const end = rawEnd && !isNaN(rawEnd.getTime()) ? rawEnd : null;
+
     if (end) {
       end.setHours(23, 59, 59, 999);
     }
