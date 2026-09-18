@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   calculateDateRange,
   categorizeManovrType,
+  toTehranJalali,
 } from "@/lib/train-performance";
 import {
   recordDiagnosticLog,
@@ -100,6 +101,21 @@ describe("Train Performance Business Logic Tests", () => {
       const { content, filename } = await getDiagnosticLogFileContent();
       expect(content).toBeDefined();
       expect(filename).toContain(".log");
+    });
+  });
+
+  describe("toTehranJalali & Date Formatting", () => {
+    it("should format valid date to Tehran Jalali string with Persian numerals", () => {
+      const d = new Date("2026-09-18T10:00:00.000Z");
+      const formatted = toTehranJalali(d);
+      expect(formatted).not.toBe("—");
+      expect(formatted).toContain("۱۴۰۵");
+    });
+
+    it("should return dash for invalid or null dates", () => {
+      expect(toTehranJalali(null)).toBe("—");
+      expect(toTehranJalali(undefined)).toBe("—");
+      expect(toTehranJalali("invalid-date")).toBe("—");
     });
   });
 });

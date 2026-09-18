@@ -26,6 +26,26 @@ export interface TrainPerformanceManovrItem {
   trainId: number;
 }
 
+export interface TrainMatrixRow {
+  trainId: number;
+  trainCode: string;
+  trainType: number;
+  trainStatus: number;
+  currentLineName: string;
+  hasKafshak: boolean;
+  noAtp: boolean;
+  noLicense: boolean;
+  totalManovrs: number;
+  byDetailedType: Record<number, number>;
+  byCategory: {
+    lineChange: number;
+    permanent: number;
+    exit: number;
+    normal: number;
+  };
+  manovrs: TrainPerformanceManovrItem[];
+}
+
 export interface TrainPerformanceStats {
   totalManovrs: number;
   byType: {
@@ -39,6 +59,13 @@ export interface TrainPerformanceStats {
   topDrivers: Array<{ id: number; name: string; count: number }>;
   topLines: Array<{ id: number; name: string; count: number }>;
   manovrs: TrainPerformanceManovrItem[];
+  matrix: TrainMatrixRow[];
+  allManovrTypes: Array<{ code: number; label: string; count: number }>;
+  effectiveRangeJalali: {
+    start: string;
+    end: string;
+    label: string;
+  };
   trainInfo?: {
     id: number;
     code: string;
