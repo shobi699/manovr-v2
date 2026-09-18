@@ -12,6 +12,7 @@ import { useTheme } from "@/components/ThemeProvider";
 import { safeAccentColor } from "@/lib/branding";
 import ServerStatusBadge from "@/components/ServerStatusBadge";
 import SidebarFlyoutTooltip, { type FlyoutTooltipItem } from "@/components/SidebarFlyoutTooltip";
+import { APP_CURRENT_VERSION, APP_BUILD_DATE_JALALI } from "@/lib/version";
 
 interface NavItem {
   href: string;
@@ -695,29 +696,29 @@ export default function Sidebar({
             onClick={hideTooltip}
             onMouseEnter={(e) =>
               showTooltip(e, {
-                title: "سامانه مانور دپو · نسخه ۰.۱.۲",
+                title: `سامانه مانور دپو · نسخه ${APP_CURRENT_VERSION}`,
                 category: "شناسنامه سیستم",
-                subtitle: "۲۵ شهریور ۱۴۰۵ · توسعه: سید شبیر موسوی",
+                subtitle: `${APP_BUILD_DATE_JALALI} · توسعه: سید شبیر موسوی`,
                 badge: "درباره ما",
               })
             }
             onMouseLeave={hideTooltip}
             onFocus={(e) =>
               showTooltip(e, {
-                title: "سامانه مانور دپو · نسخه ۰.۱.۲",
+                title: `سامانه مانور دپو · نسخه ${APP_CURRENT_VERSION}`,
                 category: "شناسنامه سیستم",
-                subtitle: "۲۵ شهریور ۱۴۰۵ · توسعه: سید شبیر موسوی",
+                subtitle: `${APP_BUILD_DATE_JALALI} · توسعه: سید شبیر موسوی`,
                 badge: "درباره ما",
               })
             }
             onBlur={hideTooltip}
           >
             {isCollapsed ? (
-              <span>v0.1.2</span>
+              <span>v{APP_CURRENT_VERSION}</span>
             ) : (
               <div>
-                <span style={{ fontWeight: 600 }}>سامانه مانور دپو · نسخه ۰.۱.۲</span>
-                <div style={{ marginTop: "2px", fontSize: "9.5px", color: "var(--ink-faint)" }}>۲۵ شهریور ۱۴۰۵ · توسعه توسط سید شبیر موسوی</div>
+                <span style={{ fontWeight: 600 }}>سامانه مانور دپو · نسخه {APP_CURRENT_VERSION}</span>
+                <div style={{ marginTop: "2px", fontSize: "9.5px", color: "var(--ink-faint)" }}>{APP_BUILD_DATE_JALALI} · توسعه توسط سید شبیر موسوی</div>
               </div>
             )}
           </Link>
