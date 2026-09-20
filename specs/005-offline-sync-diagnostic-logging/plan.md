@@ -29,7 +29,7 @@
 5. **پروتکل همگام‌سازی سه‌گانه (Tri-Sync Mandatory Protocol)**:
    - تعریف دسترسی‌های جدید `system.diagnostics` و `system.repair` در `src/lib/perms.ts`.
    - به‌روزرسانی پنل مدیریت نقش‌ها (`/roles`).
-   - مستندسازی کامل با سقف حداقل ۱۰۰۰ کاراکتر فارسی در راهنمای سامانه (`src/lib/help-menu-guides.ts`).
+   - مستندسازی کامل فارسی در راهنمای سامانه (`src/lib/help-menu-guides.ts`).
 
 ---
 

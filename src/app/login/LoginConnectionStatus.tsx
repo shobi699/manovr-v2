@@ -12,7 +12,7 @@ export default function LoginConnectionStatus() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showDiagModal, setShowDiagModal] = useState(false);
-
+0
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 

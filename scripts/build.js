@@ -18,34 +18,7 @@ if (!fs.existsSync(process.env.ELECTRON_BUILDER_CACHE)) {
 }
 
 const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
-const version = pkg.version || '0.1.1';
-
-function cleanFilePattern(dir, extensions, termsToExclude = []) {
-  if (!fs.existsSync(dir)) return;
-  fs.readdirSync(dir).forEach(file => {
-    const filePath = path.join(dir, file);
-    const stat = fs.lstatSync(filePath);
-    if (stat.isDirectory()) {
-      cleanFilePattern(filePath, extensions, termsToExclude);
-    } else {
-      const ext = path.extname(file).toLowerCase();
-      if (extensions.includes(ext)) {
-        let matchesExclude = false;
-        for (const term of termsToExclude) {
-          if (file.toLowerCase().includes(term.toLowerCase())) {
-            matchesExclude = true;
-            break;
-          }
-        }
-        if (!matchesExclude) {
-          try {
-            fs.unlinkSync(filePath);
-          } catch (e) {}
-        }
-      }
-    }
-  });
-}
+const version = pkg.version || '0.1.3';
 
 function cleanUnusedLocales(localesDir) {
   if (!fs.existsSync(localesDir)) return;
@@ -58,6 +31,70 @@ function cleanUnusedLocales(localesDir) {
         } catch (e) {}
       }
     }
+  });
+}
+
+function sanitizeDirectoryRecursive(dir, rootDirScope) {
+  if (!fs.existsSync(dir)) return;
+  const rootScope = rootDirScope || dir;
+  fs.readdirSync(dir).forEach(element => {
+    const fullPath = path.join(dir, element);
+    try {
+      const stats = fs.lstatSync(fullPath);
+      if (stats.isDirectory()) {
+        const lower = element.toLowerCase();
+        const isDirectChild = path.normalize(dir) === path.normalize(rootScope);
+        const globallyProhibitedDirs = [
+          'src', '.agents', '.claude', 'graphify-out', 'e2e', 'e2e-skills-1.16.0',
+          'qa-skills-1.13.3', 'workflows', '.playwright', '.specify', 'specs',
+          '.git', '.github', '.idea', '.vscode', 'tests'
+        ];
+        const rootOnlyProhibitedDirs = [
+          'export', 'backups', 'data', 'seed', 'plans', 'docs', 'test-results', 'scripts', 'fonts'
+        ];
+
+        if (globallyProhibitedDirs.includes(lower)) {
+          fs.rmSync(fullPath, { recursive: true, force: true });
+          console.log(`[Sanitizer] Removed prohibited directory: ${fullPath}`);
+        } else if (isDirectChild && rootOnlyProhibitedDirs.includes(lower)) {
+          fs.rmSync(fullPath, { recursive: true, force: true });
+          console.log(`[Sanitizer] Removed root directory: ${fullPath}`);
+        } else {
+          sanitizeDirectoryRecursive(fullPath, rootScope);
+        }
+      } else {
+        const lower = element.toLowerCase();
+        const ext = path.extname(element).toLowerCase();
+
+        // حذف قطعی کدهای تایپ‌اسکریپت و سورس‌مپ‌ها
+        if (ext === '.map' || ext === '.ts' || ext === '.tsx' || ext === '.tsbuildinfo') {
+          fs.unlinkSync(fullPath);
+          return;
+        }
+
+        // حذف نشانه‌ها و فایل‌های متادیتای AI
+        if (
+          lower === 'skills-lock.json' ||
+          lower === 'vibe.config.json' ||
+          lower === 'agent.md' ||
+          lower === 'agents.md' ||
+          lower === 'claude.md' ||
+          lower === 'vibe.md'
+        ) {
+          fs.unlinkSync(fullPath);
+          console.log(`[Sanitizer] Removed AI marker file: ${fullPath}`);
+          return;
+        }
+
+        // حذف فایل‌های موقت پریزما انجین
+        if (
+          lower.includes('query_engine-windows.dll.node.tmp') ||
+          (lower.startsWith('query_engine') && lower.includes('.tmp'))
+        ) {
+          fs.unlinkSync(fullPath);
+        }
+      }
+    } catch (e) {}
   });
 }
 
@@ -91,7 +128,6 @@ function build() {
   const isExportOnly = process.argv.includes('--export-only');
   try {
     const exportDir = path.join(rootDir, 'export');
-
     const isSkipNext = process.argv.includes('--skip-next');
 
     if (!isExportOnly) {
@@ -121,7 +157,6 @@ function build() {
         fs.rmSync(distDir, { recursive: true, force: true });
       }
 
-      const exportDir = path.join(rootDir, 'export');
       if (fs.existsSync(exportDir)) {
         try {
           fs.rmSync(exportDir, { recursive: true, force: true });
@@ -138,31 +173,34 @@ function build() {
         console.log('2. Skipping Next.js build (--skip-next specified)...');
       }
 
-    console.log('3. Running copy-assets.js...');
-    runCommand('node scripts/copy-assets.js');
+      console.log('3. Running copy-assets.js...');
+      runCommand('node scripts/copy-assets.js');
 
-    console.log('4. Running electron-builder --dir (unpacked)...');
-    runCommand('npx electron-builder --dir');
+      console.log('4. Running electron-builder --dir (unpacked)...');
+      runCommand('npx electron-builder --dir');
 
-    console.log('5. Optimizing win-unpacked directory...');
-    // Delete LICENSES.chromium.html
-    const licenseFile = path.join(unpackedDir, 'LICENSES.chromium.html');
-    if (fs.existsSync(licenseFile)) {
-      fs.unlinkSync(licenseFile);
-      console.log('Deleted LICENSES.chromium.html');
+      console.log('5. Optimizing and sanitizing win-unpacked directory...');
+      // Delete LICENSES.chromium.html
+      const licenseFile = path.join(unpackedDir, 'LICENSES.chromium.html');
+      if (fs.existsSync(licenseFile)) {
+        fs.unlinkSync(licenseFile);
+        console.log('Deleted LICENSES.chromium.html');
+      }
+
+      // Clean locales
+      const localesDir = path.join(unpackedDir, 'locales');
+      cleanUnusedLocales(localesDir);
+      console.log('Cleaned unused Chromium locales.');
+
+      // Deep sanitize unpacked directory before packaging installers
+      sanitizeDirectoryRecursive(unpackedDir);
+      console.log('win-unpacked directory sanitized successfully.');
+
+      console.log('6. Packaging optimized installers with electron-builder...');
+      runCommand(`npx electron-builder --win nsis portable --prepackaged "${unpackedDir}"`);
     }
 
-    // Clean locales
-    const localesDir = path.join(unpackedDir, 'locales');
-    cleanUnusedLocales(localesDir);
-    console.log('Cleaned unused Chromium locales.');
-
-    console.log('6. Packaging optimized installers with electron-builder...');
-    runCommand(`npx electron-builder --win nsis portable --prepackaged "${unpackedDir}"`);
-  }
-
-  console.log('7. Copying final packages to root directory and export folder...');
-    // Stop any running processes to prevent file locks
+    console.log('7. Copying final packages to root directory and export folder...');
     try {
       execSync('taskkill /f /fi "IMAGENAME eq Manovr*"', { stdio: 'ignore' });
       execSync('taskkill /f /im ManovrSystem.exe', { stdio: 'ignore' });
@@ -172,7 +210,7 @@ function build() {
       fs.mkdirSync(exportDir, { recursive: true });
     }
 
-    // کپی فایل‌های نصبی و پرتابل به ریشه و پوشه export
+    // ۱. کپی فایل‌های نصبی و پرتابل به ریشه و پوشه export
     fs.readdirSync(distDir).forEach(file => {
       if (file.endsWith('.exe')) {
         const src = path.join(distDir, file);
@@ -196,7 +234,7 @@ function build() {
       }
     });
 
-    // ایجاد فایل ManovrSystem 0.1.1.exe از روی نسخه پرتابل مطابق درخواست صریح کاربر
+    // ۲. ایجاد فایل ManovrSystem 0.1.3.exe از روی نسخه پرتابل
     const portableBuilt = path.join(distDir, `ManovrSystem-Portable-${version}.exe`);
     if (fs.existsSync(portableBuilt)) {
       const explicitExeName = `ManovrSystem ${version}.exe`;
@@ -207,7 +245,7 @@ function build() {
       });
     }
 
-    // کپی پوشه بازشده/نصب‌شده آماده (win-unpacked) به پوشه export برای کپی مستقیم در شبکه
+    // ۳. کپی پوشه بازشده/نصب‌شده آماده (win-unpacked) به پوشه export
     const exportUnpackedDir = path.join(exportDir, 'ManovrSystem');
     if (fs.existsSync(unpackedDir)) {
       console.log('Copying unpacked installation folder to export/ManovrSystem...');
@@ -215,30 +253,40 @@ function build() {
       console.log('Copied unpacked application folder to export/ManovrSystem successfully.');
     }
 
-    // کپی manovr-config.json به پوشه export و داخل پوشه ManovrSystem
+    // ۴. کپی manovr-config.json به پوشه export و داخل ManovrSystem
     const configSrc = path.join(rootDir, 'manovr-config.json');
     if (fs.existsSync(configSrc)) {
       fs.copyFileSync(configSrc, path.join(exportDir, 'manovr-config.json'));
       if (fs.existsSync(exportUnpackedDir)) {
         fs.copyFileSync(configSrc, path.join(exportUnpackedDir, 'manovr-config.json'));
       }
-      console.log('Copied manovr-config.json to export package.');
+      console.log('Copied manovr-config.json to export and ManovrSystem.');
     }
 
-    // کپی اسکریپت‌های هوشمند ساخت میانبر کلاینت شبکه به پوشه export و ManovrSystem
+    // ۵. پاکسازی نهایی پوشه export/ManovrSystem از هرگونه فایل زائد
+    if (fs.existsSync(exportUnpackedDir)) {
+      sanitizeDirectoryRecursive(exportUnpackedDir);
+      // حذف هرگونه اسکریپت یا markdown که ممکن است از بیلد قبلی یا اشتباه مانده باشد
+      fs.readdirSync(exportUnpackedDir).forEach(f => {
+        const full = path.join(exportUnpackedDir, f);
+        const ext = path.extname(f).toLowerCase();
+        if (['.bat', '.ps1', '.sh', '.md', '.markdown', '.txt', '.log'].includes(ext) || f === 'scripts') {
+          fs.rmSync(full, { recursive: true, force: true });
+          console.log(`[Export Cleanup] Removed non-app file from ManovrSystem: ${f}`);
+        }
+      });
+    }
+
+    // ۶. کپی اسکریپت‌ها و ابزارهای نگهداری سرور فقط در ریشه export
     const deployScripts = ['create-client-shortcut.ps1', 'create-client-shortcut.bat'];
     deployScripts.forEach(scriptFile => {
       const src = path.join(rootDir, 'scripts', 'deploy', scriptFile);
       if (fs.existsSync(src)) {
         fs.copyFileSync(src, path.join(exportDir, scriptFile));
-        if (fs.existsSync(exportUnpackedDir)) {
-          fs.copyFileSync(src, path.join(exportUnpackedDir, scriptFile));
-        }
-        console.log(`Copied deployment script to export: ${scriptFile}`);
+        console.log(`Copied deployment script to export root: ${scriptFile}`);
       }
     });
 
-    // کپی اسکریپت‌های عیب‌یابی، تعمیر و رفع محدودیت‌های دیتابیس و شبکه
     const toolScripts = [
       'repair-server-db.bat',
       'repair-server-db.ps1',
@@ -250,14 +298,10 @@ function build() {
       if (fs.existsSync(src)) {
         fs.copyFileSync(src, path.join(exportDir, scriptFile));
         fs.copyFileSync(src, path.join(distDir, scriptFile));
-        if (fs.existsSync(exportUnpackedDir)) {
-          fs.copyFileSync(src, path.join(exportUnpackedDir, scriptFile));
-        }
-        console.log(`Copied maintenance tool to package: ${scriptFile}`);
+        console.log(`Copied maintenance tool to export root: ${scriptFile}`);
       }
     });
 
-    // کپی اسکریپت تخصصی repair-network-db.mjs به پوشه scripts در پکیج‌ها
     const repairMjsSrc = path.join(rootDir, 'scripts', 'repair-network-db.mjs');
     if (fs.existsSync(repairMjsSrc)) {
       const exportScriptsDir = path.join(exportDir, 'scripts');
@@ -266,26 +310,17 @@ function build() {
       fs.mkdirSync(distScriptsDir, { recursive: true });
       fs.copyFileSync(repairMjsSrc, path.join(exportScriptsDir, 'repair-network-db.mjs'));
       fs.copyFileSync(repairMjsSrc, path.join(distScriptsDir, 'repair-network-db.mjs'));
-      if (fs.existsSync(exportUnpackedDir)) {
-        const unpackedScriptsDir = path.join(exportUnpackedDir, 'scripts');
-        fs.mkdirSync(unpackedScriptsDir, { recursive: true });
-        fs.copyFileSync(repairMjsSrc, path.join(unpackedScriptsDir, 'repair-network-db.mjs'));
-      }
-      console.log('Copied repair-network-db.mjs to scripts folders.');
+      console.log('Copied repair-network-db.mjs to export/scripts.');
     }
 
-    // کپی راهنمای جامع رفع محدودیت و دسترسی دیتابیس
     const dbGuideSrc = path.join(rootDir, 'راهنمای_جامع_رفع_محدودیت_و_دسترسی_دیتابیس.md');
     if (fs.existsSync(dbGuideSrc)) {
       fs.copyFileSync(dbGuideSrc, path.join(exportDir, 'راهنمای_جامع_رفع_محدودیت_و_دسترسی_دیتابیس.md'));
       fs.copyFileSync(dbGuideSrc, path.join(distDir, 'راهنمای_جامع_رفع_محدودیت_و_دسترسی_دیتابیس.md'));
-      if (fs.existsSync(exportUnpackedDir)) {
-        fs.copyFileSync(dbGuideSrc, path.join(exportUnpackedDir, 'راهنمای_جامع_رفع_محدودیت_و_دسترسی_دیتابیس.md'));
-      }
-      console.log('Copied database permissions guide to packages.');
+      console.log('Copied database permissions guide to export root.');
     }
 
-    // آماده‌سازی اولیه پوشه data در export برای استفاده در شبکه
+    // آماده‌سازی دایرکتوری داده‌های اولیه شبکه در export
     const exportDataDir = path.join(exportDir, 'data', 'database');
     if (!fs.existsSync(exportDataDir)) {
       fs.mkdirSync(exportDataDir, { recursive: true });
@@ -297,19 +332,15 @@ function build() {
       console.log('Initialized export/data/database/dev.db');
     }
 
-    // کپی اسناد جامع آموزش و مشخصات فنی به پوشه export
     const userGuideSrc = path.join(rootDir, 'USER_GUIDE_AND_TECHNICAL_SPECIFICATIONS.md');
     if (fs.existsSync(userGuideSrc)) {
       fs.copyFileSync(userGuideSrc, path.join(exportDir, 'USER_GUIDE.md'));
       fs.copyFileSync(userGuideSrc, path.join(distDir, 'USER_GUIDE.md'));
       fs.copyFileSync(userGuideSrc, path.join(exportDir, 'راهنمای_جامع_کاربری_و_آموزش_پایانه.md'));
-      if (fs.existsSync(exportUnpackedDir)) {
-        fs.copyFileSync(userGuideSrc, path.join(exportUnpackedDir, 'USER_GUIDE.md'));
-      }
-      console.log('Copied user guide and documentation to export folder.');
+      console.log('Copied user guide to export root.');
     }
 
-    // ایجاد فایل فشرده ZIP از پوشه کامل بازشده برای جابجایی آسان
+    // ۷. ایجاد فایل فشرده ZIP از پوشه پاکسازی‌شده ManovrSystem
     if (fs.existsSync(exportUnpackedDir)) {
       try {
         const AdmZip = require('adm-zip');
@@ -317,7 +348,7 @@ function build() {
         if (fs.existsSync(zipFile)) {
           try { fs.unlinkSync(zipFile); } catch (e) {}
         }
-        console.log('Creating ZIP archive of ManovrSystem at:', zipFile);
+        console.log('Creating clean ZIP archive of ManovrSystem at:', zipFile);
         const zip = new AdmZip();
         zip.addLocalFolder(exportUnpackedDir, 'ManovrSystem');
         zip.writeZip(zipFile);
@@ -327,39 +358,39 @@ function build() {
       }
     }
 
-    // نوشتن فایل راهنمای شبکه در پوشه export
+    // ۸. نوشتن فایل راهنمای شبکه
     const readmePath = path.join(exportDir, 'راهنمای_استفاده_در_شبکه.txt');
-    const readmeContent = `راهنمای استفاده از سامانه مانور دپو تحت شبکه شرکت (پایانه فتح‌آباد):
+    const readmeContent = `راهنمای استفاده از سامانه مدیریت پایانه و مانور فتح‌آباد تحت شبکه شرکت (خط یک مترو):
 ======================================================================
 
 آدرس پیش‌فرض پوشه اشتراکی شبکه در فایل manovr-config.json:
 \\\\srvdfs01\\Line1\\Depo\\data
 
-محتویات این بسته خروجی (نسخه ${version} - تاریخ ۲۵ شهریور ۱۴۰۵):
+محتویات این بسته خروجی رسمی (نگارش ${version} - تاریخ ۲۸ شهریور ۱۴۰۵):
 ----------------------------------------------------------------------
-۱. پوشه استخراج‌شده آماده استقرار در شبکه (بدون نیاز به نصب): ManovrSystem/
-   - این پوشه را مستقیماً داخل پوشه اشتراکی شبکه سرور کپی کنید.
-   - کلاینت‌ها بدون نیاز به هیچ‌گونه اکسترکت در زمان اجرا، مستقیماً فایل ManovrSystem.exe را باز می‌کنند.
-۲. اسکریپت خودکار ساخت شورتکات بهینه: create-client-shortcut.bat
-   - با دوبار کلیک کلاینت، میانبری بهینه روی دسکتاپ با فلگ‌های شتاب‌بخش کرومیوم ایجاد می‌شود.
+۱. پوشه اجرایی استقرار در شبکه (بدون نیاز به نصب): ManovrSystem/
+   - این پوشه حاوی فایل‌های کامپایل‌شده اجرایی برنامه است و مستقیماً روی سرور یا کلاینت‌ها قابل اجراست.
+   - کلاینت‌ها مستقیماً فایل ManovrSystem.exe را اجرا می‌نمایند.
+۲. اسکریپت خودکار ساخت میانبر کلاینت: create-client-shortcut.bat
+   - با دوبار کلیک کلاینت، میانبری بهینه روی دسکتاپ ایجاد می‌شود.
 ۳. فایل نصبی استاندارد ویندوز: ManovrSystem Setup ${version}.exe
-   - جهت نصب محلی دائمی با قابلیت ایجاد میانبر خودکار.
+   - جهت نصب محلی دائمی با قابلیت ایجاد میانبر خودکار در منوی استارت و دسکتاپ.
 ۴. فایل پرتابل تک‌فایلی: ManovrSystem-Portable-${version}.exe و ManovrSystem ${version}.exe
    - نسخه سبک و قابل حمل بر روی فلش‌مموری یا سیستم‌های اضطراری.
 ۵. ابزار تست و عیب‌یابی دسترسی شبکه و دیتابیس: check-database-permissions.bat
-   - بررسی خودکار اتصال، مجوز نوشتن، قفل فایل و سلامت دیتابیس بدون نیاز به ابزار اضافی.
+   - بررسی خودکار اتصال، مجوز نوشتن، قفل فایل و سلامت دیتابیس.
 ۶. ابزار تخصصی آزادسازی قفل و تعمیر دیتابیس سرور: repair-server-db.bat
-   - پاکسازی قفل‌ها، ادغام لاگ‌ها و تثبیت حالت TRUNCATE دیتابیس سرور.
+   - پاکسازی قفل‌ها، ادغام لاگ‌ها و تثبیت حالت TRUNCATE دیتابیس مشترک سرور.
 ۷. راهنمای جامع رفع محدودیت و دسترسی دیتابیس: راهنمای_جامع_رفع_محدودیت_و_دسترسی_دیتابیس.md
-   - راهنمای فنی، تنظیمات Share & NTFS، رفع خطای ۲۵۷۰ دیسک و تنظیمات آنتی‌ویروس.
+   - راهنمای فنی تنظیمات Share و NTFS، رفع خطای ۲۵۷۰ دیسک و تنظیمات آنتی‌ویروس.
 ۸. فایل تنظیمات شبکه: manovr-config.json
    - تعیین‌کننده مسیر پایگاه داده مشترک شبکه.
 ۹. پوشه data/database/dev.db
    - پایگاه داده متمرکز اولیه SQLite بهینه‌شده برای شبکه.
 
-روش پیشنهادی استقرار فوق‌سریع در شبکه:
+روش پیشنهادی استقرار در شبکه:
 ----------------------------------------------------------------------
-۱. پوشه «ManovrSystem» را همراه با پوشه «data»، اسکریپت‌ها و فایل «manovr-config.json» داخل مسیر شبکه سرور قرار دهید:
+۱. پوشه «ManovrSystem» را همراه با پوشه «data»، اسکریپت‌ها و فایل «manovr-config.json» داخل مسیر اشتراکی سرور قرار دهید:
    \\\\srvdfs01\\Line1\\Depo\\
 
 ۲. روی سیستم هر همکار یا کلاینت، وارد مسیر فوق شده و روی فایل «create-client-shortcut.bat» دوبار کلیک کنید.
@@ -370,7 +401,7 @@ function build() {
     fs.writeFileSync(readmePath, readmeContent, 'utf8');
     console.log('Created network usage guide in export folder.');
 
-    // تولید خودکار distribution-manifest.json با هش و حجم واقعی
+    // ۹. مانیفست‌های رسمی توزیع و به‌روزرسانی
     const crypto = require('crypto');
     function getHash(filePath) {
       if (!fs.existsSync(filePath)) return null;
@@ -394,11 +425,11 @@ function build() {
     const dbGuide = path.join(distDir, 'راهنمای_جامع_رفع_محدودیت_و_دسترسی_دیتابیس.md');
 
     const manifestData = {
-      manifestId: `MANOVR-DIST-20260915-012`,
-      productName: 'ManovrSystem - سامانه هوشمند مدیریت پایانه و مانور فتح‌آباد',
+      manifestId: `MANOVR-DIST-20260918-013`,
+      productName: 'ManovrSystem - سامانه مدیریت پایانه و مانور خط یک متروی تهران (فتح‌آباد)',
       version: version,
-      buildDate: '2026-09-15',
-      buildDateJalali: '۱۴۰۵/۰۶/۲۵',
+      buildDate: '2026-09-18',
+      buildDateJalali: '۱۴۰۵/۰۶/۲۸',
       developer: 'سید شبیر موسوی',
       sponsors: [
         'مدیریت عملیات خط یک شرکت بهره‌برداری راه‌آهن شهری تهران و حومه',
@@ -470,11 +501,10 @@ function build() {
     fs.writeFileSync(path.join(exportDir, 'distribution-manifest.json'), JSON.stringify(manifestData, null, 2), 'utf8');
     console.log('Successfully generated distribution-manifest.json in both dist and export directories.');
 
-    // ساخت مانیفست version.json سازگار با ماژول auto-updater
     const versionManifest = {
       version: version,
-      releaseDate: '2026-09-15T18:00:00Z',
-      releaseDateJalali: '۱۴۰۵/۰۶/۲۵',
+      releaseDate: '2026-09-18T09:00:00Z',
+      releaseDateJalali: '۱۴۰۵/۰۶/۲۸',
       minSupportedVersion: '0.1.0',
       packageType: 'full',
       packageFile: `ManovrSystem-Portable-${version}.exe`,
@@ -483,19 +513,19 @@ function build() {
       mandatory: false,
       changelog: {
         highlights: [
-          'ارتقای نگارش رسمی به ۰.۱.۲',
-          'افزودن صفحه اختصاصی درباره ما و شناسنامه سامانه',
-          'تثبیت قطعی پایداری شبکه و پایگاه داده سرور'
+          'ارتقای نگارش رسمی به ۰.۱.۳',
+          'افزودن شناسنامه رسمی پروژه و معرفی مدیران ارشد خط یک در صفحه درباره ما',
+          'حفاظت کامل از سورس‌کد و پاکسازی دایرکتوری اجرایی نرم‌افزار'
         ],
         features: [
-          'صفحه درباره ما و شناسنامه سامانه با معرفی مدیریت عملیات خط یک، ریاست پایانه و مانور و برنامه‌نویس',
-          'ابزار عیب‌یابی و بررسی مجوزهای شبکه و دیتابیس (check-database-permissions)',
-          'ابزار آزادسازی و تعمیر دیتابیس مشترک سرور (repair-server-db)'
+          'معرفی رسمی مدیریت محترم عملیات خط یک و ریاست محترم عملیات و مانور در صفحه درباره ما',
+          'سامانه هوشمند تاریخچه نگارش‌ها (Changelog) در شناسنامه نرم‌افزار',
+          'پاکسازی و بهینه‌سازی کامل پوشه ManovrSystem جهت استقرار پاک در شبکه'
         ],
         fixes: [
-          'حل قطعی خطای ۲۵۷۰ SQLite (SQLITE_IOERR_DELETE) با تبدیل ژورنال به TRUNCATE',
-          'محاسبه دقیق تاخیر فیزیکی دیسک شبکه (Physical Ping)',
-          'ایزولاسیون تراکنش‌های شبکه و صف‌بندی با Exponential Backoff'
+          'حذف کامل پوشه سورس‌کدها و سورس‌مپ‌ها از بسته نهایی نرم‌افزار',
+          'تضمین اجرای امن و پرسرعت نرم‌افزار با کدهای کامپایل‌شده',
+          'پاکسازی اسکریپت‌های سرور از پوشه کلاینت و تفکیک ابزارهای نگهداری'
         ]
       },
       targetPlatform: 'win-x64'
@@ -503,9 +533,8 @@ function build() {
     fs.writeFileSync(path.join(distDir, 'version.json'), JSON.stringify(versionManifest, null, 2), 'utf8');
     fs.writeFileSync(path.join(exportDir, 'version.json'), JSON.stringify(versionManifest, null, 2), 'utf8');
     console.log('Successfully generated version.json for auto-updater.');
-    console.log('Successfully generated distribution-manifest.json in both dist and export directories.');
 
-    console.log('Success! Optimized build completed successfully.');
+    console.log('Success! Optimized and fully sanitized build completed successfully.');
   } catch (error) {
     console.error('Error during build process:', error);
     process.exit(1);
