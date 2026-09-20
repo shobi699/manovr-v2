@@ -3,6 +3,12 @@ import { hasPerm } from "@/lib/perms";
 import { redirect } from "next/navigation";
 import AboutClient from "./AboutClient";
 
+import {
+  APP_CURRENT_VERSION,
+  APP_BUILD_DATE_JALALI,
+  APP_BUILD_DATE_GREGORIAN,
+} from "@/lib/version";
+
 export const metadata = {
   title: "درباره ما و شناسنامه سامانه | سامانه مدیریت مانور و دپو فتح‌آباد",
   description: "معرفی متولیان سازمانی، مدیریت عملیات خط یک، ریاست پایانه و مانور، تیم توسعه و مشخصات فنی سامانه",
@@ -20,9 +26,9 @@ export default async function AboutPage() {
     redirect("/dashboard");
   }
 
-  const currentVersion = "0.1.2";
-  const buildDateJalali = "۲۵ شهریور ۱۴۰۵";
-  const buildDateGregorian = "2026-09-15";
+  const currentVersion = APP_CURRENT_VERSION;
+  const buildDateJalali = APP_BUILD_DATE_JALALI;
+  const buildDateGregorian = APP_BUILD_DATE_GREGORIAN;
 
   return (
     <>

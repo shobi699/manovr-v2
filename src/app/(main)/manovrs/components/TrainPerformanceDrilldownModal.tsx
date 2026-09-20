@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { type TrainMatrixRow } from "@/lib/train-performance";
 import ExcelJS from "exceljs";
@@ -22,6 +22,9 @@ export default function TrainPerformanceDrilldownModal({
   const [selectedType, setSelectedType] = useState<string>("all");
   const [isExporting, setIsExporting] = useState(false);
 
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   // اطمینان از قرارگیری در کلاینت و قفل کردن اسکرول صفحه زیرین
   useEffect(() => {
     setMounted(true);
@@ -31,7 +34,7 @@ export default function TrainPerformanceDrilldownModal({
     // بستن با کلید Escape
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        onCloseRef.current();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -40,7 +43,7 @@ export default function TrainPerformanceDrilldownModal({
       document.body.style.overflow = originalOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onClose]);
+  }, []);
 
   // فیلتر داخلی مانورهای قطار
   const filteredManovrs = useMemo(() => {

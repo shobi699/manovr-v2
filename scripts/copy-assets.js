@@ -44,14 +44,12 @@ function removeAndReplaceJunctions(parentDir) {
           : path.resolve(path.dirname(fullPath), targetPath);
         
         console.log(`Replacing junction/symlink: ${fullPath} -> ${resolvedTarget}`);
-        // Delete symlink or junction
         if (stats.isDirectory() && !stats.isSymbolicLink()) {
-          fs.rmdirSync(fullPath); // on Windows directory junctions can be removed via rmdir
+          fs.rmdirSync(fullPath);
         } else {
           fs.unlinkSync(fullPath);
         }
         
-        // Copy the actual target files in its place
         copyFolderSync(resolvedTarget, fullPath);
       } else if (stats.isDirectory()) {
         removeAndReplaceJunctions(fullPath);
@@ -59,6 +57,120 @@ function removeAndReplaceJunctions(parentDir) {
     } catch (err) {
       // skip errors
     }
+  });
+}
+
+function cleanRecursively(dir, rootStandaloneDir) {
+  if (!fs.existsSync(dir)) return;
+  fs.readdirSync(dir).forEach(element => {
+    const fullPath = path.join(dir, element);
+    try {
+      const stats = fs.lstatSync(fullPath);
+      if (stats.isDirectory()) {
+        const lower = element.toLowerCase();
+        const isDirectChildOfStandalone = path.normalize(dir) === path.normalize(rootStandaloneDir);
+
+        // ۱. پوشه‌هایی که در هیچ کجای بیلد نباید باشند
+        const globallyProhibitedDirs = [
+          'src', '.agents', '.claude', 'graphify-out', 'e2e', 'e2e-skills-1.16.0',
+          'qa-skills-1.13.3', 'workflows', '.playwright', '.specify', 'specs',
+          '.git', '.github', '.idea', '.vscode', 'tests'
+        ];
+
+        // ۲. پوشه‌هایی که صرفاً در ریشه standalone نباید وجود داشته باشند (تا به روت‌های api یا node_modules آسیب نرسد)
+        const rootOnlyProhibitedDirs = [
+          'export', 'backups', 'data', 'seed', 'plans', 'docs', 'test-results', 'scripts', 'fonts'
+        ];
+
+        if (globallyProhibitedDirs.includes(lower)) {
+          fs.rmSync(fullPath, { recursive: true, force: true });
+          console.log(`Removed prohibited directory: ${fullPath}`);
+        } else if (isDirectChildOfStandalone && rootOnlyProhibitedDirs.includes(lower)) {
+          fs.rmSync(fullPath, { recursive: true, force: true });
+          console.log(`Removed root standalone directory: ${fullPath}`);
+        } else {
+          cleanRecursively(fullPath, rootStandaloneDir);
+        }
+      } else {
+        const lower = element.toLowerCase();
+        const ext = path.extname(element).toLowerCase();
+
+        // ۱. حذف قطعی تمامی فایل‌های سورس‌کد و سورس‌مپ
+        if (ext === '.map' || ext === '.ts' || ext === '.tsx' || ext === '.tsbuildinfo') {
+          fs.unlinkSync(fullPath);
+          return;
+        }
+
+        // ۲. حذف هرگونه فایل با ردپای هوش مصنوعی (AI / LLM / Agent)
+        if (
+          lower === 'skills-lock.json' ||
+          lower === 'vibe.config.json' ||
+          lower === 'agent.md' ||
+          lower === 'agents.md' ||
+          lower === 'claude.md' ||
+          lower === 'vibe.md'
+        ) {
+          fs.unlinkSync(fullPath);
+          console.log(`Removed AI metadata file: ${element}`);
+          return;
+        }
+
+        // ۳. حذف فایل‌های پریزما انجین‌های بلااستفاده
+        if (
+          lower.includes('query_engine-windows.dll.node.tmp') ||
+          (lower.startsWith('query_engine') && lower.includes('.tmp')) ||
+          ((lower.includes('cockroachdb') ||
+            lower.includes('postgresql') ||
+            lower.includes('mysql') ||
+            lower.includes('sqlserver')) &&
+           (lower.endsWith('.js') || lower.endsWith('.mjs') || lower.endsWith('.wasm')))
+        ) {
+          fs.unlinkSync(fullPath);
+          return;
+        }
+      }
+    } catch (e) {
+      // skip files that can't be read or deleted
+    }
+  });
+}
+
+function cleanStandaloneRootFiles(standaloneDir) {
+  if (!fs.existsSync(standaloneDir)) return;
+  fs.readdirSync(standaloneDir).forEach(file => {
+    const filePath = path.join(standaloneDir, file);
+    try {
+      const stats = fs.lstatSync(filePath);
+      if (!stats.isDirectory()) {
+        const lower = file.toLowerCase();
+        const ext = path.extname(file).toLowerCase();
+        if (
+          ['.exe', '.rar', '.zip', '.docx', '.pdf', '.md', '.log', '.tmp', '.markdown', '.bat', '.ps1', '.sh', '.ts', '.tsx', '.map', '.yml', '.yaml'].includes(ext) ||
+          lower.startsWith('manovrsystem') ||
+          lower.startsWith('agent') ||
+          lower.startsWith('claude') ||
+          lower.startsWith('vibe') ||
+          lower.startsWith('readme') ||
+          lower.startsWith('user_guide') ||
+          lower.startsWith('.env') ||
+          lower === 'tsconfig.json' ||
+          lower === 'next.config.ts' ||
+          lower === 'vitest.config.ts' ||
+          lower === 'eslint.config.mjs' ||
+          lower === 'postcss.config.mjs' ||
+          lower === 'electron-builder.yml' ||
+          lower === 'package-lock.json' ||
+          lower === 'main.js' ||
+          lower === 'preload.js' ||
+          lower === 'splash.html' ||
+          lower === 'skills-lock.json' ||
+          lower === 'vibe.config.json'
+        ) {
+          fs.unlinkSync(filePath);
+          console.log(`Cleaned root standalone file: ${file}`);
+        }
+      }
+    } catch (e) {}
   });
 }
 
@@ -93,70 +205,18 @@ function copyAssets() {
     removeAndReplaceJunctions(standaloneDir);
     console.log('Junction dereferencing completed successfully.');
 
-    // ۴. حذف موتورهای بلااستفاده پریزما (غیر از sqlite) برای بهینه‌سازی حجم
-    console.log('Cleaning unused Prisma engines from standalone directory...');
-    cleanUnusedPrismaEngines(standaloneDir);
-    console.log('Prisma database engines cleaned successfully.');
+    // ۴. پاکسازی بازگشتی و عمیق سورس‌کدها، سورس‌مپ‌ها، متادیتای هوش مصنوعی و دایرکتوری‌های غیرمجاز
+    console.log('Executing deep sanitization of standalone directory (purging src, .ts, .map, AI markers)...');
+    cleanRecursively(standaloneDir, standaloneDir);
 
-    // ۵. پاکسازی فایل‌ها و پوشه‌های اضافی از standalone جهت بهینه‌سازی حداکثری حجم بیلد
-    console.log('Cleaning unneeded directories and files from standalone...');
-    const dirsToRemove = [
-      'export', 'backups', 'data', 'seed', 'plans', '.agents', '.claude', 'graphify-out',
-      'e2e', 'e2e-skills-1.16.0', 'qa-skills-1.13.3', 'workflows', 'docs', 'test-results', '.playwright',
-      '.specify', 'specs', '.git', '.github', '.idea', '.vscode', 'tests'
-    ];
-    dirsToRemove.forEach(d => {
-      const p = path.join(standaloneDir, d);
-      if (fs.existsSync(p)) {
-        fs.rmSync(p, { recursive: true, force: true });
-        console.log(`Cleaned unneeded directory from standalone: ${d}`);
-      }
-    });
-
-    fs.readdirSync(standaloneDir).forEach(f => {
-      const ext = path.extname(f).toLowerCase();
-      if (['.exe', '.rar', '.zip', '.docx', '.pdf', '.md', '.log', '.tmp', '.markdown'].includes(ext) || f.startsWith('ManovrSystem') || f.startsWith('AGENTS') || f.startsWith('CLAUDE') || f.startsWith('README')) {
-        try {
-          fs.unlinkSync(path.join(standaloneDir, f));
-          console.log(`Cleaned file from standalone: ${f}`);
-        } catch (e) {}
-      }
-    });
+    // ۵. پاکسازی فایل‌های پیکربندی و زاید از ریشه standalone
+    cleanStandaloneRootFiles(standaloneDir);
+    console.log('Standalone directory sanitization completed successfully.');
 
   } catch (err) {
-    console.error('Error copying assets or replacing junctions:', err);
+    console.error('Error copying assets or cleaning standalone:', err);
     process.exit(1);
   }
-}
-
-function cleanUnusedPrismaEngines(dir) {
-  if (!fs.existsSync(dir)) return;
-  fs.readdirSync(dir).forEach(element => {
-    const fullPath = path.join(dir, element);
-    try {
-      const stats = fs.lstatSync(fullPath);
-      if (stats.isDirectory()) {
-        cleanUnusedPrismaEngines(fullPath);
-      } else {
-        const lowerName = element.toLowerCase();
-        if (
-          lowerName.includes('query_engine-windows.dll.node.tmp') ||
-          (lowerName.startsWith('query_engine') && lowerName.includes('.tmp')) ||
-          ((lowerName.includes('cockroachdb') ||
-            lowerName.includes('postgresql') ||
-            lowerName.includes('mysql') ||
-            lowerName.includes('sqlserver')) &&
-           (lowerName.endsWith('.js') || lowerName.endsWith('.mjs') || lowerName.endsWith('.wasm')))
-        ) {
-          fs.unlinkSync(fullPath);
-        } else if (lowerName.endsWith('.map')) {
-          fs.unlinkSync(fullPath);
-        }
-      }
-    } catch (e) {
-      // skip files that can't be read or deleted
-    }
-  });
 }
 
 copyAssets();

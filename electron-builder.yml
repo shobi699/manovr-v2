@@ -12,6 +12,10 @@ compression: "normal"
 asar: true
 asarUnpack:
   - ".next/standalone/**/*"
+  - "!.next/standalone/src/**"
+  - "!.next/standalone/**/*.ts"
+  - "!.next/standalone/**/*.tsx"
+  - "!.next/standalone/**/*.map"
 
 directories:
   output: "D:/manovr-build-dist"
@@ -24,6 +28,20 @@ files:
   - "manovr-config.json"
   - ".next/standalone/**/*"
   - "!.next/standalone/**/.env*"
+  - "!.next/standalone/src/**"
+  - "!.next/standalone/**/*.ts"
+  - "!.next/standalone/**/*.tsx"
+  - "!.next/standalone/**/*.map"
+  - "!.next/standalone/**/*.md"
+  - "!.next/standalone/**/agent*"
+  - "!.next/standalone/**/AGENTS*"
+  - "!.next/standalone/**/CLAUDE*"
+  - "!.next/standalone/**/vibe*"
+  - "!.next/standalone/**/skill*"
+  - "!.next/standalone/**/specs/**"
+  - "!.next/standalone/**/.specify/**"
+  - "!.next/standalone/**/tests/**"
+  - "!.next/standalone/**/test-results/**"
   - "public/**/*"
   - "!node_modules/**/*"
 
