@@ -19,7 +19,7 @@ import {
 } from "@/lib/validations";
 import { getOfflinePolicy } from "@/lib/settings";
 import { getNetworkStatus } from "@/lib/network-status";
-import { recordOfflineAction } from "@/lib/offline-sync";
+import { recordOfflineAction, withFastOfflineFallback } from "@/lib/offline-sync";
 
 // خطای دامنه‌ای که باید به پیام کاربر تبدیل شود، نه خطای ۵۰۰
 class ManovrError extends Error {}
@@ -78,119 +78,95 @@ export async function createManovr(
 
   // بررسی ظرفیت و ثبت مانور و جابجایی قطار باید اتمیک باشند تا دو مانور همزمان
   // نتوانند هر دو از یک ظرفیت باقیمانده عبور کنند
-  let created;
+  let created: any = null;
+  let wasOffline = false;
+
   try {
-    created = await prisma.$transaction(async (tx) => {
-      let dest = null;
-      if (destinationLineId) {
-        dest = await tx.line.findUnique({ where: { id: destinationLineId } });
-      }
+    const executeDbTransaction = async () => {
+      return await prisma.$transaction(async (tx) => {
+        let dest = null;
+        if (destinationLineId) {
+          dest = await tx.line.findUnique({ where: { id: destinationLineId } });
+        }
 
-      // در مانور انتقال دائم (خروج قطار)، قطار از پایانه خارج می‌شود و ظرفیت اشغال نمی‌کند
-      if (!isPerm && dest) {
-        // ۱. بررسی ظرفیت کلی خط مقصد (بدون احتساب خود این قطار تا مانور در محل مسدود نشود)
-        const onDest = await tx.train.count({
-          where: {
-            lineId: destinationLineId,
-            isDisposed: false,
-            id: { not: trainId },
+        // در مانور انتقال دائم (خروج قطار)، قطار از پایانه خارج می‌شود و ظرفیت اشغال نمی‌کند
+        if (!isPerm && dest) {
+          // ۱. بررسی ظرفیت کلی خط مقصد (بدون احتساب خود این قطار تا مانور در محل مسدود نشود)
+          const onDest = await tx.train.count({
+            where: {
+              lineId: destinationLineId,
+              isDisposed: false,
+              id: { not: trainId },
+            },
+          });
+          if (!hasRoomOnLine(onDest, dest.capacity)) {
+            throw new ManovrError("ظرفیت خط مقصد پر شده است.");
+          }
+
+          // ۲. بررسی محدوده مجاز اسلات بر اساس ظرفیت خط
+          if (slotIndex < 0 || slotIndex >= dest.capacity) {
+            throw new ManovrError(`جایگاه انتخابی خارج از ظرفیت خط مقصد (${dest.capacity} جایگاه) است.`);
+          }
+
+          // ۳. بررسی اتمیک عدم اشغال همزمان اسلات توسط قطار دیگر (جلوگیری قطعی از Race Condition و رزرو دوبل)
+          const existingInSlot = await tx.train.findFirst({
+            where: {
+              lineId: destinationLineId,
+              slotIndex: slotIndex,
+              isDisposed: false,
+              id: { not: trainId },
+            },
+          });
+          if (existingInSlot) {
+            throw new ManovrError(`جایگاه ${slotIndex + 1} در خط ${dest.name} در حال حاضر توسط قطار ${existingInSlot.code} اشغال شده است.`);
+          }
+        }
+
+        const manovr = await tx.manovr.create({
+          data: {
+            type,
+            status: 1,
+            confirmationStatus: 3,
+            description: isPerm && !description ? "انتقال دائم و خروج قطار از پایانه" : description,
+            sourceLineId,
+            destinationLineId,
+            trainId,
+            rahbar1Id,
+            rahbar2Id,
+            creatorId: session.id,
+            executionTime,
+          },
+          include: {
+            train: true,
+            sourceLine: true,
+            destinationLine: true,
           },
         });
-        if (!hasRoomOnLine(onDest, dest.capacity)) {
-          throw new ManovrError("ظرفیت خط مقصد پر شده است.");
+
+        const trainUpdateData: {
+          lineId: number | null;
+          slotIndex: number;
+          isDisposed?: boolean;
+          hasKafshak?: boolean;
+        } = isPerm
+          ? { isDisposed: true, lineId: null, slotIndex: 0 }
+          : { lineId: destinationLineId, slotIndex };
+
+        if (shouldSetKafshak(type)) {
+          trainUpdateData.hasKafshak = true;
         }
 
-        // ۲. بررسی محدوده مجاز اسلات بر اساس ظرفیت خط
-        if (slotIndex < 0 || slotIndex >= dest.capacity) {
-          throw new ManovrError(`جایگاه انتخابی خارج از ظرفیت خط مقصد (${dest.capacity} جایگاه) است.`);
-        }
-
-        // ۳. بررسی اتمیک عدم اشغال همزمان اسلات توسط قطار دیگر (جلوگیری قطعی از Race Condition و رزرو دوبل)
-        const existingInSlot = await tx.train.findFirst({
-          where: {
-            lineId: destinationLineId,
-            slotIndex: slotIndex,
-            isDisposed: false,
-            id: { not: trainId },
-          },
+        await tx.train.update({
+          where: { id: trainId },
+          data: trainUpdateData,
         });
-        if (existingInSlot) {
-          throw new ManovrError(`جایگاه ${slotIndex + 1} در خط ${dest.name} در حال حاضر توسط قطار ${existingInSlot.code} اشغال شده است.`);
-        }
-      }
 
-      const manovr = await tx.manovr.create({
-        data: {
-          type,
-          status: 1,
-          confirmationStatus: 3,
-          description: isPerm && !description ? "انتقال دائم و خروج قطار از پایانه" : description,
-          sourceLineId,
-          destinationLineId,
-          trainId,
-          rahbar1Id,
-          rahbar2Id,
-          creatorId: session.id,
-          executionTime,
-        },
-        include: {
-          train: true,
-          sourceLine: true,
-          destinationLine: true,
-        },
+        return manovr;
       });
+    };
 
-      const trainUpdateData: {
-        lineId: number | null;
-        slotIndex: number;
-        isDisposed?: boolean;
-        hasKafshak?: boolean;
-      } = isPerm
-        ? { isDisposed: true, lineId: null, slotIndex: 0 }
-        : { lineId: destinationLineId, slotIndex };
-
-      if (shouldSetKafshak(type)) {
-        trainUpdateData.hasKafshak = true;
-      }
-
-      await tx.train.update({
-        where: { id: trainId },
-        data: trainUpdateData,
-      });
-
-      return manovr;
-    });
-  } catch (err) {
-    if (err instanceof ManovrError) return { error: err.message };
-    console.error("createManovr transaction error:", err);
-    return { error: "خطایی در ثبت مانور در دیتابیس رخ داد." };
-  }
-
-  // ثبت لاگ وقایع
-  const trainCode = created.train?.code || String(trainId);
-  const srcName = created.sourceLine?.name || "نامشخص";
-  const destName = created.destinationLine?.name || "نامشخص";
-  const typeLabel = ManovrType[type] || `نوع ${type}`;
-  const isSameLine = sourceLineId === destinationLineId;
-  const auditMessage = isPerm
-    ? `ثبت مانور ${typeLabel} - خروج دائم قطار کد ${trainCode} از پایانه`
-    : isSameLine
-    ? `مانور در محل (ثابت) برای قطار ${trainCode} روی خط ${destName} ثبت گردید.`
-    : `مانور جدیدی برای قطار ${trainCode} از خط ${srcName} به خط ${destName} ثبت گردید.`;
-
-  await audit(
-    session,
-    "manovr",
-    created.id,
-    "CREATE",
-    null,
-    created,
-    auditMessage
-  );
-
-  // در صورت قطعی شبکه و ثبت در حالت محلی، عملیات در صف آفلاین ذخیره می‌شود
-  if (!netStatus.isShared) {
-    try {
+    const handleOfflineFallback = async () => {
+      wasOffline = true;
       await recordOfflineAction({
         actionType: "CREATE_MANOVR",
         data: {
@@ -210,10 +186,56 @@ export async function createManovr(
         userId: session.id,
         userFullName: (session as any).name || (session as any).username || "کاربر سیستم",
       });
-    } catch (offlineErr) {
-      console.error("[createManovr] خطا در ذخیره صف همگام‌سازی آفلاین:", offlineErr);
+    };
+
+    // اگر ارتباط شبکه قطع باشد، مستقیماً به صف آفلاین می‌رود
+    if (!netStatus.isShared) {
+      await handleOfflineFallback();
+    } else {
+      // در صورت برقراری اتصال، اگر شبکه کند باشد و ثبت بیش از ۳ ثانیه طول بکشد، بی‌درنگ در صف محلی ثبت می‌شود
+      const fallbackResult = await withFastOfflineFallback(
+        executeDbTransaction,
+        handleOfflineFallback,
+        3000 // سقف استاندارد ۳ ثانیه‌ای برای جلوگیری از تاخیر کاربر
+      );
+
+      if (fallbackResult.wasOfflineFallback) {
+        wasOffline = true;
+      } else {
+        created = fallbackResult.result;
+      }
     }
+  } catch (err) {
+    if (err instanceof ManovrError) return { error: err.message };
+    console.error("createManovr transaction error:", err);
+    return { error: "خطایی در ثبت مانور در دیتابیس رخ داد." };
   }
+
+  // ثبت لاگ وقایع
+  const trainCode = created?.train?.code || String(trainId);
+  const srcName = created?.sourceLine?.name || "نامشخص";
+  const destName = created?.destinationLine?.name || "نامشخص";
+  const typeLabel = ManovrType[type] || `نوع ${type}`;
+  const isSameLine = sourceLineId === destinationLineId;
+  const auditMessage = wasOffline
+    ? `مانور ${typeLabel} به علت کندی یا قطعی شبکه دپو با موفقیت در صف آفلاین محلی ثبت شد و به محض ثبات شبکه با سرور همگام می‌شود.`
+    : isPerm
+    ? `ثبت مانور ${typeLabel} - خروج دائم قطار کد ${trainCode} از پایانه`
+    : isSameLine
+    ? `مانور در محل (ثابت) برای قطار ${trainCode} روی خط ${destName} ثبت گردید.`
+    : `مانور جدیدی برای قطار ${trainCode} از خط ${srcName} به خط ${destName} ثبت گردید.`;
+
+  try {
+    await audit(
+      session,
+      "manovr",
+      created?.id || 0,
+      "CREATE",
+      null,
+      created || { trainId, sourceLineId, destinationLineId, wasOffline: true },
+      auditMessage
+    );
+  } catch {}
 
   revalidatePath("/manovrs");
   revalidatePath("/dashboard");

@@ -5,6 +5,7 @@ import { getBrandingSettings } from "@/app/actions/lookups";
 import { getUserPerms } from "@/lib/perms";
 import { prisma } from "@/lib/prisma";
 import { ContextMenuProvider } from "@/components/context-menu";
+import OfflineBanner from "@/components/OfflineBanner";
 
 export default async function MainLayout({
   children,
@@ -30,8 +31,9 @@ export default async function MainLayout({
       <div className="shell">
         <Sidebar userId={session.id} fullName={session.fullName} role={session.role} roleName={roleName} perms={perms} />
         <main className="main">
+          <OfflineBanner />
 
-        {branding.announcementActive && branding.announcementText && (
+          {branding.announcementActive && branding.announcementText && (
           <div className={`banner-${branding.announcementKind}`} style={{
             padding: "12px 18px",
             backgroundColor: branding.announcementKind === "alert" ? "var(--crit-soft)" : branding.announcementKind === "warning" ? "var(--warn-soft)" : branding.announcementKind === "success" ? "var(--good-soft)" : "var(--accent-soft)",

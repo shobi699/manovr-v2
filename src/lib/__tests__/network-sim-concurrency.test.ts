@@ -5,7 +5,7 @@ import { isSqliteLockOrIoError } from "../prisma";
 
 describe("US1: آزمون استرس همروندی دیتابیس و شبیه‌سازی کاربران همزمان (Multi-User Concurrency)", () => {
   it("باید چندین تراکنش همزمان خواندن و نوشتن را بدون خطای قفل پایگاه داده (SQLITE_BUSY) اجرا کند", async () => {
-    const { targetDb } = setupVirtualNetworkShare();
+    const { targetDb } = setupVirtualNetworkShare("network-concurrency");
     const testPrisma = new PrismaClient({
       datasources: {
         db: {
@@ -84,7 +84,7 @@ describe("US1: آزمون استرس همروندی دیتابیس و شبیه�
   }, 30000);
 
   it("باید سرعت استعلام و زمان پاسخ‌دهی دیتابیس در ترافیک بالا زیر آستانه مجاز باشد", async () => {
-    const { targetDb } = setupVirtualNetworkShare();
+    const { targetDb } = setupVirtualNetworkShare("network-concurrency-speed");
     const testPrisma = new PrismaClient({
       datasources: {
         db: {

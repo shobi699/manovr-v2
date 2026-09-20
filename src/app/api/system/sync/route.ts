@@ -1,17 +1,16 @@
 import { NextResponse } from "next/server";
-import { getOfflineQueue, syncOfflineActionsToServer } from "@/lib/offline-sync";
-import { getOfflinePolicy } from "@/lib/settings";
+import { getOfflineQueue, getOfflineSyncStatus, syncOfflineActionsToServer } from "@/lib/offline-sync";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
     const queue = await getOfflineQueue();
-    const policy = await getOfflinePolicy();
+    const status = await getOfflineSyncStatus();
+
     return NextResponse.json({
       success: true,
-      queueLength: queue.length,
-      policy,
+      ...status,
       queueSummary: queue.map((item) => ({
         id: item.id,
         actionType: item.actionType,

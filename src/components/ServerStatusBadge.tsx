@@ -28,6 +28,7 @@ export default function ServerStatusBadge({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRefreshing, startRefresh] = useTransition();
   const [queueCount, setQueueCount] = useState<number>(0);
+  const [hasStaleItems, setHasStaleItems] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
 
@@ -50,6 +51,7 @@ export default function ServerStatusBadge({
           if (syncRes.ok) {
             const syncInfo = await syncRes.json();
             setQueueCount(syncInfo.queueLength || 0);
+            setHasStaleItems(Boolean(syncInfo.hasStaleItems));
 
             // همگام‌سازی تمام خودکار به محض اتصال مجدد به سرور (بدون نیاز به دخالت کاربر)
             if (
@@ -237,18 +239,23 @@ export default function ServerStatusBadge({
             <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
               {queueCount > 0 && (
                 <span
-                  title={`${queueCount} مورد در صف همگام‌سازی`}
+                  title={
+                    hasStaleItems
+                      ? `${queueCount} مورد در صف آفلاین (هشدار: معوقه بیش از ۱۰ دقیقه)`
+                      : `${queueCount} مورد در صف همگام‌سازی`
+                  }
                   style={{
                     fontSize: "10px",
                     fontWeight: 700,
-                    color: "#b45309",
-                    backgroundColor: "#fef3c7",
+                    color: hasStaleItems ? "#991b1b" : "#b45309",
+                    backgroundColor: hasStaleItems ? "#fee2e2" : "#fef3c7",
                     borderRadius: "10px",
                     padding: "0 5px",
                     lineHeight: "16px",
+                    border: hasStaleItems ? "1px solid #ef4444" : "none",
                   }}
                 >
-                  {queueCount}
+                  {hasStaleItems ? `⚠️ ${queueCount}` : queueCount}
                 </span>
               )}
 

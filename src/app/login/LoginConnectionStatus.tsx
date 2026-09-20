@@ -2,27 +2,16 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
-
-export interface NetworkStatusData {
-  isShared: boolean;
-  isDatabaseReady: boolean;
-  targetSharedPath: string;
-  activeDatabasePath: string;
-  maskedTarget?: string;
-  maskedActivePath?: string;
-  storageSource: string;
-  pingMs: number;
-  sharedPathAccessible: boolean;
-  serverHostname: string;
-  checkedAt: string;
-}
+import type { NetworkStatusResult } from "@/lib/network-status";
+import DatabaseDiagnosticModal from "./DatabaseDiagnosticModal";
 
 export default function LoginConnectionStatus() {
-  const [status, setStatus] = useState<NetworkStatusData | null>(null);
+  const [status, setStatus] = useState<NetworkStatusResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [showDiagModal, setShowDiagModal] = useState(false);
 
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -48,7 +37,7 @@ export default function LoginConnectionStatus() {
       });
 
       if (res.ok) {
-        const data: NetworkStatusData = await res.json();
+        const data: NetworkStatusResult = await res.json();
         setStatus(data);
 
         // در صورت موفقیت و در دسترس بودن دیتابیس، شمارنده ریتری صفر می‌شود
@@ -331,6 +320,72 @@ export default function LoginConnectionStatus() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* هشدار صریح عدم دسترسی نوشتن به پوشه سرور مطابق دستور کاربر */}
+      {status && status.sharedPathAccessible && !status.sharedPathWritable && (
+        <div
+          style={{
+            marginTop: "8px",
+            padding: "8px 10px",
+            borderRadius: "8px",
+            backgroundColor: "rgba(239, 68, 68, 0.12)",
+            border: "1px solid rgba(239, 68, 68, 0.35)",
+            color: "#dc2626",
+            fontSize: "11px",
+            lineHeight: "1.6",
+            fontWeight: 600,
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "6px",
+          }}
+        >
+          <span style={{ fontSize: "14px" }}>⛔</span>
+          <div>
+            <b>عدم مجوز نوشتن:</b> شما دسترسی نوشتن و اصلاح (Modify/Write) در پوشه اشتراکی سرور را ندارید. لطفاً جهت فعال‌سازی دسترسی به ادمین سرور مراجعه فرمایید.
+          </div>
+        </div>
+      )}
+
+      {/* دکمه ابزار عیب‌یابی و تعمیر پایگاه داده */}
+      <div style={{ marginTop: "8px", display: "flex", justifyContent: "flex-end" }}>
+        <button
+          type="button"
+          onClick={() => setShowDiagModal(true)}
+          style={{
+            background: "transparent",
+            border: "1px dashed var(--line)",
+            borderRadius: "6px",
+            padding: "4px 10px",
+            fontSize: "11px",
+            fontWeight: 650,
+            color: "var(--ink-soft)",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "5px",
+            transition: "all 0.2s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = "var(--accent)";
+            e.currentTarget.style.color = "var(--accent)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "var(--line)";
+            e.currentTarget.style.color = "var(--ink-soft)";
+          }}
+        >
+          <span>🔍</span>
+          <span>ابزار عیب‌یابی و تعمیر پایگاه داده</span>
+        </button>
+      </div>
+
+      {/* مودال جامع عیب‌یابی و تعمیر */}
+      <DatabaseDiagnosticModal
+        isOpen={showDiagModal}
+        onClose={() => setShowDiagModal(false)}
+        initialStatus={status}
+        onStatusUpdated={(s) => setStatus(s)}
+      />
     </div>
   );
 }

@@ -8,9 +8,9 @@ describe("Help & Documentation System — Comprehensive Menu Guides Verification
     expect(Icons.Help).toBeDefined();
   });
 
-  it("contains comprehensive documentation for all 21 system menus", () => {
+  it("contains comprehensive documentation for all 22 system menus", () => {
     expect(MENU_GUIDES).toBeDefined();
-    expect(MENU_GUIDES.length).toBe(21);
+    expect(MENU_GUIDES.length).toBe(22);
   });
 
   it("strictly enforces that every single menu guide has at least 1,000 characters of detailed documentation", () => {
@@ -22,7 +22,7 @@ describe("Help & Documentation System — Comprehensive Menu Guides Verification
     }
   });
 
-  it("ensures all 21 menus have unique IDs and unique routes", () => {
+  it("ensures all 22 menus have unique IDs and unique routes", () => {
     const ids = new Set<string>();
     const routes = new Set<string>();
 
@@ -34,8 +34,8 @@ describe("Help & Documentation System — Comprehensive Menu Guides Verification
       routes.add(guide.route);
     }
 
-    expect(ids.size).toBe(21);
-    expect(routes.size).toBe(21);
+    expect(ids.size).toBe(22);
+    expect(routes.size).toBe(22);
   });
 
   it("ensures all required structured fields are populated for every menu", () => {
@@ -58,7 +58,7 @@ describe("Help & Documentation System — Comprehensive Menu Guides Verification
 
     expect(terminalOps.length).toBe(5);
     expect(baseInfo.length).toBe(5);
-    expect(adminAnalysis.length).toBe(11);
+    expect(adminAnalysis.length).toBe(12);
   });
 
   it("verifies Persian search matching on menu guides", () => {
