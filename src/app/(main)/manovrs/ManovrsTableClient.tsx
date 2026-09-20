@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import DataTable from "@/components/DataTable";
 import ManovrRowActions from "./ManovrRowActions";
 import DriverShuntingReportsView from "./components/DriverShuntingReportsView";
+import TrainPerformanceView from "./TrainPerformanceView";
 import { ManovrType, ManovrStatus, ConfirmationStatus } from "@/lib/enums";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { toast } from "@/components/ui/Toast";
@@ -26,6 +27,13 @@ interface DriverItem {
   orgPosition?: number;
 }
 
+interface TrainItem {
+  id: number;
+  code: string;
+  type?: number;
+  status?: number;
+}
+
 interface ManovrsTableClientProps {
   manovrs: any[];
   totalRows: number;
@@ -39,6 +47,7 @@ interface ManovrsTableClientProps {
   confirmationStatuses?: LookupValue[];
   shifts?: LookupValue[];
   drivers?: DriverItem[];
+  trains?: TrainItem[];
 }
 
 function fmt(d: string | Date) {
@@ -64,14 +73,19 @@ export default function ManovrsTableClient({
   confirmationStatuses,
   shifts = [],
   drivers = [],
+  trains = [],
 }: ManovrsTableClientProps) {
 
   useLiveRefresh(["manovr_changed"]);
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // تب فعال: فهرست تاریخچه مانورها یا گزارش عملکرد راهبران و شیفت‌ها
-  const [activeTab, setActiveTab] = useState<"history" | "driver_reports">("history");
+  // تب فعال: فهرست تاریخچه مانورها، گزارش عملکرد راهبران یا کارنامه عملکرد قطارها
+  const [activeTab, setActiveTab] = useState<"history" | "driver_reports" | "train_reports">(() => {
+    const t = searchParams.get("tab");
+    if (t === "driver_reports" || t === "train_reports") return t;
+    return "history";
+  });
   const [showFilters, setShowFilters] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -445,10 +459,13 @@ export default function ManovrsTableClient({
           boxShadow: "0 2px 10px -3px rgba(0,0,0,0.08)",
         }}
       >
-        <div style={{ display: "flex", gap: "6px" }}>
+        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
           <button
             type="button"
-            onClick={() => setActiveTab("history")}
+            onClick={() => {
+              setActiveTab("history");
+              updateUrl({ tab: "history" });
+            }}
             className={`btn ${activeTab === "history" ? "primary" : "secondary"}`}
             style={{
               display: "flex",
@@ -476,7 +493,10 @@ export default function ManovrsTableClient({
 
           <button
             type="button"
-            onClick={() => setActiveTab("driver_reports")}
+            onClick={() => {
+              setActiveTab("driver_reports");
+              updateUrl({ tab: "driver_reports" });
+            }}
             className={`btn ${activeTab === "driver_reports" ? "primary" : "secondary"}`}
             style={{
               display: "flex",
@@ -489,7 +509,7 @@ export default function ManovrsTableClient({
               boxShadow: activeTab === "driver_reports" ? "0 2px 8px rgba(234,88,12,0.3)" : "none",
             }}
           >
-            <span>📊 گزارش عملکرد، شیفت و سولو</span>
+            <span>📊 گزارش شیفت راهبران</span>
             <span
               className="pill"
               style={{
@@ -500,7 +520,40 @@ export default function ManovrsTableClient({
                 fontWeight: "bold",
               }}
             >
-              گزارش تفکیکی
+              راهبران
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("train_reports");
+              updateUrl({ tab: "train_reports" });
+            }}
+            className={`btn ${activeTab === "train_reports" ? "primary" : "secondary"}`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              fontWeight: 600,
+              borderRadius: "8px",
+              padding: "7px 16px",
+              fontSize: "12.5px",
+              boxShadow: activeTab === "train_reports" ? "0 2px 8px rgba(16,185,129,0.3)" : "none",
+            }}
+          >
+            <span>🚦 گزارش عملکرد قطارها</span>
+            <span
+              className="pill"
+              style={{
+                background: activeTab === "train_reports" ? "#059669" : "rgba(16, 185, 129, 0.15)",
+                color: activeTab === "train_reports" ? "#fff" : "#059669",
+                border: "1px solid rgba(16, 185, 129, 0.35)",
+                fontSize: "11px",
+                fontWeight: "bold",
+              }}
+            >
+              کارنامه ناوگان
             </span>
           </button>
         </div>
@@ -521,7 +574,12 @@ export default function ManovrsTableClient({
       </div>
 
       {/* نمایش بر اساس تب فعال */}
-      {activeTab === "driver_reports" ? (
+      {activeTab === "train_reports" ? (
+        <TrainPerformanceView
+          trains={trains}
+          initialTrainCode={filterTrainCode}
+        />
+      ) : activeTab === "driver_reports" ? (
         <DriverShuntingReportsView
           drivers={drivers}
           shifts={shifts}

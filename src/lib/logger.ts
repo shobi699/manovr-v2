@@ -202,8 +202,35 @@ export async function generateDiagnosticReportForAdmin(): Promise<string> {
     }
   }
 
+
   report.push(`---`);
   report.push(`_تهیه شده توسط سیستم عیب‌یابی هوشمند سامانه مانور خط یک متروی تهران_`);
 
   return report.join("\n");
 }
+
+/**
+ * دریافت محتوای کامل یا خلاصه فایل متنی لاگ دیسک جهت دانلود مستقیم
+ */
+export async function getDiagnosticLogFileContent(): Promise<{ content: string; filename: string }> {
+  const filePath = getLogFilePath();
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const filename = `manovr-diagnostics-${dateStr}.log`;
+
+  try {
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, "utf-8");
+      return { content, filename };
+    }
+  } catch {}
+
+  // در صورت نبود فایل روی دیسک، خروجی از لاگ‌های حافظه ساخته می‌شود
+  const fallbackLines = inMemoryLogs.map(
+    (l) => `[${l.timestampJalali}] [${l.level}] [${l.category}] ${l.message}${l.details ? ` | ${l.details}` : ""}`
+  );
+  return {
+    content: fallbackLines.length > 0 ? fallbackLines.join("\n") : "هیچ رویدادی ثبت نشده است.",
+    filename,
+  };
+}
+
